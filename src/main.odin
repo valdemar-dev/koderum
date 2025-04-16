@@ -54,6 +54,7 @@ main :: proc() {
         update_camera()
        
         render()
+
         update_fonts()
     }
 

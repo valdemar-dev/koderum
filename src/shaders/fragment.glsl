@@ -14,7 +14,7 @@ void main() {
 
         float grayscale = texture(firstTexture, TexCoord).r;
 
-        vec4 FinalTexture = vec4(vec3(grayscale), 1.0);
+        vec4 FinalTexture = vec4(vec3(grayscale), Texture.r);
         // vec4 FinalTexture = vec4(Color.x, Color.y, Color.z, Texture.r);
 
         FragColor = FinalTexture;

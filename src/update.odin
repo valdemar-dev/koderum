@@ -9,7 +9,7 @@ import gl "vendor:OpenGL"
 
 @(private="package")
 update_state :: proc(current_time: f64) {
-
+    //add_missing_characters()
 }
 
 @(private="package")

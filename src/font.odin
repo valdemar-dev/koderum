@@ -111,6 +111,9 @@ atlas : []u8
 @(private="package")
 char_rects : [dynamic]rp.Rect = {}
 
+width : i32
+height : i32
+
 @(private="package")
 add_missing_characters :: proc() {
     if len(missing_characters) < 1 {
@@ -168,8 +171,8 @@ add_missing_characters :: proc() {
 
     side := int(math.sqrt(f64(total_area)))
 
-    width := i32(next_power_of_two(max(side, int(side * 2))))
-    height := i32(next_power_of_two(int(max(total_area / width, i32(side * 2)))))
+    width = i32(next_power_of_two(max(side, int(side * 2))))
+    height = i32(next_power_of_two(int(max(total_area / width, i32(side * 2)))))
 
     atlas_size := width * height 
 
@@ -205,12 +208,6 @@ add_missing_characters :: proc() {
         fmt.println("Total area:", total_area)
     }
 
-    /*
-    index := 0
-    for missing_char in missing_characters {        index += 1
-    }
-    */
-
     for font_size,character_map in character_maps {
         for character_code, char in character_map {
             if char == nil {
@@ -245,14 +242,12 @@ add_missing_characters :: proc() {
     char_uv_map_size = vec2{f32(width),f32(height)}
 
     upload_texture_buffer(raw_data(atlas), gl.RED, width, height, font_texture_id)
-
-    fmt.println(char_uv_maps)
-
-    fmt.println(char_rects)
+    /*
     image.write_png(
         "atlas.png",
         width,height,1,raw_data(atlas),width,
     )
+    */
 
     //free_character_buffers()
 }
@@ -273,7 +268,8 @@ try_adding_character :: proc(missing_char: MissingCharacter) {
     character, error_msg := gen_glyph_bitmap(missing_char.char_code, missing_char.font_height)
 
     if error_msg != "" {
-        fmt.println("Char Code:", rune(missing_char.char_code))
+        fmt.println("Char Code:", rune(missing_char.char_code), missing_char.char_code)
+
         fmt.println(error_msg)
     }
 

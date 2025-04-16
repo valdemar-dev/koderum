@@ -7,6 +7,7 @@ import "core:strings"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import "base:runtime"
+import "core:unicode/utf8"
 
 BufferLine :: struct {
     characters: string,
@@ -100,23 +101,37 @@ open_file :: proc(file_name: string) {
 }
 
 remove_char_at_index :: proc(s: string, index: int) -> string {
-    capped_max := min(index + 1, len(s) - 1)
+    runes := utf8.string_to_runes(s)
 
-    return strings.concatenate({s[0:index], s[capped_max:]}) 
-}
-
-insert_char_at_index :: proc(s: string, index: int, c: rune) -> string {
-    if index < 0 || index > len(s) {
+    if index < 0 || index >= len(s) {
         return s
     }
 
-    buf, n := runtime.encode_rune(c) 
 
-    return strings.concatenate({
-        s[0:index],
-        string(buf[0:n]),
-        s[index:],
-    })
+    new_runes := make([dynamic]rune, 0, len(runes) - 1)
+    defer delete(new_runes)
+
+    append_elems(&new_runes, ..runes[0:index])
+    append_elems(&new_runes, ..runes[index+1:])
+
+    return utf8.runes_to_string(new_runes[:])
+}
+
+insert_char_at_index :: proc(s: string, index: int, c: rune) -> string {
+    runes := utf8.string_to_runes(s)
+
+    clamped_index := clamp(index, 0, len(runes))
+
+    new_runes := make([dynamic]rune, 0, len(runes) + 1)
+    defer delete(new_runes)
+    
+    append_elems(&new_runes, ..runes[0:index])
+    append_elem(&new_runes, c)
+    append_elems(&new_runes, ..runes[index:])
+
+    return_string := utf8.runes_to_string(new_runes[:])
+
+    return return_string
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
@@ -196,6 +211,9 @@ insert_into_buffer :: proc (key: rune) {
     line := &buffer[buffer_cursor_line] 
     
     line^.characters = insert_char_at_index(line.characters, buffer_cursor_char_index, key)
+
+    get_char(buffer_font_size, u64(key))
+    add_missing_characters()
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 }
