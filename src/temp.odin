@@ -11,7 +11,21 @@ draw_temp :: proc() {
 
     pen := vec2{100,100}
 
-    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, font_size, "asdf    a")
+    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, 128, "This is REALLY BIG TEXT")
+
+    pen.x = 100
+
+    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, 8, "This is really small text!")
+
+    pen.x = 100
+
+    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, 16, "This is regularly sized text.")
+
+    pen.x = 100
+
+    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, 32, "я люблю есть кошек")
+    pen = add_text(&rect_cache, pen, vec4{1,1,1,1}, 32, "我喜欢吃猫")
+
     draw_rects(&rect_cache)
 
     reset_rect_cache(&rect_cache)

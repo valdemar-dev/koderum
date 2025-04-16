@@ -6,6 +6,17 @@ import gl "vendor:OpenGL"
 import "vendor:glfw"
 import freetype "../../alt-odin-freetype"
 import "core:mem"
+import "base:runtime"
+import "core:math"
+import "core:strings"
+import "core:time"
+import "core:thread"
+
+target_fps :: 60.0
+target_frame_time :: 1.0 / target_fps
+
+second := time.Duration(1_000_000_000)
+
 
 main :: proc() {
     when ODIN_DEBUG {
@@ -33,12 +44,10 @@ main :: proc() {
     init()
 
     for !glfw.WindowShouldClose(window) {
-        update_fonts()
+        process_input()
 
         set_camera_ui()
         set_view_ui()
-
-        process_input()
 
         update_camera()
         

@@ -20,6 +20,8 @@ init :: proc() {
     init_textures()
     init_fonts()
 
+    init_update_thread()
+
     fb_width, fb_height := glfw.GetFramebufferSize(window)
     fb_size = vec2{f32(fb_width), f32(fb_height)}
 
@@ -37,6 +39,12 @@ init_camera :: proc() {
 init_textures :: proc () {
 }
 
+init_update_thread :: proc() {
+    update_thread := thread.create(update)
+
+    thread.start(update_thread)
+}
+
 init_window :: proc() {
     did_succeed := glfw.Init()
 
@@ -44,20 +52,22 @@ init_window :: proc() {
         fmt.println("failed to init glfw")
     }
 
-    primary_monitor := glfw.GetPrimaryMonitor()
-    mode := glfw.GetVideoMode(primary_monitor)
-    
-
-    window = glfw.CreateWindow(mode.width, mode.height, "metropoville", primary_monitor, nil)
-
     glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3)
     glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3)
     glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
     glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
+
+    primary_monitor := glfw.GetPrimaryMonitor()
+    mode := glfw.GetVideoMode(primary_monitor)
+    
+    window = glfw.CreateWindow(mode.width, mode.height, "metropoville", nil, nil)
 
     glfw.SetFramebufferSizeCallback(window, size_callback)
 
     glfw.SetKeyCallback(window, key_callback)
+    glfw.SetCharCallback(window, char_callback)
+
     glfw.SetScrollCallback(window, scroll_callback)
     glfw.SetCursorPosCallback(window, cursor_callback)
     glfw.SetMouseButtonCallback(window, mouse_button_callback)

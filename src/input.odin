@@ -6,6 +6,7 @@ import "core:fmt"
 import "base:runtime"
 import "core:math"
 
+@(private="package")
 ActiveKey :: struct {
     is_down: bool,
     is_pressed: bool,
@@ -22,9 +23,22 @@ Click :: struct {
     pos: vec2,
 }
 
+@(private="package")
+InputMode :: enum {
+    COMMAND,
+    TEXT,
+}
+
+@(private="package")
+input_mode : InputMode = .COMMAND
+
 click_pos := Click{}
 
+@(private="package")
 key_store : map[i32]ActiveKey = {}
+
+@(private="package")
+pressed_chars : [dynamic]rune = {}
 
 @(private="package")
 is_key_down :: proc(key: i32) -> bool {
@@ -40,11 +54,30 @@ is_key_pressed :: proc(key: i32) -> bool {
 process_input :: proc() {
     context = runtime.default_context()
 
-    if is_key_down(glfw.KEY_ESCAPE) {
+    if is_key_down(glfw.KEY_F10) {
         glfw.SetWindowShouldClose(window, true)
     }
 
+    switch input_mode {
+    case .COMMAND:
+        handle_command_input()
+    case .TEXT:
+        handle_text_input()
+    }
+
     set_keypress_states()
+}
+
+@(private="package")
+char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
+    context = runtime.default_context()
+
+    switch input_mode {
+    case .COMMAND:
+        break
+    case .TEXT:
+        insert_into_buffer(key)
+    }
 }
 
 @(private="package")
@@ -57,7 +90,7 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
         }
 
         break
-    case glfw.PRESS: 
+    case glfw.PRESS, glfw.REPEAT: 
         key_store[key] = ActiveKey{
             is_pressed=true,
             is_down=true,
@@ -75,8 +108,6 @@ set_keypress_states :: proc() {
         }
     }
 }
-
-
 
 @(private="package")
 scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) {

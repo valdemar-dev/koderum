@@ -1,0 +1,81 @@
+package main
+
+import "core:fmt"
+
+buffer_cursor_pos := vec2{}
+
+buffer_cursor_line : int
+buffer_cursor_char_index : int
+
+cursor_width : f32
+
+draw_cursor :: proc() {
+    if active_buffer == "" {
+        return
+    }
+
+    char_map := character_maps[buffer_font_size]
+
+    if char_map == nil {
+        return
+    }
+
+    reset_rect_cache(&rect_cache)
+
+    cursor_height := buffer_font_size
+
+    add_rect(&rect_cache,
+        rect{
+            buffer_cursor_pos.x,
+            buffer_cursor_pos.y,
+            5,
+            cursor_height,
+        },
+        no_texture,
+        vec4{1,1,1,1},
+    )
+
+    draw_rects(&rect_cache)
+}
+
+set_buffer_cursor_pos :: proc(line: int, char_index: int) {
+    if active_buffer == "" {
+        return
+    }
+
+    buffer_lines := buffers[active_buffer]
+
+    new_line := buffer_lines[line]
+    characters := new_line.characters
+
+    new_x := buffer_pen_x_start
+
+    last_width : f32 = cursor_width
+
+    buffer_cursor_line = line
+    buffer_cursor_char_index = char_index
+
+    for index in 0..<char_index {
+        if index >= len(characters) {
+            break
+        }
+
+        r := characters[index]
+
+        char := get_char(buffer_font_size, u64(r))
+
+        if char == nil {
+            continue
+        }
+
+        new_x += (char.advance.x / 64) 
+        last_width = (char.advance.x / 64)
+    }
+
+    cursor_width = last_width
+
+    line_height := buffer_font_size * line_height
+
+    buffer_cursor_pos.x = new_x
+    buffer_cursor_pos.y = f32(line) * line_height
+}

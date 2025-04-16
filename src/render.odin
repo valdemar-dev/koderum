@@ -21,7 +21,13 @@ render :: proc() {
     gl.ClearColor(0, 0, 0, 0)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-    draw_temp()
+    gl.UseProgram(shader_id)
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.Uniform1i(first_texture_loc, 0)
+
+    draw_buffer()
+    draw_cursor()
+    draw_ui()
 
     glfw.SwapBuffers(window)
     glfw.PollEvents()
@@ -141,7 +147,7 @@ add_text :: proc(
     max_descent : f32 = 0
 
     for r in text {
-        character := character_map[u64(r)]
+        character := get_char(font_height, u64(r))
 
         if character == nil {
             continue
@@ -162,52 +168,38 @@ add_text :: proc(
         y=pos.y + max_ascent,
     }
 
-    font_scale := font_height / font_size
-
     for r in text {
-        if r == ' ' {
-            sub := character_map[u64('a')]
-
-            if sub == nil {
-                report_missing_character(u64('a'))
-                continue
-            }
-
-            pen.x += (sub.advance.x / 64) * font_scale
-
-            continue
-        }
-
         if r == '\n' {
-            sub := character_map[u64('a')]
-
-            if sub == nil {
-                report_missing_character(u64('a'))
-                continue
-            }
-
             pen.x = pos.x
-            pen.y = pen.y + line_height * font_scale
+            pen.y = pen.y + font_height * line_height
 
             continue
         }
 
+        char_uv_map := char_uv_maps[font_height]
+
+        if char_uv_map == nil {
+            new_map := new(CharUvMap)
+
+            char_uv_maps[font_height] = new_map
+            char_uv_map = new_map
+        }
+        
         uvs := char_uv_map[u64(r)]
-        character := character_map[u64(r)]
+
+        character := get_char(font_height, u64(r))
 
         if character == nil {
-            report_missing_character(u64(r))
-
             continue
         }
 
-        height := f32(character.rows) * font_scale
-        width := f32(character.width) * font_scale
+        height := f32(character.rows)
+        width := f32(character.width)
 
         add_rect(rect_cache,
             rect{
-                pen.x + character.offset.x * font_scale,
-                pen.y - character.offset.y * font_scale,
+                pen.x + character.offset.x,
+                pen.y - character.offset.y,
                 width,
                 height,
             },
@@ -216,8 +208,8 @@ add_text :: proc(
             char_uv_map_size,
         )
 
-        pen.x = pen.x + (character.advance.x / 64) * font_scale
-        pen.y = pen.y + character.advance.y * font_scale
+        pen.x = pen.x + (character.advance.x / 64)
+        pen.y = pen.y + character.advance.y
     }
 
     return pen
