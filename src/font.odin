@@ -131,7 +131,6 @@ add_missing_characters :: proc() {
     max_w : rp.Coord
     max_h : rp.Coord
 
-
     for missing_char in missing_characters {
         char := get_char(missing_char.font_height, missing_char.char_code)
 

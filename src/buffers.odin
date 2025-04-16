@@ -10,7 +10,7 @@ import "base:runtime"
 import "core:unicode/utf8"
 
 BufferLine :: struct {
-    characters: string,
+    characters: []rune,
 }
 
 @(private="package")
@@ -45,7 +45,7 @@ draw_buffer :: proc() {
             pen,
             vec4{1,1,1,1},
             buffer_font_size,
-            chars,
+            utf8.runes_to_string(chars[:]),
         )
 
         pen.y = pen.y + line_height
@@ -76,8 +76,10 @@ open_file :: proc(file_name: string) {
     }
 
     for line in lines { 
+        runes := utf8.string_to_runes(line)
+        
         buffer_line := BufferLine{
-            characters=line,
+            characters=runes,
         }
 
         for r in line {
@@ -100,38 +102,30 @@ open_file :: proc(file_name: string) {
     set_buffer_cursor_pos(0,0)
 }
 
-remove_char_at_index :: proc(s: string, index: int) -> string {
-    runes := utf8.string_to_runes(s)
-
-    if index < 0 || index >= len(s) {
-        return s
+remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
+    if index < 0 || index >= len(runes) {
+        return runes
     }
 
 
     new_runes := make([dynamic]rune, 0, len(runes) - 1)
-    defer delete(new_runes)
 
     append_elems(&new_runes, ..runes[0:index])
     append_elems(&new_runes, ..runes[index+1:])
 
-    return utf8.runes_to_string(new_runes[:])
+    return new_runes[:]
 }
 
-insert_char_at_index :: proc(s: string, index: int, c: rune) -> string {
-    runes := utf8.string_to_runes(s)
-
+insert_char_at_index :: proc(runes: []rune, index: int, c: rune) -> []rune {
     clamped_index := clamp(index, 0, len(runes))
 
     new_runes := make([dynamic]rune, 0, len(runes) + 1)
-    defer delete(new_runes)
     
-    append_elems(&new_runes, ..runes[0:index])
+    append_elems(&new_runes, ..runes[0:clamped_index])
     append_elem(&new_runes, c)
-    append_elems(&new_runes, ..runes[index:])
+    append_elems(&new_runes, ..runes[clamped_index:])
 
-    return_string := utf8.runes_to_string(new_runes[:])
-
-    return return_string
+    return new_runes[:]
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
@@ -161,6 +155,10 @@ handle_text_input :: proc() {
     char_index := buffer_cursor_char_index
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
+        if char_index > len(line.characters) {
+            char_index = len(line.characters)
+        }
+
         target := char_index - 1
         
         if target < 0 {
@@ -171,10 +169,13 @@ handle_text_input :: proc() {
             prev_line := &buffer[buffer_cursor_line-1]
             prev_line_len := len(prev_line.characters)
 
-            prev_line^.characters = strings.concatenate({
-                prev_line.characters,
-                line.characters,
-            })
+
+            new_runes := make([dynamic]rune)
+            
+            append_elems(&new_runes, ..prev_line.characters)
+            append_elems(&new_runes, ..line.characters)
+
+            prev_line^.characters = new_runes[:]
 
             ordered_remove(buffer, buffer_cursor_line)
             set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
