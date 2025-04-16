@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 
 buffer_cursor_pos := vec2{}
+buffer_cursor_target_pos := vec2{}
 
 buffer_cursor_line : int
 buffer_cursor_char_index : int
@@ -74,8 +75,14 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     cursor_width = last_width
 
-    line_height := buffer_font_size * line_height
+    line_height := buffer_font_size * line_height 
 
-    buffer_cursor_pos.x = new_x
-    buffer_cursor_pos.y = f32(line) * line_height
+    buffer_cursor_target_pos.x = new_x
+    buffer_cursor_target_pos.y = f32(line) * line_height
+}
+
+@(private="package")
+tick_buffer_cursor :: proc() {
+    buffer_cursor_pos.x = smooth_lerp(buffer_cursor_pos.x, buffer_cursor_target_pos.x, 30, frame_time)
+    buffer_cursor_pos.y = smooth_lerp(buffer_cursor_pos.y, buffer_cursor_target_pos.y, 30, frame_time)
 }

@@ -9,7 +9,7 @@ import gl "vendor:OpenGL"
 
 @(private="package")
 update_state :: proc(current_time: f64) {
-    update_fonts()
+
 }
 
 @(private="package")

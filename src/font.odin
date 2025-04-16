@@ -13,6 +13,9 @@ import image "vendor:stb/image"
 import "core:c"
 
 @(private="package")
+rect_pack_glyp_padding : f32 = 16
+
+@(private="package")
 font_size : f32 = 16
 
 @(private="package")
@@ -26,7 +29,6 @@ faces : [dynamic]ft.Face = {}
 
 @(private="package")
 font_texture_id : u32
-
 
 MissingCharacterMap :: map[u64]bool
 
@@ -58,7 +60,7 @@ FontSize :: f32
 CharacterCode :: u64
 
 @(private="package")
-CharUvMap :: map[CharacterCode]rect
+CharUvMap :: map[CharacterCode]int
 
 @(private="package")
 char_uv_maps : map[FontSize]^CharUvMap
@@ -92,7 +94,7 @@ load_font :: proc(path: cstring) -> ft.Face {
 load_all_fonts :: proc() {
     // lower index higher importance
     font_list : []cstring = {
-        "/usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFontMono-Regular.ttf"
+        "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
     }
 
     for font in font_list {
@@ -102,7 +104,12 @@ load_all_fonts :: proc() {
     }
 }
 
-ctx: rp.Context
+total_area: i32 = 0
+
+atlas : []u8
+
+@(private="package")
+char_rects : [dynamic]rp.Rect = {}
 
 @(private="package")
 add_missing_characters :: proc() {
@@ -118,39 +125,45 @@ add_missing_characters :: proc() {
         try_adding_character(missing_char)
     }
 
-    clear(&missing_characters)
-
-    char_rects : [dynamic]rp.Rect = {}
-    defer delete(char_rects)
-
-    total_area: i32 = 0
-
     max_w : rp.Coord
     max_h : rp.Coord
 
-    for font_size,character_map in character_maps {
-        glyph_padding : f32 = font_size / 2
 
-        characters := character_map
+    for missing_char in missing_characters {
+        char := get_char(missing_char.font_height, missing_char.char_code)
 
-        for character,bitmap in characters {
-            rect := rp.Rect{
-                w=rp.Coord(bitmap.width) + rp.Coord(glyph_padding),
-                h=rp.Coord(bitmap.rows) + rp.Coord(glyph_padding),
-            }
-
-            if rect.w > max_w {
-                max_w = rect.w
-            }
-
-            if rect.h > max_h {
-                max_h = rect.h
-            }
-
-            append_elem(&char_rects, rect)
-
-            total_area += i32(rect.w * rect.h)
+        // some chars didnt get added probably
+        if char == nil {
+            continue
         }
+
+        char_rect := rp.Rect{
+            w=rp.Coord(char.width) + rp.Coord(rect_pack_glyp_padding),
+            h=rp.Coord(char.rows) + rp.Coord(rect_pack_glyp_padding),
+        }
+
+        if char_rect.w > max_w {
+            max_w = char_rect.w
+        }
+
+        if char_rect.h > max_h {
+            max_h = char_rect.h
+        }
+
+        append_elem(&char_rects, char_rect)
+
+        char_uv_map := char_uv_maps[missing_char.font_height]
+
+        if char_uv_map == nil {
+            new_map := new(CharUvMap)
+
+            char_uv_maps[missing_char.font_height] = new_map
+            char_uv_map = new_map
+        }
+        
+        char_uv_map[missing_char.char_code] = len(char_rects) - 1
+
+        total_area += i32(char_rect.w * char_rect.h)
     }
 
     side := int(math.sqrt(f64(total_area)))
@@ -158,10 +171,24 @@ add_missing_characters :: proc() {
     width := i32(next_power_of_two(max(side, int(side * 2))))
     height := i32(next_power_of_two(int(max(total_area / width, i32(side * 2)))))
 
-    num_nodes := width * 2
+    atlas_size := width * height 
+
+    has_atlas_grown := int(atlas_size) != len(atlas)
+
+    if has_atlas_grown {
+        atlas = make([]u8, width * height)
+
+        when ODIN_DEBUG {
+            fmt.println("Atlas resized to:", atlas_size)
+        }
+    }
+
+    num_nodes := width
 
     nodes := make([]rp.Node, num_nodes)
     defer delete(nodes)
+
+    ctx: rp.Context
 
     rp.init_target(&ctx, width, height, &nodes[0], i32(num_nodes))
 
@@ -172,103 +199,62 @@ add_missing_characters :: proc() {
     )
 
     when ODIN_DEBUG {
-        fmt.println("Success? ", success == 1)
+        fmt.println("Success:", success == 1)
         fmt.println("WH:", width, height)
         fmt.println("Side:", side)
         fmt.println("Total area:", total_area)
     }
 
+    /*
     index := 0
+    for missing_char in missing_characters {        index += 1
+    }
+    */
 
     for font_size,character_map in character_maps {
-        for character_code,character in character_map {
-            char_rect := char_rects[index]
+        for character_code, char in character_map {
+            if char == nil {
+                continue
+            }
 
             char_uv_map := char_uv_maps[font_size]
+            index := char_uv_map[character_code]
 
-            if char_uv_map == nil {
-                new_map := new(CharUvMap)
+            char_rect := char_rects[index]
 
-                char_uv_maps[font_size] = new_map
-                char_uv_map = new_map
-            }
-            
-            char_uv_map[character_code] = rect{
-                x=f32(char_rect.x),
-                y=f32(char_rect.y),
-                width=f32(character.width),
-                height=f32(character.rows),
-            }
-
-            index += 1
-        }
-    }
-    
-    atlas := make([]u8, width * height)
-    defer delete(atlas)
-
-    index = 0
-    for font_size,character_map in character_maps {
-        for character_code, character in character_map {
-            rect := char_rects[index]
-
-            if rect.was_packed == false {
-                fmt.println("Skipping char", character_code, "— not packed properly")
-                continue
-            }
-
-            index += 1
-
-            x := i32(rect.x)
-            y := i32(rect.y)
-            w := i32(character.width)
-            h := i32(character.rows)
-            pitch := character.pitch
-
-            if x < 0 || y < 0 || w <= 0 || h <= 0 || pitch <= 0 {
-                continue
-            }
+            x := i32(char_rect.x)
+            y := i32(char_rect.y)
+            w := i32(char.width)
+            h := i32(char.rows)
+            pitch := char.pitch
 
             for row in 0..<h {
                 src_offset := row * pitch
                 dst_offset := (y + row) * width + x
 
-                if dst_offset < 0 || dst_offset + w > i32(len(atlas)) || src_offset + w > i32(character.buffer_len) {
-                    fmt.println("Skipping char:", character_code, 
-                        "row:", row,
-                        "src_offset:", src_offset,
-                        "dst_offset:", dst_offset,
-                        "w:", w,
-                        "pitch:", character.pitch,
-                        "rows:", character.rows,
-                        "buffer_len:", character.buffer_len)
-                    break
-
-                }
-
-                copy(atlas[dst_offset:dst_offset+w], character.buffer[src_offset:src_offset+w])
+                copy(
+                    atlas[dst_offset:dst_offset+i32(w)],
+                    char.buffer[src_offset:src_offset+i32(w)],
+                )
             }
         }
     }
 
+    clear(&missing_characters)
+
     char_uv_map_size = vec2{f32(width),f32(height)}
 
-    gl.ActiveTexture(gl.TEXTURE0)
-    font_texture_id_result, ok := upload_texture_buffer(raw_data(atlas), gl.RED, width, height)
+    upload_texture_buffer(raw_data(atlas), gl.RED, width, height, font_texture_id)
 
-    if !ok {
-        fmt.println("Failed to upload font texture buffer.")
-        return
-    }
+    fmt.println(char_uv_maps)
 
-    font_texture_id = font_texture_id_result
-
+    fmt.println(char_rects)
     image.write_png(
         "atlas.png",
         width,height,1,raw_data(atlas),width,
     )
 
-    free_character_buffers()
+    //free_character_buffers()
 }
 
 try_adding_character :: proc(missing_char: MissingCharacter) {
@@ -284,18 +270,10 @@ try_adding_character :: proc(missing_char: MissingCharacter) {
         return
     }
 
-    when ODIN_DEBUG {
-        fmt.println(
-            "Attempting to add character",
-            rune(missing_char.char_code),
-            "with font height:",
-            missing_char.font_height,
-        )
-    }
-
     character, error_msg := gen_glyph_bitmap(missing_char.char_code, missing_char.font_height)
 
     if error_msg != "" {
+        fmt.println("Char Code:", rune(missing_char.char_code))
         fmt.println(error_msg)
     }
 
@@ -391,7 +369,10 @@ report_missing_character :: proc(char_code: u64, font_height: f32) {
 
     if known_non_existing_chars == nil {
         new_map := new(MissingCharacterMap)
-        fmt.println("Added missing char map for font_height:", font_height)
+
+        when ODIN_DEBUG {
+            fmt.println("Added missing char map for font_height:", font_height)
+        }
 
         known_non_existing_char_maps[font_height] = new_map
         known_non_existing_chars = new_map
@@ -399,10 +380,6 @@ report_missing_character :: proc(char_code: u64, font_height: f32) {
 
     if char_code in known_non_existing_chars {
         return
-    }
-
-    when ODIN_DEBUG {
-        fmt.println("Chararacter", rune(char_code), "was reported missing for font height", font_height)
     }
 
     char := MissingCharacter{
@@ -459,6 +436,7 @@ clear_fonts :: proc() {
 
     delete(faces)
     delete(missing_characters)
+    delete(char_rects)
 
     delete(known_non_existing_char_maps)
 }

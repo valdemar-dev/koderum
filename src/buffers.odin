@@ -70,7 +70,9 @@ open_file :: proc(file_name: string) {
 
     buffer_lines := new([dynamic]BufferLine)
 
-    fmt.println("Validating buffer lines")
+    when ODIN_DEBUG {
+        fmt.println("Validating buffer lines")
+    }
 
     for line in lines { 
         buffer_line := BufferLine{
@@ -88,7 +90,9 @@ open_file :: proc(file_name: string) {
 
     active_buffer = file_name
 
-    fmt.println("Updating fonts for buffer")
+    when ODIN_DEBUG {
+        fmt.println("Updating fonts for buffer")
+    }
 
     update_fonts()
 
@@ -96,11 +100,9 @@ open_file :: proc(file_name: string) {
 }
 
 remove_char_at_index :: proc(s: string, index: int) -> string {
-    if index < 0 || index >= len(s) {
-        return s
-    }
+    capped_max := min(index + 1, len(s) - 1)
 
-    return strings.concatenate({s[0:index], s[index+1:]}) 
+    return strings.concatenate({s[0:index], s[capped_max:]}) 
 }
 
 insert_char_at_index :: proc(s: string, index: int, c: rune) -> string {
@@ -141,10 +143,7 @@ handle_text_input :: proc() {
 
     line := &buffer[buffer_cursor_line] 
     
-    char_index := min(
-        buffer_cursor_char_index,
-        len(line.characters)-1,
-    )
+    char_index := buffer_cursor_char_index
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         target := char_index - 1
@@ -196,12 +195,7 @@ insert_into_buffer :: proc (key: rune) {
 
     line := &buffer[buffer_cursor_line] 
     
-    char_index := min(
-        buffer_cursor_char_index,
-        len(line.characters)-1,
-    )
-
-    line^.characters = insert_char_at_index(line.characters, char_index, key)
+    line^.characters = insert_char_at_index(line.characters, buffer_cursor_char_index, key)
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 }

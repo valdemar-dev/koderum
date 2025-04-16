@@ -16,6 +16,8 @@ frame_time : f32
 @(private="package")
 rect_cache := RectCache{}
 
+prev_time : f64
+
 @(private="package")
 render :: proc() {
     gl.ClearColor(0, 0, 0, 0)
@@ -24,6 +26,16 @@ render :: proc() {
     gl.UseProgram(shader_id)
     gl.ActiveTexture(gl.TEXTURE0)
     gl.Uniform1i(first_texture_loc, 0)
+
+    gl.Enable(gl.BLEND)
+    gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+
+
+    time := glfw.GetTime()
+
+    frame_time = f32(time - prev_time)
+
+    prev_time = time
 
     draw_buffer()
     draw_cursor()
@@ -143,25 +155,7 @@ add_text :: proc(
     font_height: f32,
     text: string,
 ) -> vec2 {
-    max_ascent : f32 = 0
-    max_descent : f32 = 0
-
-    for r in text {
-        character := get_char(font_height, u64(r))
-
-        if character == nil {
-            continue
-        }
-
-        if character.offset.y > max_ascent {
-            max_ascent = character.offset.y
-        }
-
-        descent := f32(character.rows) - character.offset.y
-        if descent > max_descent {
-            max_descent = descent
-        }
-    }
+    max_ascent : f32 = font_height
 
     pen := vec2{
         x=pos.x,
@@ -184,15 +178,16 @@ add_text :: proc(
             char_uv_maps[font_height] = new_map
             char_uv_map = new_map
         }
-        
-        uvs := char_uv_map[u64(r)]
 
         character := get_char(font_height, u64(r))
 
         if character == nil {
             continue
         }
-
+        
+        uvs_index := char_uv_map[u64(r)]
+        uvs := char_rects[uvs_index]
+      
         height := f32(character.rows)
         width := f32(character.width)
 
@@ -203,7 +198,12 @@ add_text :: proc(
                 width,
                 height,
             },
-            uvs,
+            rect{
+                f32(uvs.x),
+                f32(uvs.y),
+                f32(uvs.w) - rect_pack_glyp_padding,
+                f32(uvs.h) - rect_pack_glyp_padding,
+            },
             tint,
             char_uv_map_size,
         )

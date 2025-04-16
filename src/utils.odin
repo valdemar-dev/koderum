@@ -56,3 +56,7 @@ next_power_of_two :: proc(n: int) -> int {
     for p < n do p *= 2
     return p
 }
+
+smooth_lerp :: proc(current, target, smoothing_factor: f32, frame_time: f32) -> f32 {
+    return current + (target - current) * (1 - math.pow(2.71828, -smoothing_factor * frame_time))
+}   

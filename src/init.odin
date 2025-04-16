@@ -123,7 +123,6 @@ init_opengl :: proc() {
     projection_loc = gl.GetUniformLocation(prog_id, "cameraProjection")
     view_loc = gl.GetUniformLocation(prog_id, "cameraView")
     first_texture_loc = gl.GetUniformLocation(prog_id, "firstTexture")
-    world_tint_loc = gl.GetUniformLocation(prog_id, "worldTint")
 
     gl.BindVertexArray(vao)
     gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
@@ -140,4 +139,8 @@ init_opengl :: proc() {
     gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 
     fmt.println("Shader Uniform Locations:",projection_loc,view_loc,first_texture_loc)
+
+    gl.GenTextures(1, &font_texture_id)
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.BindTexture(gl.TEXTURE_2D, font_texture_id)
 }

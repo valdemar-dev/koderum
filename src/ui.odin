@@ -18,5 +18,18 @@ draw_ui :: proc() {
         colour_bg_lighter,
     )
 
+    text_pos := vec2{
+        bottom_bar_rect.x,
+        bottom_bar_rect.y,
+    }
+
+    add_text(&rect_cache,
+        text_pos,
+        vec4{1,1,1,1},
+        20,
+        "hi"
+    )
+
+
     draw_rects(&rect_cache)
 }

@@ -48,10 +48,13 @@ main :: proc() {
 
         set_camera_ui()
         set_view_ui()
+        
+        tick_buffer_cursor()
 
         update_camera()
-        
+       
         render()
+        update_fonts()
     }
 
     clear_fonts()
