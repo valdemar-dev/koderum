@@ -28,7 +28,7 @@ draw_cursor :: proc() {
     add_rect(&rect_cache,
         rect{
             buffer_cursor_pos.x,
-            buffer_cursor_pos.y,
+            buffer_cursor_pos.y - buffer_scroll_position,
             5,
             cursor_height,
         },

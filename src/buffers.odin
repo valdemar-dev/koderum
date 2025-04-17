@@ -26,6 +26,9 @@ buffer_font_size : f32 = 32
 active_buffer : string
 
 @(private="package")
+buffer_scroll_position : f32
+
+@(private="package")
 draw_buffer :: proc() {
     if active_buffer == "" {
         return
@@ -42,7 +45,10 @@ draw_buffer :: proc() {
 
         add_text(
             &rect_cache,
-            pen,
+            vec2{
+                pen.x,
+                pen.y - buffer_scroll_position,
+            },
             vec4{1,1,1,1},
             buffer_font_size,
             utf8.runes_to_string(chars[:]),
@@ -219,6 +225,50 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 }
 
+move_up :: proc() {
+    buffer := buffers[active_buffer]
+
+    if buffer_cursor_line > 0 {
+        set_buffer_cursor_pos(
+            buffer_cursor_line-1,
+            buffer_cursor_char_index,
+        )
+
+        if (buffer_cursor_target_pos.y - buffer_scroll_position) < 0 {
+            buffer_scroll_position -= buffer_font_size
+        }
+    }
+}
+
+move_down :: proc() {
+    buffer := &buffers[active_buffer]
+
+    if buffer == nil {
+        return
+    }
+
+    if buffer_cursor_line < len(buffer^) - 1 {
+        new_index := buffer_cursor_line+1
+
+        set_buffer_cursor_pos(
+            new_index,
+            buffer_cursor_char_index,
+        )
+
+        if (buffer_cursor_target_pos.y - buffer_scroll_position) >= (fb_size.y - 100) {
+            buffer_scroll_position += buffer_font_size
+        }
+    }
+}
+
+scroll_down :: proc() {
+    buffer_scroll_position += ((buffer_font_size * line_height) * 20) * frame_time
+}
+
+scroll_up :: proc() {
+    buffer_scroll_position -= ((buffer_font_size * line_height) * 20) * frame_time
+}
+
 @(private="package")
 handle_command_input :: proc() {
     if is_key_pressed(glfw.KEY_O) {
@@ -233,34 +283,35 @@ handle_command_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_J) {
-        buffer := &buffers[active_buffer]
 
-        if buffer == nil {
+    if is_key_down(glfw.KEY_J) {
+        key := key_store[glfw.KEY_J]
+
+        if key.modifiers == 1 {
+            scroll_down()
+
             return
         }
+    }
 
-        if buffer_cursor_line < len(buffer^) - 1 {
-            new_index := buffer_cursor_line+1
-
-            set_buffer_cursor_pos(
-                new_index,
-                buffer_cursor_char_index,
-            )
-        }
+    if is_key_pressed(glfw.KEY_J) {
+        move_down()
 
         return
     }
 
-    if is_key_pressed(glfw.KEY_K) {
-        buffer := buffers[active_buffer]
+    if is_key_down(glfw.KEY_K) {
+        key := key_store[glfw.KEY_K]
 
-        if buffer_cursor_line > 0 {
-            set_buffer_cursor_pos(
-                buffer_cursor_line-1,
-                buffer_cursor_char_index,
-            )
+        if key.modifiers == 1 {
+            scroll_up()
+
+            return
         }
+    }
+
+    if is_key_pressed(glfw.KEY_K) {
+        move_up()
 
         return
     }

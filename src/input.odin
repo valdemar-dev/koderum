@@ -10,6 +10,7 @@ import "core:math"
 ActiveKey :: struct {
     is_down: bool,
     is_pressed: bool,
+    modifiers: i32,
 }
 
 @(private="package")
@@ -87,6 +88,7 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
         key_store[key] = ActiveKey{
             is_down=false,
             is_pressed=false,
+            modifiers=mods,
         }
 
         break
@@ -94,6 +96,7 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
         key_store[key] = ActiveKey{
             is_pressed=true,
             is_down=true,
+            modifiers=mods,
         }
 
         break
@@ -105,6 +108,7 @@ set_keypress_states :: proc() {
         active_key = ActiveKey{
             is_down=active_key.is_down,
             is_pressed=false,
+            modifiers=active_key.modifiers,
         }
     }
 }
