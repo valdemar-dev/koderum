@@ -20,7 +20,7 @@ buffers : map[string]^[dynamic]BufferLine
 buffer_pen_x_start : f32 = 20
 
 @(private="package")
-buffer_font_size : f32 = 32
+buffer_font_size : f32 = 20
 
 @(private="package")
 active_buffer : string
@@ -225,6 +225,20 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 }
 
+constrain_scroll_to_cursor :: proc() {
+    amnt_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position)
+
+    if amnt_offscreen < 0 {
+        buffer_scroll_position -= -amnt_offscreen
+    }
+
+    amnt_offscreen = (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - 100)
+
+    if amnt_offscreen >= 0 {
+        buffer_scroll_position += amnt_offscreen
+    }
+}
+
 move_up :: proc() {
     buffer := buffers[active_buffer]
 
@@ -233,11 +247,9 @@ move_up :: proc() {
             buffer_cursor_line-1,
             buffer_cursor_char_index,
         )
-
-        if (buffer_cursor_target_pos.y - buffer_scroll_position) < 0 {
-            buffer_scroll_position -= buffer_font_size
-        }
     }
+
+    constrain_scroll_to_cursor()
 }
 
 move_down :: proc() {
@@ -254,11 +266,9 @@ move_down :: proc() {
             new_index,
             buffer_cursor_char_index,
         )
-
-        if (buffer_cursor_target_pos.y - buffer_scroll_position) >= (fb_size.y - 100) {
-            buffer_scroll_position += buffer_font_size
-        }
     }
+
+    constrain_scroll_to_cursor()
 }
 
 scroll_down :: proc() {
