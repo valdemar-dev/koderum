@@ -422,14 +422,14 @@ clear_fonts :: proc() {
     fmt.println("Char Maps Array:", character_maps_array)
 
     for size,index in character_maps {
-        character_map := &character_maps_array[index]
+        character_map := character_maps_array[index]
 
         for char_code, character in character_map {
             delete(character.buffer)
             free(character)
         }
 
-        //delete(character_map^)
+        delete(character_map)
     }
 
     for size,index in char_uv_maps {
