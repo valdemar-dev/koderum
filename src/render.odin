@@ -30,7 +30,6 @@ render :: proc() {
     gl.Enable(gl.BLEND)
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-
     time := glfw.GetTime()
 
     frame_time = f32(time - prev_time)

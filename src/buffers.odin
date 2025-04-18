@@ -20,13 +20,16 @@ buffers : map[string]^[dynamic]BufferLine
 buffer_pen_x_start : f32 = 20
 
 @(private="package")
-buffer_font_size : f32 = 20
+buffer_font_size : f32 = 16
 
 @(private="package")
 active_buffer : string
 
 @(private="package")
 buffer_scroll_position : f32
+
+@(private="package")
+buffer_horizontal_scroll_position : f32
 
 @(private="package")
 draw_buffer :: proc() {
@@ -49,7 +52,7 @@ draw_buffer :: proc() {
         add_text(
             &rect_cache,
             vec2{
-                pen.x,
+                pen.x - buffer_horizontal_scroll_position,
                 pen.y - buffer_scroll_position,
             },
             vec4{1,1,1,1},
@@ -229,16 +232,28 @@ insert_into_buffer :: proc (key: rune) {
 }
 
 constrain_scroll_to_cursor :: proc() {
-    amnt_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position)
+    amnt_above_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position)
 
-    if amnt_offscreen < 0 {
-        buffer_scroll_position -= -amnt_offscreen
+    if amnt_above_offscreen < 0 {
+        buffer_scroll_position -= -amnt_above_offscreen 
     }
 
-    amnt_offscreen = (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - 100)
+    amnt_below_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - 100)
 
-    if amnt_offscreen >= 0 {
-        buffer_scroll_position += amnt_offscreen
+    if amnt_below_offscreen >= 0 {
+        buffer_scroll_position += amnt_below_offscreen 
+    }
+
+    amnt_left_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position)
+
+    if amnt_left_offscreen < 0 {
+        buffer_horizontal_scroll_position -= -amnt_left_offscreen 
+    }
+
+    amnt_right_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position) - (fb_size.x - 100)
+
+    if amnt_right_offscreen >= 0 {
+        buffer_horizontal_scroll_position += amnt_right_offscreen 
     }
 }
 
@@ -249,6 +264,38 @@ move_up :: proc() {
         set_buffer_cursor_pos(
             buffer_cursor_line-1,
             buffer_cursor_char_index,
+        )
+    }
+
+    constrain_scroll_to_cursor()
+}
+
+move_left :: proc() {
+    buffer := buffers[active_buffer]
+
+    if buffer_cursor_char_index > 0 {
+        line := buffer[buffer_cursor_line]
+
+        new := min(buffer_cursor_char_index - 1, len(line.characters)-1)
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            new,
+        )
+    }
+
+    constrain_scroll_to_cursor()
+}
+
+move_right :: proc() {
+    buffer := buffers[active_buffer]
+
+    line := buffer[buffer_cursor_line]
+
+    if buffer_cursor_char_index < len(line.characters) {
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index + 1,
         )
     }
 
@@ -330,33 +377,13 @@ handle_command_input :: proc() {
     }
 
     if is_key_pressed(glfw.KEY_D) {
-        buffer := buffers[active_buffer]
-
-        if buffer_cursor_char_index > 0 {
-            line := buffer[buffer_cursor_line]
-
-            new := min(buffer_cursor_char_index - 1, len(line.characters)-1)
-
-            set_buffer_cursor_pos(
-                buffer_cursor_line,
-                new,
-            )
-        }
+        move_left()
 
         return
     }
 
     if is_key_pressed(glfw.KEY_F) {
-        buffer := buffers[active_buffer]
-
-        line := buffer[buffer_cursor_line]
-
-        if buffer_cursor_char_index < len(line.characters) {
-            set_buffer_cursor_pos(
-                buffer_cursor_line,
-                buffer_cursor_char_index + 1,
-            )
-        }
+        move_right()
 
         return
     }

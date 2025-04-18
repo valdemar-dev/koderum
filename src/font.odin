@@ -16,7 +16,7 @@ import "core:c"
 rect_pack_glyp_padding : f32 = 16
 
 @(private="package")
-font_size : f32 = 16
+font_size : f32 = 20
 
 @(private="package")
 line_height : f32 = 1.2
@@ -98,8 +98,8 @@ load_font :: proc(path: cstring) -> ft.Face {
 load_all_fonts :: proc() {
     // lower index higher importance
     font_list : []cstring = {
-        //"/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-        "/usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf",
+        "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
+        //"/usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf",
     }
 
     for font in font_list {
@@ -250,7 +250,9 @@ add_missing_characters :: proc() {
 
     upload_texture_buffer(raw_data(atlas), gl.RED, width, height, font_texture_id)
 
-    fmt.println("Success! Added missing characters:", missing_characters)
+    when ODIN_DEBUG {
+        fmt.println("Success! Added missing characters:", missing_characters)
+    }
 
     clear(&missing_characters)
 
@@ -317,12 +319,17 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     error = ft.set_pixel_sizes(face, 0, u32(font_size))
     if error != .Ok do return nil, "failed to set glyph pixel size"
-    
-    error = ft.load_glyph(face, glyph_index, ft.Load_Flags{})
+
+    load_flags := ft.Load_Flags{
+        .Force_Autohint,
+        .Load_Target_Light,
+    }
+
+    error = ft.load_glyph(face, glyph_index, load_flags)
     if error != .Ok {
         return nil, "failed to load glyph"
     }
-    
+
     error = ft.render_glyph(face.glyph, ft.Render_Mode.Normal)
     if error != .Ok {
         return nil, "Failed to render glyph"
@@ -330,7 +337,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     orig_bmp := face.glyph.bitmap
 
-    if orig_bmp.pixel_mode != 2 {
+    if orig_bmp.pixel_mode != 2 { // 2 = FT_PIXEL_MODE_GRAY
         return nil, "Wrong pixel mode"
     }
 
@@ -345,7 +352,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     mem.copy(raw_data(new_buffer), raw_data(buffer_slice), size)
 
-    char := new(Character)
+    char := new(Character, context.allocator)
 
     char^ = Character{
         buffer=new_buffer,
@@ -418,15 +425,15 @@ free_character_buffers :: proc() {
 
 @(private="package")
 clear_fonts :: proc() {
-    fmt.println("Char Maps:", character_maps)
-    fmt.println("Char Maps Array:", character_maps_array)
-
     for size,index in character_maps {
         character_map := character_maps_array[index]
 
         for char_code, character in character_map {
             delete(character.buffer)
-            free(character)
+
+            if character != nil {
+                free(character, context.allocator)
+            }
         }
 
         delete(character_map)
