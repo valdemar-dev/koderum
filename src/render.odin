@@ -87,7 +87,6 @@ normalize_to_texture_coords :: proc(texture_rect: rect, atlas_size: vec2) -> [4]
     return result
 }
 
-
 add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4, atlas_size := vec2{512,512}, z_pos : f32 = 0, invert_x : bool = false) {
     rectangle := rect{
         input_rect.x,
@@ -145,6 +144,47 @@ add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4
 
     cache^.raw_vertices = raw_data(cache.vertices)
     cache^.raw_indices = raw_data(cache.indices)
+}
+
+measure_text :: proc (
+    font_height: f32,
+    text: string,
+) -> vec2 {
+    max_ascent : f32 = font_height
+
+    highest := vec2{
+        y=max_ascent,
+    }
+
+    pen := highest
+
+    for r,i in text {
+        if r == '\n' {
+            pen.x = 0
+            pen.y = pen.y + font_height * line_height
+
+            continue
+        }
+
+        character := get_char(font_height, u64(r))
+
+        if character == nil {
+            continue
+        }
+
+        pen.x = pen.x + (character.advance.x / 64)
+        pen.y = pen.y + character.advance.y
+
+        if pen.x > highest.x {
+            highest.x = pen.x
+        }
+
+        if pen.y > highest.y {
+            highest.y = pen.y
+        }
+    }
+
+    return pen
 }
 
 add_text :: proc(

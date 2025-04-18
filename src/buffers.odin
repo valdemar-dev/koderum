@@ -8,22 +8,28 @@ import gl "vendor:OpenGL"
 import "vendor:glfw"
 import "base:runtime"
 import "core:unicode/utf8"
+import "core:strconv"
 
 BufferLine :: struct {
     characters: []rune,
 }
 
 @(private="package")
-buffers : map[string]^[dynamic]BufferLine
+do_draw_line_count := true
+
+Buffer :: struct {
+    lines: ^[dynamic]BufferLine,
+    x_offset: f32,
+}
 
 @(private="package")
-buffer_pen_x_start : f32 = 20
+buffers : map[string]^Buffer
 
 @(private="package")
-buffer_font_size : f32 = 32
+buffer_font_size : f32 = 16
 
 @(private="package")
-active_buffer : string
+active_buffer : ^Buffer
 
 @(private="package")
 buffer_scroll_position : f32
@@ -31,30 +37,88 @@ buffer_scroll_position : f32
 @(private="package")
 buffer_horizontal_scroll_position : f32
 
+sb := strings.builder_make()
+
 @(private="package")
 draw_buffer :: proc() {
     if active_buffer == "" {
         return
     }
 
-    buffer := buffers[active_buffer]
+    buffer_lines := buffers[active_buffer]
 
-    pen := vec2{buffer_pen_x_start,0}
+    pen := vec2{0,0}
 
     line_height := buffer_font_size * 1.2
 
-    for buffer_line in buffer {
+    strings.builder_reset(&sb)
+    strings.write_int(&sb, len(buffer_lines))
+
+    highest_line_string := strings.to_string(sb)
+
+    max_line_size := measure_text(buffer_font_size, highest_line_string)
+
+    if do_draw_line_count {
+        add_rect(&rect_cache,
+            rect{
+                0,
+                0 - buffer_scroll_position,
+                max_line_size.x,
+                f32(len(buffer_lines)) * (line_height),
+            },
+            no_texture,
+            vec4{0.1,0,0,1},
+        )
+    }
+
+    line_buffer := make([dynamic]byte, len(buffer_lines))
+    defer delete(line_buffer)
+    
+    for buffer_line, index in buffer_lines {
+        line_pos := vec2{
+            pen.x - buffer_horizontal_scroll_position,
+            pen.y - buffer_scroll_position,
+        }
+
+        if do_draw_line_count {
+            line_pos.x += (max_line_size.x) + (buffer_font_size * .5)
+        }
+
+        if line_pos.y > fb_size.y {
+            break
+        }
+
+        if line_pos.y < 0 {
+            pen.y = pen.y + line_height
+
+            continue
+        }
+
         chars := buffer_line.characters
 
         string := utf8.runes_to_string(chars[:])
         defer delete(string)
 
+        if do_draw_line_count {
+            line_pos := vec2{
+                pen.x,
+                pen.y - buffer_scroll_position
+            }
+
+            line_string := strconv.itoa(line_buffer[:], index)
+
+            add_text(&rect_cache,
+                line_pos,
+                vec4{1,1,1,1},
+                buffer_font_size,
+                line_string
+            )
+
+        }
+
         add_text(
             &rect_cache,
-            vec2{
-                pen.x - buffer_horizontal_scroll_position,
-                pen.y - buffer_scroll_position,
-            },
+            line_pos,
             vec4{1,1,1,1},
             buffer_font_size,
             string,
@@ -203,8 +267,10 @@ handle_text_input :: proc() {
     } 
 
     if is_key_pressed(glfw.KEY_ENTER) {
-        after_cursor := line.characters[buffer_cursor_char_index:]
-        before_cursor := line.characters[:buffer_cursor_char_index] 
+        index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+
+        after_cursor := line.characters[index:]
+        before_cursor := line.characters[:index] 
 
         line^.characters = before_cursor
 
@@ -229,6 +295,8 @@ insert_into_buffer :: proc (key: rune) {
     add_missing_characters()
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
+
+    constrain_scroll_to_cursor()
 }
 
 constrain_scroll_to_cursor :: proc() {

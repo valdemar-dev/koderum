@@ -50,7 +50,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     new_line := buffer_lines[line]
     characters := new_line.characters
 
-    new_x := buffer_pen_x_start
+    new_x : f32 = 0
 
     last_width : f32 = cursor_width
 
