@@ -162,21 +162,12 @@ add_text :: proc(
         y=pos.y + max_ascent,
     }
 
-    for r in text {
+    for r,i in text {
         if r == '\n' {
             pen.x = pos.x
             pen.y = pen.y + font_height * line_height
 
             continue
-        }
-
-        char_uv_map := char_uv_maps[font_height]
-
-        if char_uv_map == nil {
-            new_map := new(CharUvMap)
-
-            char_uv_maps[font_height] = new_map
-            char_uv_map = new_map
         }
 
         character := get_char(font_height, u64(r))
@@ -185,6 +176,14 @@ add_text :: proc(
             continue
         }
         
+        if font_height in char_uv_maps == false {
+            continue
+        }
+
+        index := char_uv_maps[font_height]
+
+        char_uv_map := char_uv_maps_array[index]
+
         uvs_index := char_uv_map[u64(r)]
         uvs := char_rects[uvs_index]
       

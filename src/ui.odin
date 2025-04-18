@@ -27,7 +27,7 @@ draw_ui :: proc() {
         text_pos,
         vec4{1,1,1,1},
         20,
-        "hi"
+        "di"
     )
 
 

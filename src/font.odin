@@ -30,11 +30,10 @@ faces : [dynamic]ft.Face = {}
 @(private="package")
 font_texture_id : u32
 
-MissingCharacterMap :: map[u64]bool
+NonExistingCharacterMap :: map[u64]bool
 
-@(private="package")
-known_non_existing_char_maps : map[f32]^MissingCharacterMap
-
+known_non_existing_char_maps_array : [dynamic]NonExistingCharacterMap
+known_non_existing_char_maps : map[f32]int
 
 MissingCharacter :: struct {
     char_code: u64,
@@ -44,8 +43,7 @@ MissingCharacter :: struct {
 missing_characters : [dynamic]MissingCharacter
 
 Character :: struct {
-    buffer: []u8,
-    buffer_len: int,
+    buffer: [dynamic]u8,
 
     width:u32,
     rows:u32,
@@ -63,7 +61,10 @@ CharacterCode :: u64
 CharUvMap :: map[CharacterCode]int
 
 @(private="package")
-char_uv_maps : map[FontSize]^CharUvMap
+char_uv_maps_array : [dynamic]CharUvMap
+
+@(private="package")
+char_uv_maps : map[FontSize]int
 
 @(private="package")
 char_uv_map_size : vec2
@@ -72,7 +73,10 @@ char_uv_map_size : vec2
 CharacterMap :: map[CharacterCode]^Character
 
 @(private="package")
-character_maps : map[FontSize]^CharacterMap = {}
+character_maps : map[FontSize]int
+
+@(private="package")
+character_maps_array : [dynamic]CharacterMap
 
 load_font :: proc(path: cstring) -> ft.Face {
     face : ft.Face
@@ -94,7 +98,8 @@ load_font :: proc(path: cstring) -> ft.Face {
 load_all_fonts :: proc() {
     // lower index higher importance
     font_list : []cstring = {
-        "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
+        //"/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf",
     }
 
     for font in font_list {
@@ -106,13 +111,17 @@ load_all_fonts :: proc() {
 
 total_area: i32 = 0
 
-atlas : []u8
+atlas : [dynamic]u8
 
 @(private="package")
 char_rects : [dynamic]rp.Rect = {}
 
 width : i32
 height : i32
+
+max_w : rp.Coord
+max_h : rp.Coord
+
 
 @(private="package")
 add_missing_characters :: proc() {
@@ -125,14 +134,8 @@ add_missing_characters :: proc() {
     }
 
     for missing_char in missing_characters {
-        try_adding_character(missing_char)
-    }
-
-    max_w : rp.Coord
-    max_h : rp.Coord
-
-    for missing_char in missing_characters {
-        char := get_char(missing_char.font_height, missing_char.char_code)
+        //char := get_char(missing_char.font_height, missing_char.char_code)
+        char := try_adding_character(missing_char)
 
         // some chars didnt get added probably
         if char == nil {
@@ -154,36 +157,39 @@ add_missing_characters :: proc() {
 
         append_elem(&char_rects, char_rect)
 
-        char_uv_map := char_uv_maps[missing_char.font_height]
+        uv_map_index := char_uv_maps[missing_char.font_height]
 
-        if char_uv_map == nil {
-            new_map := new(CharUvMap)
+        if missing_char.font_height in char_uv_maps == false {
+            new_map := make(CharUvMap)
 
-            char_uv_maps[missing_char.font_height] = new_map
-            char_uv_map = new_map
+            append(&char_uv_maps_array, new_map)
+
+            new_index := len(char_uv_maps_array) - 1
+
+            char_uv_maps[missing_char.font_height] = new_index
+
+            uv_map_index = new_index
         }
         
-        char_uv_map[missing_char.char_code] = len(char_rects) - 1
+        char_uv_map := &char_uv_maps_array[uv_map_index]
+        assert(char_uv_map != nil)
+
+        char_uv_map^[missing_char.char_code] = len(char_rects) - 1
 
         total_area += i32(char_rect.w * char_rect.h)
     }
 
     side := int(math.sqrt(f64(total_area)))
 
-    width = i32(next_power_of_two(max(side, int(side * 2))))
-    height = i32(next_power_of_two(int(max(total_area / width, i32(side * 2)))))
+    width = i32(next_power_of_two(int(side * 2)))
+    height = i32(next_power_of_two(int(side * 2)))
 
     atlas_size := width * height 
 
     has_atlas_grown := int(atlas_size) != len(atlas)
 
-    if has_atlas_grown {
-        atlas = make([]u8, width * height)
-
-        when ODIN_DEBUG {
-            fmt.println("Atlas resized to:", atlas_size)
-        }
-    }
+    atlas = make([dynamic]u8, width * height)
+    defer delete(atlas)
 
     num_nodes := width
 
@@ -207,13 +213,15 @@ add_missing_characters :: proc() {
         fmt.println("Total area:", total_area)
     }
 
-    for font_size,character_map in character_maps {
+    for font_size,index in character_maps {
+        character_map := character_maps_array[index]
+        
         for character_code, char in character_map {
-            if char == nil {
-                continue
-            }
+            assert(char != nil)
 
-            char_uv_map := char_uv_maps[font_size]
+            map_index := char_uv_maps[font_size]
+            char_uv_map := char_uv_maps_array[map_index]
+
             index := char_uv_map[character_code]
 
             char_rect := char_rects[index]
@@ -228,6 +236,8 @@ add_missing_characters :: proc() {
                 src_offset := row * pitch
                 dst_offset := (y + row) * width + x
 
+                assert(int(dst_offset + w) <= len(atlas))
+
                 copy(
                     atlas[dst_offset:dst_offset+i32(w)],
                     char.buffer[src_offset:src_offset+i32(w)],
@@ -236,11 +246,14 @@ add_missing_characters :: proc() {
         }
     }
 
-    clear(&missing_characters)
-
     char_uv_map_size = vec2{f32(width),f32(height)}
 
     upload_texture_buffer(raw_data(atlas), gl.RED, width, height, font_texture_id)
+
+    fmt.println("Success! Added missing characters:", missing_characters)
+
+    clear(&missing_characters)
+
     /*
     image.write_png(
         "atlas.png",
@@ -251,18 +264,14 @@ add_missing_characters :: proc() {
     //free_character_buffers()
 }
 
-try_adding_character :: proc(missing_char: MissingCharacter) {
-    known_non_existing_chars := known_non_existing_char_maps[missing_char.font_height]
+try_adding_character :: proc(missing_char: MissingCharacter) -> ^Character {
+    index := known_non_existing_char_maps[missing_char.font_height]
+    known_non_existing_chars := known_non_existing_char_maps_array[index]
 
-    if known_non_existing_chars[missing_char.char_code] == true {
-        return
-    }
+    char_map_index := character_maps[missing_char.font_height]
+    character_map := &character_maps_array[char_map_index]
 
-    character_map := character_maps[missing_char.font_height]
-
-    if missing_char.char_code in character_map {
-        return
-    }
+    assert(missing_char.char_code in character_map == false)
 
     character, error_msg := gen_glyph_bitmap(missing_char.char_code, missing_char.font_height)
 
@@ -275,12 +284,12 @@ try_adding_character :: proc(missing_char: MissingCharacter) {
     if character == nil {
         known_non_existing_chars[missing_char.char_code] = true
 
-        return
+        return nil
     }
 
-    character_map[missing_char.char_code] = character
+    character_map^[missing_char.char_code] = character
 
-    return
+    return character
 }
 
 find_char_in_faces :: proc(charcode: u64) -> (u32, ft.Face) {
@@ -330,17 +339,16 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
         return nil, "Invalid bitmap size"
     }
 
-    new_buffer := make([]u8, size)
+    new_buffer := make([dynamic]u8, size, context.allocator)
 
     buffer_slice := mem.slice_ptr(orig_bmp.buffer, size)
 
-    mem.copy(mem.raw_data(new_buffer), mem.raw_data(buffer_slice), size)
+    mem.copy(raw_data(new_buffer), raw_data(buffer_slice), size)
 
     char := new(Character)
 
     char^ = Character{
         buffer=new_buffer,
-        buffer_len=len(new_buffer),
         width=orig_bmp.width,
         rows=orig_bmp.rows,
         pitch=orig_bmp.pitch,
@@ -360,22 +368,31 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
 @(private="package")
 report_missing_character :: proc(char_code: u64, font_height: f32) {
-    known_non_existing_chars := known_non_existing_char_maps[font_height]
+    index := known_non_existing_char_maps[font_height]
 
-    if known_non_existing_chars == nil {
-        new_map := new(MissingCharacterMap)
+    if font_height in known_non_existing_char_maps == false {
+        new_map := make(NonExistingCharacterMap)
 
         when ODIN_DEBUG {
             fmt.println("Added missing char map for font_height:", font_height)
         }
 
-        known_non_existing_char_maps[font_height] = new_map
-        known_non_existing_chars = new_map
+        append_elem(&known_non_existing_char_maps_array, new_map)
+
+        new_index := len(known_non_existing_char_maps_array)-1
+
+        known_non_existing_char_maps[font_height] = new_index 
+        index = new_index 
     }
+
+    known_non_existing_chars := known_non_existing_char_maps_array[index]
 
     if char_code in known_non_existing_chars {
         return
     }
+
+    known_non_existing_chars[char_code] = true
+    known_non_existing_char_maps_array[index] = known_non_existing_chars
 
     char := MissingCharacter{
         char_code=char_code,
@@ -397,57 +414,62 @@ init_fonts :: proc() {
 }
 
 free_character_buffers :: proc() { 
-    for size,character_map in character_maps {
-        for char_code, character in character_map {
-            //delete(character.buffer)
-        }
-    }
 }
 
 @(private="package")
 clear_fonts :: proc() {
-    for size,character_map in character_maps {
+    fmt.println("Char Maps:", character_maps)
+    fmt.println("Char Maps Array:", character_maps_array)
+
+    for size,index in character_maps {
+        character_map := &character_maps_array[index]
+
         for char_code, character in character_map {
-            //free(character)
+            delete(character.buffer)
+            free(character)
         }
 
-        delete_map(character_map^)
-        //free(character_map)
+        //delete(character_map^)
     }
 
-    delete_map(character_maps)
-
-    for size,char_uv_map in char_uv_maps {
-        delete_map(char_uv_map^)
-        //free(char_uv_map)
+    for size,index in char_uv_maps {
+        delete(char_uv_maps_array[index])
     }
-
-    delete_map(char_uv_maps)
 
     for size,known_non_existing_char_map in known_non_existing_char_maps {
-        delete(known_non_existing_char_map^)
-        //free(known_non_existing_char_map)
+        delete(known_non_existing_char_maps_array[known_non_existing_char_map])
     }
 
+    delete(known_non_existing_char_maps_array)
+    delete(character_maps)
+    delete(char_uv_maps)
     delete(faces)
     delete(missing_characters)
     delete(char_rects)
-
     delete(known_non_existing_char_maps)
+
+    delete(character_maps_array)
+    delete(char_uv_maps_array)
 }
 
 @(private="package")
 get_char :: proc(font_height: f32, char_code: u64) -> ^Character {
-    char_map := character_maps[font_height]
+    index := character_maps[font_height]
 
-    if char_map == nil {
-        new_map :=  new(CharacterMap)
+    if font_height in character_maps == false {
+        new_map := make(CharacterMap, context.allocator)
 
-        character_maps[font_height] = new_map
-        char_map = new_map
+        append(&character_maps_array, new_map)
+
+        new_index := len(character_maps_array) - 1
+
+        character_maps[font_height] = new_index
+        index = new_index
     }
 
-    character := char_map[char_code]
+    char_map := character_maps_array[index]
+
+    character, ok := char_map[char_code]
 
     if character == nil {
         report_missing_character(char_code, font_height) 

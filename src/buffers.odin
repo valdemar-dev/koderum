@@ -43,6 +43,9 @@ draw_buffer :: proc() {
     for buffer_line in buffer {
         chars := buffer_line.characters
 
+        string := utf8.runes_to_string(chars[:])
+        defer delete(string)
+
         add_text(
             &rect_cache,
             vec2{
@@ -51,7 +54,7 @@ draw_buffer :: proc() {
             },
             vec4{1,1,1,1},
             buffer_font_size,
-            utf8.runes_to_string(chars[:]),
+            string,
         )
 
         pen.y = pen.y + line_height

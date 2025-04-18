@@ -15,7 +15,8 @@ draw_cursor :: proc() {
         return
     }
 
-    char_map := character_maps[buffer_font_size]
+    index := character_maps[buffer_font_size]
+    char_map := character_maps_array[index]
 
     if char_map == nil {
         return
