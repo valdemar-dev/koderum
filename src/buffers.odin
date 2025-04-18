@@ -20,7 +20,7 @@ buffers : map[string]^[dynamic]BufferLine
 buffer_pen_x_start : f32 = 20
 
 @(private="package")
-buffer_font_size : f32 = 16
+buffer_font_size : f32 = 32
 
 @(private="package")
 active_buffer : string
