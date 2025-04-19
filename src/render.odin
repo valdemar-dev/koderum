@@ -194,11 +194,9 @@ add_text :: proc(
     font_height: f32,
     text: string,
 ) -> vec2 {
-    max_ascent : f32 = font_height
-
     pen := vec2{
         x=pos.x,
-        y=pos.y + max_ascent,
+        y=pos.y,
     }
 
     for r,i in text {
@@ -229,10 +227,15 @@ add_text :: proc(
         height := f32(character.rows)
         width := f32(character.width)
 
+        error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+        assert(error == .Ok)
+
+        ascend := primary_font.size.metrics.ascender >> 6
+       
         add_rect(rect_cache,
             rect{
                 pen.x + character.offset.x,
-                pen.y - character.offset.y,
+                (pen.y - character.offset.y + f32(ascend)),
                 width,
                 height,
             },

@@ -50,8 +50,8 @@ Character :: struct {
     pitch:i32,
     pixel_mode:u8,
 
-    advance:vec2,
-    offset:vec2,
+    advance: vec2,
+    offset: vec2,
 }
 
 FontSize :: f32
@@ -77,6 +77,9 @@ character_maps : map[FontSize]int
 
 @(private="package")
 character_maps_array : [dynamic]CharacterMap
+
+@(private="package")
+primary_font : ft.Face
 
 load_font :: proc(path: cstring) -> ft.Face {
     face : ft.Face
@@ -107,6 +110,8 @@ load_all_fonts :: proc() {
 
         append_elem(&faces, face)
     }
+
+    primary_font = faces[0]
 }
 
 total_area: i32 = 0
@@ -367,7 +372,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
         offset=vec2{
             f32(face.glyph.bitmap_left),
             f32(face.glyph.bitmap_top),
-        }
+        },
     }
 
     return char, ""

@@ -1,10 +1,14 @@
-D&F -> Left-Right Movement.
-J&K -> Up-Down Movement.
+(D)&(F) -> Left-Right Movement.
+(J)&(K) -> Up-Down Movement.
 
-R -> Move backwards in the current bufferline until a word-break character is detected.
-U -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
+(R) -> Move backwards in the current bufferline until a word-break character is detected.
+(U) -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
 
-I -> Go into Text Insert mode.
-Esc -> Go into Command mode.
+This is slightly different to VIM-like W-B movement, since going back goes to the *end* of a word,
+and going forward goes to the *start* of a word.
 
-Ctrl + S -> Save active buffer.
+(I) -> Go into Text Insert mode.
+(A) -> Move buffer cursor character index to the end, and go into Text Insert Mode.
+(Esc) -> Go into Command mode.
+
+(Ctrl + S) -> Save active buffer.

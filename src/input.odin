@@ -101,6 +101,10 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
 
         break
     }
+
+    context = runtime.default_context()
+
+    handle_ui_input(key, scancode, action, mods)
 }
 
 set_keypress_states :: proc() {

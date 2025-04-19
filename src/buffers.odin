@@ -31,7 +31,7 @@ Buffer :: struct {
 buffers : map[string]^Buffer
 
 @(private="package")
-buffer_font_size : f32 = 16
+buffer_font_size : f32 = 32
 
 @(private="package")
 active_buffer : ^Buffer
@@ -258,8 +258,6 @@ save_buffer :: proc() {
         buffer_to_save[:],
         true,
     )
-
-    fmt.println(buffer_to_save)
 }
 
 insert_tab_as_spaces:: proc() {
@@ -506,6 +504,17 @@ scroll_up :: proc() {
     buffer_scroll_position -= ((buffer_font_size * line_height) * 20) * frame_time
 }
 
+append_to_line :: proc() {
+    line := active_buffer.lines[buffer_cursor_line]
+
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        len(line.characters)
+    )
+
+    input_mode = .TEXT
+}
+
 @(private="package")
 handle_buffer_input :: proc() {
     if is_key_pressed(glfw.KEY_S) {
@@ -514,6 +523,12 @@ handle_buffer_input :: proc() {
         if key.modifiers == 2 {
             save_buffer()
         }
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_A) {
+        append_to_line()
 
         return
     }

@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import ft "../../alt-odin-freetype"
 
 buffer_cursor_pos := vec2{}
 buffer_cursor_target_pos := vec2{}
@@ -24,14 +25,20 @@ draw_cursor :: proc() {
 
     reset_rect_cache(&rect_cache)
 
-    cursor_height := buffer_font_size
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    if error != .Ok do return
+
+    asc := primary_font.size.metrics.ascender >> 6
+    desc := primary_font.size.metrics.descender >> 6
+
+    cursor_height := asc - desc
 
     add_rect(&rect_cache,
         rect{
             buffer_cursor_pos.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             buffer_cursor_pos.y - buffer_scroll_position,
             5,
-            cursor_height,
+            f32(cursor_height),
         },
         no_texture,
         vec4{1,1,1,1},

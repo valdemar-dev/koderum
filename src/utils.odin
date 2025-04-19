@@ -60,3 +60,26 @@ next_power_of_two :: proc(n: int) -> int {
 smooth_lerp :: proc(current, target, smoothing_factor: f32, frame_time: f32) -> f32 {
     return current + (target - current) * (1 - math.pow(2.71828, -smoothing_factor * frame_time))
 }   
+
+SlidingBuffer :: struct($Type: typeid) {
+    data: ^Type,
+    length: int,
+    count: int,
+}
+
+push :: proc(sb: ^SlidingBuffer($TB), value: $T) {
+    if sb.count < sb.length {
+        for i := sb.count; i > 0; i -= 1 {
+            sb.data[i] = sb.data[i - 1];
+        }
+
+        sb.data[0] = value;
+        sb.count += 1;
+    } else {
+        for i := sb.length - 1; i > 0; i -= 1 {
+            sb.data[i] = sb.data[i - 1];
+        }
+
+        sb.data[0] = value;
+    }
+}
