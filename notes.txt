@@ -1,0 +1,4 @@
+add t for persistant terminal instance
+
+
+add different dterminators for words

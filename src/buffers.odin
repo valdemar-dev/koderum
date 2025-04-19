@@ -20,6 +20,9 @@ do_draw_line_count := true
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
     x_offset: f32,
+
+    x_pos: f32,
+    y_pos: f32,
 }
 
 @(private="package")
@@ -41,11 +44,11 @@ sb := strings.builder_make()
 
 @(private="package")
 draw_buffer :: proc() {
-    if active_buffer == "" {
+    if active_buffer == nil {
         return
     }
 
-    buffer_lines := buffers[active_buffer]
+    buffer_lines := active_buffer.lines
 
     pen := vec2{0,0}
 
@@ -57,6 +60,8 @@ draw_buffer :: proc() {
     highest_line_string := strings.to_string(sb)
 
     max_line_size := measure_text(buffer_font_size, highest_line_string)
+
+    active_buffer^.x_offset = (max_line_size.x) + (buffer_font_size * .5)
 
     if do_draw_line_count {
         add_rect(&rect_cache,
@@ -76,12 +81,8 @@ draw_buffer :: proc() {
     
     for buffer_line, index in buffer_lines {
         line_pos := vec2{
-            pen.x - buffer_horizontal_scroll_position,
+            pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             pen.y - buffer_scroll_position,
-        }
-
-        if do_draw_line_count {
-            line_pos.x += (max_line_size.x) + (buffer_font_size * .5)
         }
 
         if line_pos.y > fb_size.y {
@@ -105,7 +106,7 @@ draw_buffer :: proc() {
                 pen.y - buffer_scroll_position
             }
 
-            line_string := strconv.itoa(line_buffer[:], index)
+            line_string := strconv.itoa(line_buffer[:], index+1)
 
             add_text(&rect_cache,
                 line_pos,
@@ -147,6 +148,9 @@ open_file :: proc(file_name: string) {
 
     buffer_lines := new([dynamic]BufferLine)
 
+    new_buffer := new(Buffer)
+    new_buffer^.lines = buffer_lines
+
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
     }
@@ -165,9 +169,9 @@ open_file :: proc(file_name: string) {
         append_elem(buffer_lines, buffer_line)
     }
 
-    buffers[file_name] = buffer_lines
+    buffers[file_name] = new_buffer
 
-    active_buffer = file_name
+    active_buffer = new_buffer
 
     when ODIN_DEBUG {
         fmt.println("Updating fonts for buffer")
@@ -220,13 +224,11 @@ handle_text_input :: proc() {
         input_mode = .COMMAND
     }
 
-    if active_buffer == "" {
+    if active_buffer == nil {
         return
     }
 
-    buffer := buffers[active_buffer]
-
-    line := &buffer[buffer_cursor_line] 
+    line := &active_buffer.lines[buffer_cursor_line] 
     
     char_index := buffer_cursor_char_index
 
@@ -242,7 +244,7 @@ handle_text_input :: proc() {
                 return
             }
 
-            prev_line := &buffer[buffer_cursor_line-1]
+            prev_line := &active_buffer.lines[buffer_cursor_line-1]
             prev_line_len := len(prev_line.characters)
 
 
@@ -253,7 +255,7 @@ handle_text_input :: proc() {
 
             prev_line^.characters = new_runes[:]
 
-            ordered_remove(buffer, buffer_cursor_line)
+            ordered_remove(active_buffer.lines, buffer_cursor_line)
             set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
 
             return
@@ -278,16 +280,14 @@ handle_text_input :: proc() {
             characters=after_cursor,
         }
 
-        inject_at(buffer, buffer_cursor_line+1, buffer_line)
+        inject_at(active_buffer.lines, buffer_cursor_line+1, buffer_line)
         set_buffer_cursor_pos(buffer_cursor_line+1, 0)
     }
 }
 
 @(private="package")
 insert_into_buffer :: proc (key: rune) {
-    buffer := buffers[active_buffer]
-
-    line := &buffer[buffer_cursor_line] 
+    line := &active_buffer.lines[buffer_cursor_line] 
     
     line^.characters = insert_char_at_index(line.characters, buffer_cursor_char_index, key)
 
@@ -326,8 +326,6 @@ constrain_scroll_to_cursor :: proc() {
 }
 
 move_up :: proc() {
-    buffer := buffers[active_buffer]
-
     if buffer_cursor_line > 0 {
         set_buffer_cursor_pos(
             buffer_cursor_line-1,
@@ -339,10 +337,8 @@ move_up :: proc() {
 }
 
 move_left :: proc() {
-    buffer := buffers[active_buffer]
-
     if buffer_cursor_char_index > 0 {
-        line := buffer[buffer_cursor_line]
+        line := active_buffer.lines[buffer_cursor_line]
 
         new := min(buffer_cursor_char_index - 1, len(line.characters)-1)
 
@@ -356,9 +352,7 @@ move_left :: proc() {
 }
 
 move_right :: proc() {
-    buffer := buffers[active_buffer]
-
-    line := buffer[buffer_cursor_line]
+    line := active_buffer.lines[buffer_cursor_line]
 
     if buffer_cursor_char_index < len(line.characters) {
         set_buffer_cursor_pos(
@@ -371,13 +365,7 @@ move_right :: proc() {
 }
 
 move_down :: proc() {
-    buffer := &buffers[active_buffer]
-
-    if buffer == nil {
-        return
-    }
-
-    if buffer_cursor_line < len(buffer^) - 1 {
+    if buffer_cursor_line < len(active_buffer.lines) - 1 {
         new_index := buffer_cursor_line+1
 
         set_buffer_cursor_pos(
@@ -387,6 +375,54 @@ move_down :: proc() {
     }
 
     constrain_scroll_to_cursor()
+}
+
+move_back_word :: proc() {
+    line := active_buffer.lines[buffer_cursor_line]
+
+    words_before_cursor := line.characters[:buffer_cursor_char_index]
+    
+    new_char_index : int
+
+    #reverse for r,index in words_before_cursor {
+        if r == ' ' {
+            new_char_index = index
+
+            break
+        }
+    }
+
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        new_char_index,
+    )
+}
+
+move_forward_word :: proc() {
+    line := active_buffer.lines[buffer_cursor_line]
+
+    chars_after_cursor := line.characters[buffer_cursor_char_index:]
+    
+    new_char_index := buffer_cursor_char_index
+
+    prev_was_space := false
+    for r,index in chars_after_cursor {
+        if r == ' ' {
+            prev_was_space = true
+
+            continue
+        }
+
+        if prev_was_space {
+            new_char_index = index + buffer_cursor_char_index
+            break
+        }
+    }
+
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        new_char_index,
+    )
 }
 
 scroll_down :: proc() {
@@ -452,6 +488,18 @@ handle_command_input :: proc() {
 
     if is_key_pressed(glfw.KEY_F) {
         move_right()
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_R) {
+        move_back_word()
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_U) {
+        move_forward_word()
 
         return
     }

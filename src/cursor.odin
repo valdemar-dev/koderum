@@ -11,7 +11,7 @@ buffer_cursor_char_index : int
 cursor_width : f32
 
 draw_cursor :: proc() {
-    if active_buffer == "" {
+    if active_buffer == nil {
         return
     }
 
@@ -28,7 +28,7 @@ draw_cursor :: proc() {
 
     add_rect(&rect_cache,
         rect{
-            buffer_cursor_pos.x - buffer_horizontal_scroll_position,
+            buffer_cursor_pos.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             buffer_cursor_pos.y - buffer_scroll_position,
             5,
             cursor_height,
@@ -41,11 +41,11 @@ draw_cursor :: proc() {
 }
 
 set_buffer_cursor_pos :: proc(line: int, char_index: int) {
-    if active_buffer == "" {
+    if active_buffer == nil {
         return
     }
 
-    buffer_lines := buffers[active_buffer]
+    buffer_lines := active_buffer.lines
 
     new_line := buffer_lines[line]
     characters := new_line.characters
