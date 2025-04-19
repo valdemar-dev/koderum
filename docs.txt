@@ -1,0 +1,10 @@
+D&F -> Left-Right Movement.
+J&K -> Up-Down Movement.
+
+R -> Move backwards in the current bufferline until a word-break character is detected.
+U -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
+
+I -> Go into Text Insert mode.
+Esc -> Go into Command mode.
+
+Ctrl + S -> Save active buffer.

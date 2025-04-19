@@ -23,6 +23,8 @@ Buffer :: struct {
 
     x_pos: f32,
     y_pos: f32,
+
+    file_name: string,
 }
 
 @(private="package")
@@ -41,6 +43,11 @@ buffer_scroll_position : f32
 buffer_horizontal_scroll_position : f32
 
 sb := strings.builder_make()
+
+@(private="package")
+draw_buffers :: proc() {
+
+}
 
 @(private="package")
 draw_buffer :: proc() {
@@ -133,6 +140,7 @@ draw_buffer :: proc() {
     reset_rect_cache(&rect_cache)
 }
 
+@(private="package")
 open_file :: proc(file_name: string) {
     data, ok := os.read_entire_file_from_filename(file_name)
 
@@ -150,6 +158,7 @@ open_file :: proc(file_name: string) {
 
     new_buffer := new(Buffer)
     new_buffer^.lines = buffer_lines
+    new_buffer^.file_name = file_name
 
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
@@ -208,6 +217,18 @@ insert_char_at_index :: proc(runes: []rune, index: int, c: rune) -> []rune {
     return new_runes[:]
 }
 
+insert_chars_at_index :: proc(runes: []rune, index: int, chars: []rune) -> []rune {
+    clamped_index := clamp(index, 0, len(runes))
+
+    new_runes := make([dynamic]rune, 0, len(runes) + 1)
+    
+    append_elems(&new_runes, ..runes[0:clamped_index])
+    append_elems(&new_runes, ..chars[:])
+    append_elems(&new_runes, ..runes[clamped_index:])
+
+    return new_runes[:]
+}
+
 close_file :: proc(file_name: string) -> (ok: bool) {
     if file_name in buffers == false {
         return false
@@ -218,10 +239,92 @@ close_file :: proc(file_name: string) -> (ok: bool) {
     return true
 }
 
+save_buffer :: proc() {
+    buffer_to_save := make([dynamic]u8)
+    defer delete(buffer_to_save)
+
+    for line,index in active_buffer.lines {
+        if index != 0 {
+            append(&buffer_to_save, u8('\n'))
+        }
+
+        for character in line.characters {
+            append(&buffer_to_save, u8(character))
+        }
+    }    
+
+    ok := os.write_entire_file(
+        active_buffer.file_name,
+        buffer_to_save[:],
+        true,
+    )
+
+    fmt.println(buffer_to_save)
+}
+
+insert_tab_as_spaces:: proc() {
+    line := &active_buffer.lines[buffer_cursor_line]
+
+    tab_spaces := 4
+
+    tab_chars : []rune = {' ',' ',' ',' '}
+
+    line^.characters = insert_chars_at_index(line.characters, buffer_cursor_char_index, tab_chars)
+
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        buffer_cursor_char_index+tab_spaces,
+    )
+}
+
+remove_char :: proc() {
+    line := &active_buffer.lines[buffer_cursor_line] 
+
+    char_index := buffer_cursor_char_index
+
+    if char_index > len(line.characters) {
+        char_index = len(line.characters)
+    }
+
+    target := char_index - 1
+    
+    if target < 0 {
+        if buffer_cursor_line == 0 {
+            return
+        }
+
+        prev_line := &active_buffer.lines[buffer_cursor_line-1]
+        prev_line_len := len(prev_line.characters)
+
+
+        new_runes := make([dynamic]rune)
+        
+        append_elems(&new_runes, ..prev_line.characters)
+        append_elems(&new_runes, ..line.characters)
+
+        prev_line^.characters = new_runes[:]
+
+        ordered_remove(active_buffer.lines, buffer_cursor_line)
+        set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
+
+        return
+    }
+
+    line^.characters = remove_char_at_index(line.characters, target)
+
+    set_buffer_cursor_pos(buffer_cursor_line, target)
+}
+
 @(private="package")
 handle_text_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
+    }
+
+    if is_key_pressed(glfw.KEY_TAB) {
+        insert_tab_as_spaces()
+
+        return
     }
 
     if active_buffer == nil {
@@ -233,37 +336,7 @@ handle_text_input :: proc() {
     char_index := buffer_cursor_char_index
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
-        if char_index > len(line.characters) {
-            char_index = len(line.characters)
-        }
-
-        target := char_index - 1
-        
-        if target < 0 {
-            if buffer_cursor_line == 0 {
-                return
-            }
-
-            prev_line := &active_buffer.lines[buffer_cursor_line-1]
-            prev_line_len := len(prev_line.characters)
-
-
-            new_runes := make([dynamic]rune)
-            
-            append_elems(&new_runes, ..prev_line.characters)
-            append_elems(&new_runes, ..line.characters)
-
-            prev_line^.characters = new_runes[:]
-
-            ordered_remove(active_buffer.lines, buffer_cursor_line)
-            set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
-
-            return
-        }
-
-        line^.characters = remove_char_at_index(line.characters, target)
-
-        set_buffer_cursor_pos(buffer_cursor_line, target)
+        remove_char()
 
         return
     } 
@@ -434,9 +507,13 @@ scroll_up :: proc() {
 }
 
 @(private="package")
-handle_command_input :: proc() {
-    if is_key_pressed(glfw.KEY_O) {
-        open_file("./test.txt")
+handle_buffer_input :: proc() {
+    if is_key_pressed(glfw.KEY_S) {
+        key := key_store[glfw.KEY_S]
+
+        if key.modifiers == 2 {
+            save_buffer()
+        }
 
         return
     }
@@ -446,7 +523,6 @@ handle_command_input :: proc() {
 
         return
     }
-
 
     if is_key_down(glfw.KEY_J) {
         key := key_store[glfw.KEY_J]

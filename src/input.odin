@@ -131,3 +131,17 @@ cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {
 mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods: i32) {
     context = runtime.default_context()
 }
+
+handle_command_input :: proc() {
+    if is_key_pressed(glfw.KEY_O) {
+        open_file("./test.txt")
+
+        return
+    }
+
+    if active_buffer != nil {
+        handle_buffer_input()
+    }
+
+}
+

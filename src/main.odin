@@ -17,7 +17,6 @@ target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
 
-
 main :: proc() {
     when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
