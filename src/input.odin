@@ -42,6 +42,9 @@ key_store : map[i32]ActiveKey = {}
 pressed_chars : [dynamic]rune = {}
 
 @(private="package")
+do_suppress_next_char_event := false
+
+@(private="package")
 is_key_down :: proc(key: i32) -> bool {
     return key_store[key].is_down
 }
@@ -49,6 +52,17 @@ is_key_down :: proc(key: i32) -> bool {
 @(private="package")
 is_key_pressed :: proc(key: i32) -> bool {
     return key_store[key].is_pressed
+}
+
+check_inputs :: proc() -> bool {
+    switch input_mode {
+    case .COMMAND:
+        handle_command_input() or_return
+    case .TEXT:
+        handle_text_input() or_return
+    }
+
+    return false
 }
 
 @(private="package")
@@ -59,12 +73,7 @@ process_input :: proc() {
         glfw.SetWindowShouldClose(window, true)
     }
 
-    switch input_mode {
-    case .COMMAND:
-        handle_command_input()
-    case .TEXT:
-        handle_text_input()
-    }
+    check_inputs() 
 
     set_keypress_states()
 }
@@ -73,9 +82,15 @@ process_input :: proc() {
 char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
 
+    if do_suppress_next_char_event {
+        do_suppress_next_char_event = false
+
+        return
+    }
+
     switch input_mode {
     case .COMMAND:
-        break
+        return
     case .TEXT:
         insert_into_buffer(key)
     }
@@ -136,16 +151,17 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
     context = runtime.default_context()
 }
 
-handle_command_input :: proc() {
+handle_command_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_O) {
         open_file("./test.txt")
 
-        return
+        return false
     }
 
     if active_buffer != nil {
-        handle_buffer_input()
+        handle_buffer_input() or_return
     }
 
+    return false
 }
 

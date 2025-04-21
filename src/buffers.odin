@@ -1,4 +1,5 @@
 #+private file
+#+feature dynamic-literals
 package main
 
 import "core:os"
@@ -9,6 +10,7 @@ import "vendor:glfw"
 import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
+import "core:path/filepath"
 
 BufferLine :: struct {
     characters: []rune,
@@ -27,11 +29,28 @@ Buffer :: struct {
     file_name: string,
 }
 
+IndentType :: enum { 
+    FORWARD,
+    BACKWARD,
+}
+
+IndentRule :: struct {
+    type: IndentType,
+}
+
+indent_rule_language_list : map[string]map[rune]IndentRule = {
+    ".txt"={
+        '{'=IndentRule{
+            type=.FORWARD,
+        },
+    }
+}
+
 @(private="package")
 buffers : map[string]^Buffer
 
 @(private="package")
-buffer_font_size : f32 = 32
+buffer_font_size : f32 = 64
 
 @(private="package")
 active_buffer : ^Buffer
@@ -43,6 +62,8 @@ buffer_scroll_position : f32
 buffer_horizontal_scroll_position : f32
 
 sb := strings.builder_make()
+
+tab_spaces := 4
 
 @(private="package")
 draw_buffers :: proc() {
@@ -263,8 +284,6 @@ save_buffer :: proc() {
 insert_tab_as_spaces:: proc() {
     line := &active_buffer.lines[buffer_cursor_line]
 
-    tab_spaces := 4
-
     tab_chars : []rune = {' ',' ',' ',' '}
 
     line^.characters = insert_chars_at_index(line.characters, buffer_cursor_char_index, tab_chars)
@@ -285,7 +304,16 @@ remove_char :: proc() {
     }
 
     target := char_index - 1
-    
+
+    current_indent := get_line_indent_level(buffer_cursor_line) 
+
+    if target < current_indent * tab_spaces {
+
+        for i in 0..<tab_spaces {
+            line^.characters = remove_char_at_index(line.characters, target-i)
+        }
+    }
+
     if target < 0 {
         if buffer_cursor_line == 0 {
             return
@@ -313,8 +341,80 @@ remove_char :: proc() {
     set_buffer_cursor_pos(buffer_cursor_line, target)
 }
 
+get_line_indent_level :: proc(line_num: int) -> int {
+    line := active_buffer.lines[line_num]
+
+    indent_spaces := 0
+
+    for char in line.characters {
+        if char != ' ' {
+            break
+        }
+
+        indent_spaces += 1
+    }
+
+    indent_level := indent_spaces / tab_spaces
+
+    return indent_level
+}
+
+/*
+
+get_current_line_block :: proc(line_num: int) -> int {
+    if line_num == 0 {
+        return 0
+    }
+
+    block_start := line_num
+
+    target_rune
+
+    for ; block_start > 0; block_start -= 1 {
+
+    }
+
+    return block_start 
+}
+*/
+
+determine_line_indent :: proc(line_num: int) -> int {
+    if line_num == 0 {
+        return 0
+    }
+
+    prev_line := active_buffer.lines[line_num-1]
+
+    prev_line_indent_level := get_line_indent_level(line_num-1)
+
+    length := len(prev_line.characters)
+
+    if length == 0 {
+        return 0
+    }
+
+    index := length - 1
+
+    indent_runes := make([dynamic]rune)
+
+    ext := filepath.ext(active_buffer.file_name)
+    language_rules := indent_rule_language_list[ext]
+
+    prev_line_last_char := prev_line.characters[index]
+
+    if prev_line_last_char in language_rules {
+        rule := language_rules[prev_line_last_char]
+
+        if rule.type == .FORWARD {
+            prev_line_indent_level += 1
+        }       
+    }
+
+    return prev_line_indent_level*tab_spaces
+}
+
 @(private="package")
-handle_text_input :: proc() {
+handle_text_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
     }
@@ -322,11 +422,11 @@ handle_text_input :: proc() {
     if is_key_pressed(glfw.KEY_TAB) {
         insert_tab_as_spaces()
 
-        return
+        return false
     }
 
     if active_buffer == nil {
-        return
+        return false
     }
 
     line := &active_buffer.lines[buffer_cursor_line] 
@@ -336,7 +436,7 @@ handle_text_input :: proc() {
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         remove_char()
 
-        return
+        return false
     } 
 
     if is_key_pressed(glfw.KEY_ENTER) {
@@ -350,10 +450,28 @@ handle_text_input :: proc() {
         buffer_line := BufferLine{
             characters=after_cursor,
         }
+        
+        new_line_num := buffer_cursor_line+1
 
-        inject_at(active_buffer.lines, buffer_cursor_line+1, buffer_line)
-        set_buffer_cursor_pos(buffer_cursor_line+1, 0)
+        indent_spaces := determine_line_indent(new_line_num)
+
+        for i in 0..<indent_spaces {
+            buffer_line.characters = insert_char_at_index(
+                buffer_line.characters, 0, ' ',
+            )
+        }
+
+        inject_at(active_buffer.lines, new_line_num, buffer_line)
+
+        set_buffer_cursor_pos(
+            new_line_num,
+            indent_spaces,
+        )
+
+        return false
     }
+
+    return false
 }
 
 @(private="package")
@@ -371,13 +489,15 @@ insert_into_buffer :: proc (key: rune) {
 }
 
 constrain_scroll_to_cursor :: proc() {
-    amnt_above_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position)
+    edge_padding : f32 = 200
+
+    amnt_above_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - edge_padding + cursor_height
 
     if amnt_above_offscreen < 0 {
         buffer_scroll_position -= -amnt_above_offscreen 
     }
 
-    amnt_below_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - 100)
+    amnt_below_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - edge_padding)
 
     if amnt_below_offscreen >= 0 {
         buffer_scroll_position += amnt_below_offscreen 
@@ -389,7 +509,7 @@ constrain_scroll_to_cursor :: proc() {
         buffer_horizontal_scroll_position -= -amnt_left_offscreen 
     }
 
-    amnt_right_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position) - (fb_size.x - 100)
+    amnt_right_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position) - (fb_size.x - edge_padding)
 
     if amnt_right_offscreen >= 0 {
         buffer_horizontal_scroll_position += amnt_right_offscreen 
@@ -513,10 +633,12 @@ append_to_line :: proc() {
     )
 
     input_mode = .TEXT
+
+    do_suppress_next_char_event = true
 }
 
 @(private="package")
-handle_buffer_input :: proc() {
+handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_S) {
         key := key_store[glfw.KEY_S]
 
@@ -524,19 +646,21 @@ handle_buffer_input :: proc() {
             save_buffer()
         }
 
-        return
+        return false
     }
 
     if is_key_pressed(glfw.KEY_A) {
         append_to_line()
 
-        return
+        return true
     }
 
     if is_key_pressed(glfw.KEY_I) {
         input_mode = .TEXT
 
-        return
+        do_suppress_next_char_event = true
+
+        return false
     }
 
     if is_key_down(glfw.KEY_J) {
@@ -545,14 +669,14 @@ handle_buffer_input :: proc() {
         if key.modifiers == 1 {
             scroll_down()
 
-            return
+            return false
         }
     }
 
     if is_key_pressed(glfw.KEY_J) {
         move_down()
 
-        return
+        return false
     }
 
     if is_key_down(glfw.KEY_K) {
@@ -561,37 +685,39 @@ handle_buffer_input :: proc() {
         if key.modifiers == 1 {
             scroll_up()
 
-            return
+            return false
         }
     }
 
     if is_key_pressed(glfw.KEY_K) {
         move_up()
 
-        return
+        return false
     }
 
     if is_key_pressed(glfw.KEY_D) {
         move_left()
 
-        return
+        return false
     }
 
     if is_key_pressed(glfw.KEY_F) {
         move_right()
 
-        return
+        return false
     }
 
     if is_key_pressed(glfw.KEY_R) {
         move_back_word()
 
-        return
+        return false
     }
 
     if is_key_pressed(glfw.KEY_U) {
         move_forward_word()
 
-        return
+        return false
     }
+    
+    return false
 }

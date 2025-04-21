@@ -1,5 +1,15 @@
 test
 
-thing :: proc () {
-    return
+const json = {
+    "hello": "there!",
+    "this is pretty": "freaking epic!!",
+};
+
+
+
+// Here, { is the marker.
+// Autoindentation should occur.
+// 4 Spaces
+thing :: proc () -> bool {
+    return false
 }

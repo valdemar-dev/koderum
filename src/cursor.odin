@@ -10,6 +10,7 @@ buffer_cursor_line : int
 buffer_cursor_char_index : int
 
 cursor_width : f32
+cursor_height : f32
 
 draw_cursor :: proc() {
     if active_buffer == nil {
@@ -31,14 +32,14 @@ draw_cursor :: proc() {
     asc := primary_font.size.metrics.ascender >> 6
     desc := primary_font.size.metrics.descender >> 6
 
-    cursor_height := asc - desc
+    cursor_height = f32(asc - desc)
 
     add_rect(&rect_cache,
         rect{
             buffer_cursor_pos.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             buffer_cursor_pos.y - buffer_scroll_position,
             5,
-            f32(cursor_height),
+            cursor_height,
         },
         no_texture,
         vec4{1,1,1,1},

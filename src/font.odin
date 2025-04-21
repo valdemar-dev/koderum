@@ -327,7 +327,6 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     load_flags := ft.Load_Flags{
         .Force_Autohint,
-        .Load_Target_Light,
     }
 
     error = ft.load_glyph(face, glyph_index, load_flags)

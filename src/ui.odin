@@ -27,6 +27,8 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
 
     key_name := glfw.GetKeyName(key, scancode)
 
+    push(&ui_sliding_buffer, ' ')
+
     for r in key_name {
         push(&ui_sliding_buffer, r)
     }
