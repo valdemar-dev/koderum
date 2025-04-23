@@ -6,6 +6,7 @@ import "core:unicode/utf8"
 import ft "../../alt-odin-freetype"
 
 ui_general_font_size :: 20
+ui_smaller_font_size :: 16
 
 status_bar_rect := rect{
     0,
@@ -27,7 +28,9 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
 
     key_name := glfw.GetKeyName(key, scancode)
 
-    push(&ui_sliding_buffer, ' ')
+    if mods != 0 {
+        push(&ui_sliding_buffer, ' ')
+    }
 
     for r in key_name {
         push(&ui_sliding_buffer, r)
@@ -38,10 +41,10 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
 
         switch mods {
         case 1:
-            value = "Shift+"
+            value = "S-"
             break
         case 2:
-            value = "Ctrl+"
+            value = "C-"
         }
 
         #reverse for r in value {
@@ -100,7 +103,7 @@ draw_ui :: proc() {
 
     add_text(&rect_cache,
         vec2{
-            status_bar_rect.x + status_bar_rect.width - 100,
+            status_bar_rect.x + status_bar_rect.width - 400,
             status_bar_rect.y,
         },
         vec4{1,1,1,1},

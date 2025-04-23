@@ -26,7 +26,12 @@ Buffer :: struct {
     x_pos: f32,
     y_pos: f32,
 
+    width: f32,
+    height: f32,
+
     file_name: string,
+
+    info: os.File_Info,
 }
 
 IndentType :: enum { 
@@ -50,7 +55,7 @@ indent_rule_language_list : map[string]map[rune]IndentRule = {
 buffers : map[string]^Buffer
 
 @(private="package")
-buffer_font_size : f32 = 64
+buffer_font_size : f32 = 16
 
 @(private="package")
 active_buffer : ^Buffer
@@ -90,6 +95,19 @@ draw_buffer :: proc() {
     max_line_size := measure_text(buffer_font_size, highest_line_string)
 
     active_buffer^.x_offset = (max_line_size.x) + (buffer_font_size * .5)
+    
+    add_rect(&rect_cache,
+        rect{
+            active_buffer.x_pos,
+            active_buffer.y_pos,
+            active_buffer.width,
+            active_buffer.height,
+        },
+        no_texture,
+        BG_MAIN_10,
+        vec2{},
+        0,
+    )
 
     if do_draw_line_count {
         add_rect(&rect_cache,
@@ -100,7 +118,9 @@ draw_buffer :: proc() {
                 f32(len(buffer_lines)) * (line_height),
             },
             no_texture,
-            vec4{0.1,0,0,1},
+            BG_MAIN_20,
+            vec2{},
+            2,
         )
     }
 
@@ -128,6 +148,15 @@ draw_buffer :: proc() {
         string := utf8.runes_to_string(chars[:])
         defer delete(string)
 
+        add_text(
+            &rect_cache,
+            line_pos,
+            TEXT_MAIN,
+            buffer_font_size,
+            string,
+            1
+        )
+
         if do_draw_line_count {
             line_pos := vec2{
                 pen.x,
@@ -138,20 +167,12 @@ draw_buffer :: proc() {
 
             add_text(&rect_cache,
                 line_pos,
-                vec4{1,1,1,1},
+                TEXT_MAIN,
                 buffer_font_size,
-                line_string
+                line_string,
+                3,
             )
-
         }
-
-        add_text(
-            &rect_cache,
-            line_pos,
-            vec4{1,1,1,1},
-            buffer_font_size,
-            string,
-        )
 
         pen.y = pen.y + line_height
     }
@@ -180,6 +201,19 @@ open_file :: proc(file_name: string) {
     new_buffer := new(Buffer)
     new_buffer^.lines = buffer_lines
     new_buffer^.file_name = file_name
+
+    new_buffer^.width = fb_size.x
+    new_buffer^.height = fb_size.y
+
+    file_info, lstat_error := os.lstat(file_name)
+
+    if lstat_error != os.General_Error.None {
+        fmt.println("failed to lstat")
+
+        return
+    }
+
+    new_buffer^.info = file_info
 
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
@@ -305,15 +339,6 @@ remove_char :: proc() {
 
     target := char_index - 1
 
-    current_indent := get_line_indent_level(buffer_cursor_line) 
-
-    if target < current_indent * tab_spaces {
-
-        for i in 0..<tab_spaces {
-            line^.characters = remove_char_at_index(line.characters, target-i)
-        }
-    }
-
     if target < 0 {
         if buffer_cursor_line == 0 {
             return
@@ -335,6 +360,23 @@ remove_char :: proc() {
 
         return
     }
+
+    current_indent := get_line_indent_level(buffer_cursor_line) 
+
+    if target < current_indent * tab_spaces {
+
+        for i in 0..<tab_spaces {
+            line^.characters = remove_char_at_index(line.characters, target-i)
+        }
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            char_index-tab_spaces,
+        )
+        return
+    }
+
+
 
     line^.characters = remove_char_at_index(line.characters, target)
 
@@ -468,6 +510,8 @@ handle_text_input :: proc() -> bool {
             indent_spaces,
         )
 
+        constrain_scroll_to_cursor()
+
         return false
     }
 
@@ -587,14 +631,17 @@ move_back_word :: proc() {
         buffer_cursor_line,
         new_char_index,
     )
+
+    constrain_scroll_to_cursor()
 }
 
 move_forward_word :: proc() {
     line := active_buffer.lines[buffer_cursor_line]
 
-    chars_after_cursor := line.characters[buffer_cursor_char_index:]
+    clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+    chars_after_cursor := line.characters[clamped_index:]
     
-    new_char_index := buffer_cursor_char_index
+    new_char_index := clamped_index
 
     prev_was_space := false
     for r,index in chars_after_cursor {
@@ -608,12 +655,19 @@ move_forward_word :: proc() {
             new_char_index = index + buffer_cursor_char_index
             break
         }
+
+        if index+new_char_index == len(line.characters)-1 {
+            new_char_index = len(line.characters)
+
+        }
     }
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
         new_char_index,
     )
+
+    constrain_scroll_to_cursor()
 }
 
 scroll_down :: proc() {
@@ -645,6 +699,18 @@ handle_buffer_input :: proc() -> bool {
         if key.modifiers == 2 {
             save_buffer()
         }
+
+        return false
+    }
+
+    if is_key_pressed(glfw.KEY_MINUS) {
+        buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
+
+        return false
+    }
+
+    if is_key_pressed(glfw.KEY_SLASH) {
+        buffer_font_size = clamp(buffer_font_size-1, 0, buffer_font_size)
 
         return false
     }
@@ -718,6 +784,13 @@ handle_buffer_input :: proc() -> bool {
 
         return false
     }
+
+    if is_key_pressed(glfw.KEY_Q) {
+        toggle_buffer_info_view()
+
+        return false
+    }
     
     return false
 }
+

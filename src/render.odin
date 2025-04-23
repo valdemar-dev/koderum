@@ -30,6 +30,9 @@ render :: proc() {
     gl.Enable(gl.BLEND)
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
+    gl.Enable(gl.DEPTH_TEST)
+    gl.DepthFunc(gl.LEQUAL)
+
     time := glfw.GetTime()
 
     frame_time = f32(time - prev_time)
@@ -39,6 +42,7 @@ render :: proc() {
     draw_buffer()
     draw_cursor()
     draw_ui()
+    draw_buffer_info_view()
 
     glfw.SwapBuffers(window)
     glfw.PollEvents()
@@ -87,7 +91,10 @@ normalize_to_texture_coords :: proc(texture_rect: rect, atlas_size: vec2) -> [4]
     return result
 }
 
-add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4, atlas_size := vec2{512,512}, z_pos : f32 = 0, invert_x : bool = false) {
+add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4, atlas_size := vec2{512,512}, z_index : f32 = 0, invert_x : bool = false) {
+
+    z_pos := z_index / 256
+
     rectangle := rect{
         input_rect.x,
         input_rect.y,
@@ -187,12 +194,44 @@ measure_text :: proc (
     return pen
 }
 
+
+add_text_measure :: proc(
+    rect_cache: ^RectCache,
+    pos: vec2,
+    tint : vec4,
+    font_height: f32,
+    text: string,
+    z_index : f32 = 0,
+) -> vec2 {
+    pen := vec2{
+        x=pos.x,
+        y=pos.y,
+    }
+
+    pen = add_text(
+        rect_cache,
+        pen,
+        tint,
+        font_height,
+        text,
+        z_index,
+    )
+
+    return vec2{
+        pen.x - pos.x,
+        pen.y - pos.y,
+    }
+}
+
+
+
 add_text :: proc(
     rect_cache: ^RectCache,
     pos: vec2,
     tint : vec4,
     font_height: f32,
     text: string,
+    z_index : f32 = 0,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -247,6 +286,7 @@ add_text :: proc(
             },
             tint,
             char_uv_map_size,
+            z_index,
         )
 
         pen.x = pen.x + (character.advance.x / 64)

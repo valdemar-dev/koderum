@@ -49,6 +49,7 @@ main :: proc() {
         set_view_ui()
         
         tick_buffer_cursor()
+        tick_buffer_info_view()
 
         update_camera()
        
