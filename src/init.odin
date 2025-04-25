@@ -61,7 +61,13 @@ init_window :: proc() {
     primary_monitor := glfw.GetPrimaryMonitor()
     mode := glfw.GetVideoMode(primary_monitor)
     
-    window = glfw.CreateWindow(mode.width, mode.height, "metropoville", nil, nil)
+    window = glfw.CreateWindow(
+        mode.width,
+        mode.height,
+        "Visual Studio Goon",
+        nil,
+        nil,
+    )
 
     glfw.SetFramebufferSizeCallback(window, size_callback)
 

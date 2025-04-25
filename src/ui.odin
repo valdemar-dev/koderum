@@ -53,6 +53,8 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
     }
 }
 
+ui_z_index :: 10
+
 draw_ui :: proc() {
     reset_rect_cache(&rect_cache)
 
@@ -64,17 +66,29 @@ draw_ui :: proc() {
 
     status_bar_height := asc - desc
 
+    one_width_percentage := fb_size.x / 100
+    one_height_percentage := fb_size.y / 100
+
     status_bar_rect = rect{
-        0,
-        0,
-        fb_size.x,
+        one_width_percentage * 20,
+        40,
+        fb_size.x - (one_width_percentage * 40),
         f32(status_bar_height),
     }
 
+    status_bar_bg_rect := rect{
+        status_bar_rect.x - 15,
+        status_bar_rect.y - 10,
+        status_bar_rect.width + 30,
+        status_bar_rect.height + 20,
+    }
+
     add_rect(&rect_cache,
-        status_bar_rect,
+        status_bar_bg_rect,
         no_texture,
         colour_bg_lighter,
+        vec2{},
+        ui_z_index,
     )
 
     text_pos := vec2{
@@ -93,23 +107,51 @@ draw_ui :: proc() {
 
     add_text(&rect_cache,
         text_pos,
-        vec4{1,1,1,1},
+        TEXT_MAIN,
         20,
         mode_string,
+        ui_z_index + 1
     )
 
     buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:])
-    defer delete(buf_data_string )
+    defer delete(buf_data_string)
 
-    add_text(&rect_cache,
-        vec2{
-            status_bar_rect.x + status_bar_rect.width - 400,
-            status_bar_rect.y,
-        },
-        vec4{1,1,1,1},
+    end_pos := status_bar_rect.x + status_bar_rect.width
+
+    buf_data_string_size := measure_text(
         ui_general_font_size,
         buf_data_string,
     )
+
+    add_text(&rect_cache,
+        vec2{
+            end_pos - buf_data_string_size.x,
+            status_bar_rect.y
+        },
+        TEXT_MAIN,
+        ui_general_font_size,
+        buf_data_string,
+        ui_z_index + 1,
+    )
+
+    if active_buffer != nil {
+        file_name := active_buffer.info.name
+
+        file_name_size := measure_text(ui_general_font_size, file_name)
+
+        half_offset := file_name_size.x / 2
+
+        add_text(&rect_cache,
+            vec2{
+                status_bar_rect.x + (status_bar_rect.width / 2) - half_offset,
+                status_bar_rect.y,
+            },
+            TEXT_MAIN,
+            ui_general_font_size,
+            file_name,
+            ui_z_index + 1,
+        )
+    }
 
     draw_rects(&rect_cache)
 }

@@ -671,11 +671,11 @@ move_forward_word :: proc() {
 }
 
 scroll_down :: proc() {
-    buffer_scroll_position += ((buffer_font_size * line_height) * 20) * frame_time
+    buffer_scroll_position += ((buffer_font_size * line_height) * 80) * frame_time
 }
 
 scroll_up :: proc() {
-    buffer_scroll_position -= ((buffer_font_size * line_height) * 20) * frame_time
+    buffer_scroll_position -= ((buffer_font_size * line_height) * 80) * frame_time
 }
 
 append_to_line :: proc() {
