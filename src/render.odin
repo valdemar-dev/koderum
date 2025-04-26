@@ -20,7 +20,7 @@ prev_time : f64
 
 @(private="package")
 render :: proc() {
-    gl.ClearColor(0, 0, 0, 0)
+    gl.ClearColor(BG_MAIN_10.x, BG_MAIN_10.y, BG_MAIN_10.z, 1)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
     gl.UseProgram(shader_id)
@@ -43,6 +43,7 @@ render :: proc() {
     draw_cursor()
     draw_ui()
     draw_buffer_info_view()
+    draw_browser_view()
 
     glfw.SwapBuffers(window)
     glfw.PollEvents()
@@ -165,6 +166,8 @@ measure_text :: proc (
 
     pen := highest
 
+    line_height := font_height * 1.2
+
     for r,i in text {
         if r == '\n' {
             pen.x = 0
@@ -237,6 +240,8 @@ add_text :: proc(
         x=pos.x,
         y=pos.y,
     }
+
+    line_height := font_height * 1.2
 
     for r,i in text {
         if r == '\n' {

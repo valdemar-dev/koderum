@@ -19,6 +19,12 @@ BufferLine :: struct {
 @(private="package")
 do_draw_line_count := true
 
+@(private="package")
+do_highlight_long_lines := true
+
+@(private="package")
+long_line_required_characters := 80
+
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
     x_offset: f32,
@@ -75,6 +81,72 @@ draw_buffers :: proc() {
 
 }
 
+draw_buffer_line :: proc(
+    buffer_line: BufferLine,
+    index: int,
+    input_pen: vec2,
+    line_buffer: ^[dynamic]byte,
+) -> vec2 {
+    pen := input_pen
+
+    line_height := buffer_font_size * 1.2
+
+    line_pos := vec2{
+        pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
+        pen.y - buffer_scroll_position,
+    }
+
+    if line_pos.y > fb_size.y {
+        return pen
+    }
+
+    if line_pos.y < 0 {
+        pen.y = pen.y + line_height
+
+        return pen
+    }
+
+    chars := buffer_line.characters
+
+    string := utf8.runes_to_string(chars[:])
+    defer delete(string)
+
+    add_text(
+        &rect_cache,
+        line_pos,
+        TEXT_MAIN,
+        buffer_font_size,
+        string,
+        1
+    )
+
+    if do_draw_line_count {
+        line_pos := vec2{
+            pen.x,
+            pen.y - buffer_scroll_position
+        }
+
+        line_string := strconv.itoa(line_buffer^[:], index+1)
+
+        add_text(&rect_cache,
+            line_pos,
+            TEXT_TRANSPARENT,
+            buffer_font_size,
+            line_string,
+            3,
+        )
+    }
+
+    is_long_line := len(buffer_line.characters) > long_line_required_characters
+
+    if do_highlight_long_lines && is_long_line {
+    }
+
+    pen.y = pen.y + line_height
+
+    return pen
+}
+
 @(private="package")
 draw_buffer :: proc() {
     if active_buffer == nil {
@@ -82,8 +154,6 @@ draw_buffer :: proc() {
     }
 
     buffer_lines := active_buffer.lines
-
-    pen := vec2{0,0}
 
     line_height := buffer_font_size * 1.2
 
@@ -127,54 +197,15 @@ draw_buffer :: proc() {
     line_buffer := make([dynamic]byte, len(buffer_lines))
     defer delete(line_buffer)
     
+    pen := vec2{0,0}
+
     for buffer_line, index in buffer_lines {
-        line_pos := vec2{
-            pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
-            pen.y - buffer_scroll_position,
-        }
-
-        if line_pos.y > fb_size.y {
-            break
-        }
-
-        if line_pos.y < 0 {
-            pen.y = pen.y + line_height
-
-            continue
-        }
-
-        chars := buffer_line.characters
-
-        string := utf8.runes_to_string(chars[:])
-        defer delete(string)
-
-        add_text(
-            &rect_cache,
-            line_pos,
-            TEXT_MAIN,
-            buffer_font_size,
-            string,
-            1
+        pen = draw_buffer_line(
+            buffer_line,
+            index,
+            pen,
+            &line_buffer,
         )
-
-        if do_draw_line_count {
-            line_pos := vec2{
-                pen.x,
-                pen.y - buffer_scroll_position
-            }
-
-            line_string := strconv.itoa(line_buffer[:], index+1)
-
-            add_text(&rect_cache,
-                line_pos,
-                TEXT_MAIN,
-                buffer_font_size,
-                line_string,
-                3,
-            )
-        }
-
-        pen.y = pen.y + line_height
     }
 
     draw_rects(&rect_cache)
@@ -615,7 +646,9 @@ move_down :: proc() {
 move_back_word :: proc() {
     line := active_buffer.lines[buffer_cursor_line]
 
-    words_before_cursor := line.characters[:buffer_cursor_char_index]
+    clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+
+    words_before_cursor := line.characters[:clamped_index]
     
     new_char_index : int
 
@@ -671,11 +704,11 @@ move_forward_word :: proc() {
 }
 
 scroll_down :: proc() {
-    buffer_scroll_position += ((buffer_font_size * line_height) * 80) * frame_time
+    buffer_scroll_position += ((buffer_font_size * 1.2) * 80) * frame_time
 }
 
 scroll_up :: proc() {
-    buffer_scroll_position -= ((buffer_font_size * line_height) * 80) * frame_time
+    buffer_scroll_position -= ((buffer_font_size * 1.2) * 80) * frame_time
 }
 
 append_to_line :: proc() {
@@ -706,11 +739,25 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
 
+        constrain_scroll_to_cursor()
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+        )
+
         return false
     }
 
     if is_key_pressed(glfw.KEY_SLASH) {
         buffer_font_size = clamp(buffer_font_size-1, 0, buffer_font_size)
+
+        constrain_scroll_to_cursor()
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+        )
 
         return false
     }
@@ -790,7 +837,7 @@ handle_buffer_input :: proc() -> bool {
 
         return false
     }
-    
+
     return false
 }
 

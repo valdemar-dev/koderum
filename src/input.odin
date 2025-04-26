@@ -153,7 +153,7 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
 
 handle_command_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_O) {
-        open_file("./test.txt")
+        toggle_browser_view()
 
         return false
     }

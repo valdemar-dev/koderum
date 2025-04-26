@@ -8,12 +8,7 @@ import ft "../../alt-odin-freetype"
 ui_general_font_size :: 20
 ui_smaller_font_size :: 16
 
-status_bar_rect := rect{
-    0,
-    0,
-    fb_size.x,
-    0,
-}
+status_bar_rect : rect
 
 ui_sliding_buffer := SlidingBuffer([16]rune){
     length=16,
@@ -71,7 +66,7 @@ draw_ui :: proc() {
 
     status_bar_rect = rect{
         one_width_percentage * 20,
-        40,
+        20,
         fb_size.x - (one_width_percentage * 40),
         f32(status_bar_height),
     }

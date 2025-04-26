@@ -50,6 +50,7 @@ main :: proc() {
         
         tick_buffer_cursor()
         tick_buffer_info_view()
+        tick_browser_view()
 
         update_camera()
        

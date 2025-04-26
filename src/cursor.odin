@@ -84,7 +84,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     cursor_width = last_width
 
-    line_height := buffer_font_size * line_height 
+    line_height := buffer_font_size * 1.2
 
     buffer_cursor_target_pos.x = new_x
     buffer_cursor_target_pos.y = f32(line) * line_height

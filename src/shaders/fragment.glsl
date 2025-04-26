@@ -1,10 +1,11 @@
+
 #version 330 core
 
 uniform sampler2D firstTexture;
 uniform sampler2D backgroundTexture;
 
-in  vec2  TexCoord;
-in  vec4  Color;
+in vec2 TexCoord;
+in vec4 Color;
 out vec4 FragColor;
 
 const float GAMMA = 2.2;
@@ -30,7 +31,7 @@ void main() {
     vec3 textLin = toLinear(Color.rgb);  
     vec3 bgLin   = toLinear(texture(backgroundTexture, TexCoord).rgb);
 
-    vec3 outLin  = alpha * textLin + (1.0 - alpha) * bgLin;
+    vec3 outLin  = mix(bgLin, textLin, alpha);
 
     vec3 outSRGB = toSRGB(outLin);
 

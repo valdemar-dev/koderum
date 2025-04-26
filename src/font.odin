@@ -19,9 +19,6 @@ rect_pack_glyp_padding : f32 = 16
 font_size : f32 = 20
 
 @(private="package")
-line_height : f32 = 1.2
-
-@(private="package")
 library : ft.Library
 
 @(private="package")
