@@ -1,6 +1,11 @@
 #+private file
 package main
 
+import "core:os"
+import fp "core:path/filepath"
+import "core:strings"
+import "core:fmt"
+
 show_browser_view := false
 
 browser_view_y : f32
@@ -13,6 +18,14 @@ padding :: 20
 bg_rect : rect
 
 @(private="package")
+cwd : string
+
+@(private="package")
+found_files : [dynamic]string
+
+search_term := "/*"
+
+@(private="package")
 toggle_browser_view :: proc() {
     if show_browser_view {
         show_browser_view = false
@@ -22,8 +35,41 @@ toggle_browser_view :: proc() {
         suppress = false
         show_browser_view = true
 
+        set_found_files()
+
         return
     }
+}
+
+set_found_files :: proc() {
+    concat := strings.concatenate({
+        cwd,
+        search_term,
+    })
+
+    hits, err := fp.glob(concat)
+
+    assert(err == .None)
+
+    clear(&found_files)
+    append_elems(&found_files, ..hits)
+
+    fmt.println(found_files)
+}
+
+filter_files :: proc(search_term: string) {
+    new_found_files := make([dynamic]string, len(found_files))
+
+    for found_file in found_files {
+        if found_file != search_term {
+            continue
+        }
+
+        append(&new_found_files, found_file)
+    }
+
+    clear(&found_files)
+    found_files = new_found_files
 }
 
 @(private="package")
@@ -57,13 +103,33 @@ draw_browser_view :: proc() {
         BG_MAIN_20,
     )
 
-    add_text(&rect_cache,
+    size := add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN, 
         ui_general_font_size,
         "Browser",
         start_z + 1,
     )
+
+    pen.y += ui_general_font_size
+
+    for found_file in found_files {
+        add_text(&rect_cache,
+            pen,
+            TEXT_MAIN,
+            ui_smaller_font_size,
+            found_file,
+            start_z + 1,
+        )
+
+        pen.y += ui_smaller_font_size
+
+        y_bound := (bg_rect.y+bg_rect.height)
+
+        if pen.y + ui_smaller_font_size + padding > y_bound {
+            break
+        } 
+    }
 
     draw_rects(&rect_cache)
 }

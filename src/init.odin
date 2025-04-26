@@ -26,6 +26,15 @@ init :: proc() {
     fb_size = vec2{f32(fb_width), f32(fb_height)}
 
     init_camera()
+
+    home_dir := os.get_env("HOME")
+
+    if home_dir == "" {
+        panic("Please set the HOME env variable.")
+    }
+
+    os.set_current_directory(home_dir)
+    cwd = os.get_current_directory()
 }
 
 size_callback :: proc "c" (window_handle: glfw.WindowHandle, width: i32, height: i32) {

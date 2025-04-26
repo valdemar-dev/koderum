@@ -226,8 +226,6 @@ add_text_measure :: proc(
     }
 }
 
-
-
 add_text :: proc(
     rect_cache: ^RectCache,
     pos: vec2,

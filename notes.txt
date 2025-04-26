@@ -1,18 +1,5 @@
 add t for persistant terminal instance
 
-
 add different dterminators for words
 
-
-sick name: SimpDent
-# Auto Indents
-per language, styled like this
-```
-ext=js
-char={
-type=indent
-char=}
-type=dedent
-
-
-```
+add cwd auto setter
