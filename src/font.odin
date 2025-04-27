@@ -353,6 +353,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     mem.copy(raw_data(new_buffer), raw_data(buffer_slice), size)
 
+    skibidi := new(context.allocator)
     char := new(Character, context.allocator)
 
     char^ = Character{

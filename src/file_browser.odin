@@ -37,7 +37,7 @@ handle_browser_input :: proc() {
 
         end_idx := len(runes)-1
 
-        if end_idx == -1 {
+        if end_idx == 0 {
             return
         }
 
@@ -51,16 +51,23 @@ handle_browser_input :: proc() {
     }
 
     if is_key_pressed(glfw.KEY_ENTER) {
-        concat := strings.concatenate({
-            cwd, "/", search_term,
-        })
-
-        defer delete(concat)
-
-        if os.is_dir(concat) {
-            os.set_current_directory(concat)
+        change_dir :: proc(dir: string) {
+            os.set_current_directory(dir)
             cwd = os.get_current_directory()
-            search_term = ""
+
+            search_term = strings.concatenate({
+                cwd, "/",
+            })
+
+            when ODIN_DEBUG {
+                fmt.println("CD'd to", cwd)
+            }
+
+            return
+        }
+
+        if os.is_dir(search_term) {
+            change_dir(search_term)
 
             return
         }
@@ -68,6 +75,13 @@ handle_browser_input :: proc() {
         if len(found_files) < 1 {
             return
         }
+
+        if os.is_dir(found_files[0]) {
+            change_dir(found_files[0])
+
+            return
+        }
+
 
         open_file(found_files[0])
 
@@ -101,6 +115,12 @@ toggle_browser_view :: proc() {
 
         input_mode = .BROWSER_SEARCH
         do_suppress_next_char_event = true
+
+        delete(search_term)
+
+        search_term = strings.concatenate({
+            cwd, "/",
+        })
 
         set_found_files()
 
@@ -138,8 +158,7 @@ set_found_files :: proc() {
         }
 
         for hit in hits {
-            if glob == "." ||
-            strings.contains(hit.fullpath, glob) {
+            if strings.contains(hit.name, glob) {
                 append_elem(&found_files, hit.fullpath)
             }
 
@@ -160,20 +179,21 @@ set_found_files :: proc() {
         } 
     }
 
-    concat := strings.concatenate({
-        cwd, "/", search_term,
-    })
+    dir : string
 
-    dir := fp.dir(concat)
+    base := fp.base(search_term)
 
-    base := fp.base(concat)
-
-    if os.is_dir(concat) {
+    if os.is_dir(search_term) {
         base = "."
+
+        dir = strings.clone(search_term)
+    } else {
+        dir = fp.dir(search_term)
     }
 
-    defer delete(concat)
     defer delete(dir)
+
+    fmt.println(dir, base)
 
     get_dir_files(dir, base, &dirs_searched)
 }
@@ -189,6 +209,16 @@ browser_append_to_search_term :: proc(key: rune) {
 
     search_term = utf8.runes_to_string(buf[:])
 
+    if os.is_dir(search_term) {
+        last_char := search_term[len(search_term)-1:]
+
+        if last_char != "/" && last_char != "." {
+            search_term = strings.concatenate({
+                search_term, "/",
+            })
+        }
+    }
+    
     set_found_files()
 
     delete(runes)
@@ -227,10 +257,6 @@ draw_browser_view :: proc() {
         start_z,
     )
 
-    search_term := strings.concatenate({
-        cwd,"/",search_term,
-    })
-
     st_size := measure_text(ui_general_font_size, search_term)
 
     add_text(&rect_cache,
@@ -248,7 +274,7 @@ draw_browser_view :: proc() {
         pen,
         TEXT_MAIN, 
         ui_general_font_size,
-        "Browser",
+        "File Search",
         start_z + 1,
     )
 
@@ -259,7 +285,7 @@ draw_browser_view :: proc() {
             pen,
             TEXT_MAIN,
             ui_smaller_font_size,
-            found_file,
+            found_file[:],
             start_z + 1,
         )
 

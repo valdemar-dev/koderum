@@ -1,6 +1,8 @@
 #+private file
 package main
 
+import "core:fmt"
+
 show_buffer_info_view := false
 
 buffer_info_view_x : f32
@@ -12,6 +14,9 @@ padding :: 20
 
 @(private="package")
 toggle_buffer_info_view :: proc() {
+
+        fmt.println(show_buffer_info_view)
+
     if show_buffer_info_view {
         show_buffer_info_view = false
 
@@ -104,6 +109,7 @@ tick_buffer_info_view :: proc() {
         )
 
         if int(fb_size.x) - int(buffer_info_view_x) < 5 {
+            suppress = true
         }
     }
 }
