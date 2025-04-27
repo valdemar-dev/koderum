@@ -27,7 +27,8 @@ Click :: struct {
 @(private="package")
 InputMode :: enum {
     COMMAND,
-    TEXT,
+    BUFFER_INPUT,
+    BROWSER_SEARCH,
 }
 
 @(private="package")
@@ -55,11 +56,13 @@ is_key_pressed :: proc(key: i32) -> bool {
 }
 
 check_inputs :: proc() -> bool {
-    switch input_mode {
+    #partial switch input_mode {
     case .COMMAND:
         handle_command_input() or_return
-    case .TEXT:
+    case .BUFFER_INPUT:
         handle_text_input() or_return
+    case .BROWSER_SEARCH:
+        handle_browser_input()
     }
 
     return false
@@ -91,8 +94,10 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     switch input_mode {
     case .COMMAND:
         return
-    case .TEXT:
+    case .BUFFER_INPUT:
         insert_into_buffer(key)
+    case .BROWSER_SEARCH:
+        browser_append_to_search_term(key)
     }
 }
 

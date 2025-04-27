@@ -15,6 +15,7 @@ ui_sliding_buffer := SlidingBuffer([16]rune){
     data=new([16]rune),
 }
 
+
 @(private="package")
 handle_ui_input :: proc(key, scancode, action, mods: i32) {
     if action == glfw.RELEASE {
@@ -81,7 +82,7 @@ draw_ui :: proc() {
     add_rect(&rect_cache,
         status_bar_bg_rect,
         no_texture,
-        colour_bg_lighter,
+        BG_MAIN_20,
         vec2{},
         ui_z_index,
     )
@@ -96,7 +97,7 @@ draw_ui :: proc() {
     switch input_mode {
     case .COMMAND:
         mode_string = "Command"
-    case .TEXT:
+    case .BUFFER_INPUT, .BROWSER_SEARCH:
         mode_string = "Text Input"
     }
 

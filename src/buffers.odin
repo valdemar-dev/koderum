@@ -282,7 +282,6 @@ remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
         return runes
     }
 
-
     new_runes := make([dynamic]rune, 0, len(runes) - 1)
 
     append_elems(&new_runes, ..runes[0:index])
@@ -719,7 +718,7 @@ append_to_line :: proc() {
         len(line.characters)
     )
 
-    input_mode = .TEXT
+    input_mode = .BUFFER_INPUT
 
     do_suppress_next_char_event = true
 }
@@ -769,7 +768,7 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_I) {
-        input_mode = .TEXT
+        input_mode = .BUFFER_INPUT
 
         do_suppress_next_char_event = true
 
