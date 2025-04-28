@@ -63,6 +63,8 @@ handle_browser_input :: proc() {
                 fmt.println("CD'd to", cwd)
             }
 
+            set_found_files()
+
             return
         }
 
@@ -86,17 +88,13 @@ handle_browser_input :: proc() {
         open_file(found_files[0])
 
         toggle_browser_view()
-
-        search_term = ""
         
         return
     }
 
     if is_key_pressed(glfw.KEY_ESCAPE) {
         toggle_browser_view()
-
-        search_term = ""
-        
+ 
         return
     }
 }
@@ -115,8 +113,6 @@ toggle_browser_view :: proc() {
 
         input_mode = .BROWSER_SEARCH
         do_suppress_next_char_event = true
-
-        delete(search_term)
 
         search_term = strings.concatenate({
             cwd, "/",
@@ -159,7 +155,12 @@ set_found_files :: proc() {
 
         for hit in hits {
             if strings.contains(hit.name, glob) {
-                append_elem(&found_files, hit.fullpath)
+                if hit.name == glob {
+                    inject_at(&found_files, 0, hit.fullpath)
+
+                } else {
+                    append_elem(&found_files, hit.fullpath)
+                }
             }
 
             if hit.is_dir == false {
@@ -192,8 +193,6 @@ set_found_files :: proc() {
     }
 
     defer delete(dir)
-
-    fmt.println(dir, base)
 
     get_dir_files(dir, base, &dirs_searched)
 }
@@ -278,22 +277,28 @@ draw_browser_view :: proc() {
         start_z + 1,
     )
 
-    pen.y += ui_general_font_size
+    pen.y += (ui_general_font_size + padding)
 
-    for found_file in found_files {
+    dir := fp.dir(search_term, context.temp_allocator)
+
+    for found_file,index in found_files {
+        font_size : f32 = (index == 0) ? ui_bigger_font_size : ui_smaller_font_size
+
+        gap := font_size * .5
+
         add_text(&rect_cache,
             pen,
             TEXT_MAIN,
-            ui_smaller_font_size,
-            found_file[:],
+            font_size,
+            found_file[len(dir):],
             start_z + 1,
         )
 
-        pen.y += ui_smaller_font_size
+        pen.y += font_size + gap
 
         y_bound := (bg_rect.y+bg_rect.height)
 
-        if pen.y + ui_smaller_font_size + padding > y_bound {
+        if pen.y + font_size + gap > y_bound {
             break
         } 
     }

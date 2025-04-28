@@ -16,15 +16,6 @@ BufferLine :: struct {
     characters: []rune,
 }
 
-@(private="package")
-do_draw_line_count := true
-
-@(private="package")
-do_highlight_long_lines := true
-
-@(private="package")
-long_line_required_characters := 80
-
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
     x_offset: f32,
@@ -38,6 +29,8 @@ Buffer :: struct {
     file_name: string,
 
     info: os.File_Info,
+
+    is_saved: bool,
 }
 
 IndentType :: enum { 
@@ -61,7 +54,7 @@ indent_rule_language_list : map[string]map[rune]IndentRule = {
 buffers : map[string]^Buffer
 
 @(private="package")
-buffer_font_size : f32 = 16
+buffer_font_size : f32 = 24
 
 @(private="package")
 active_buffer : ^Buffer
@@ -74,11 +67,8 @@ buffer_horizontal_scroll_position : f32
 
 sb := strings.builder_make()
 
-tab_spaces := 4
-
 @(private="package")
 draw_buffers :: proc() {
-
 }
 
 draw_buffer_line :: proc(
@@ -86,19 +76,11 @@ draw_buffer_line :: proc(
     index: int,
     input_pen: vec2,
     line_buffer: ^[dynamic]byte,
+    line_pos: vec2,
 ) -> vec2 {
     pen := input_pen
 
     line_height := buffer_font_size * 1.2
-
-    line_pos := vec2{
-        pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
-        pen.y - buffer_scroll_position,
-    }
-
-    if line_pos.y > fb_size.y {
-        return pen
-    }
 
     if line_pos.y < 0 {
         pen.y = pen.y + line_height
@@ -111,10 +93,12 @@ draw_buffer_line :: proc(
     string := utf8.runes_to_string(chars[:])
     defer delete(string)
 
-    add_text(
+    long_line := do_highlight_long_lines && (len(chars) >= long_line_required_characters)
+
+    add_code_text(
         &rect_cache,
         line_pos,
-        TEXT_MAIN,
+        long_line ? TEXT_WARN : TEXT_MAIN,
         buffer_font_size,
         string,
         1
@@ -153,6 +137,22 @@ draw_buffer :: proc() {
         return
     }
 
+
+    ext := filepath.ext(active_buffer.file_name)
+
+    switch ext {
+    case ".png":
+        draw_image_buffer(ext)
+    case:
+        draw_text_buffer()
+    }
+}
+
+draw_image_buffer :: proc(ext: string) {
+
+}
+
+draw_text_buffer :: proc() {
     buffer_lines := active_buffer.lines
 
     line_height := buffer_font_size * 1.2
@@ -200,11 +200,21 @@ draw_buffer :: proc() {
     pen := vec2{0,0}
 
     for buffer_line, index in buffer_lines {
+        line_pos := vec2{
+            pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
+            pen.y - buffer_scroll_position,
+        }
+
+        if line_pos.y > fb_size.y {
+            break
+        }
+
         pen = draw_buffer_line(
             buffer_line,
             index,
             pen,
             &line_buffer,
+            line_pos,
         )
     }
 
@@ -215,6 +225,12 @@ draw_buffer :: proc() {
 
 @(private="package")
 open_file :: proc(file_name: string) {
+    if file_name in buffers {
+        active_buffer = buffers[file_name]
+
+        return
+    }
+
     data, ok := os.read_entire_file_from_filename(file_name)
 
     if !ok {
@@ -235,6 +251,7 @@ open_file :: proc(file_name: string) {
 
     new_buffer^.width = fb_size.x
     new_buffer^.height = fb_size.y
+    new_buffer^.is_saved = true
 
     file_info, lstat_error := os.lstat(file_name)
 
@@ -275,6 +292,7 @@ open_file :: proc(file_name: string) {
     update_fonts()
 
     set_buffer_cursor_pos(0,0)
+    constrain_scroll_to_cursor()
 }
 
 remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
@@ -286,6 +304,8 @@ remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
 
     append_elems(&new_runes, ..runes[0:index])
     append_elems(&new_runes, ..runes[index+1:])
+
+    active_buffer^.is_saved = false
 
     return new_runes[:]
 }
@@ -299,6 +319,8 @@ insert_char_at_index :: proc(runes: []rune, index: int, c: rune) -> []rune {
     append_elem(&new_runes, c)
     append_elems(&new_runes, ..runes[clamped_index:])
 
+    active_buffer^.is_saved = false
+
     return new_runes[:]
 }
 
@@ -310,6 +332,8 @@ insert_chars_at_index :: proc(runes: []rune, index: int, chars: []rune) -> []run
     append_elems(&new_runes, ..runes[0:clamped_index])
     append_elems(&new_runes, ..chars[:])
     append_elems(&new_runes, ..runes[clamped_index:])
+
+    active_buffer^.is_saved = false
 
     return new_runes[:]
 }
@@ -343,6 +367,12 @@ save_buffer :: proc() {
         buffer_to_save[:],
         true,
     )
+
+    if !ok {
+        panic("FAILED TO SAVE")
+    }
+
+    active_buffer^.is_saved = true
 }
 
 insert_tab_as_spaces:: proc() {
@@ -470,6 +500,7 @@ determine_line_indent :: proc(line_num: int) -> int {
     indent_runes := make([dynamic]rune)
 
     ext := filepath.ext(active_buffer.file_name)
+
     language_rules := indent_rule_language_list[ext]
 
     prev_line_last_char := prev_line.characters[index]
@@ -738,6 +769,8 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
 
+        update_fonts()
+
         constrain_scroll_to_cursor()
 
         set_buffer_cursor_pos(
@@ -749,7 +782,9 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_SLASH) {
-        buffer_font_size = clamp(buffer_font_size-1, 0, buffer_font_size)
+        buffer_font_size = clamp(buffer_font_size-1, 8, buffer_font_size)
+
+        update_fonts()
 
         constrain_scroll_to_cursor()
 

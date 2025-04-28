@@ -35,6 +35,8 @@ draw_buffer_info_view :: proc() {
         return
     }
 
+    reset_rect_cache(&rect_cache)
+
     pos_rect := rect{
         buffer_info_view_x,
         50,
@@ -42,7 +44,7 @@ draw_buffer_info_view :: proc() {
         0,
     }
 
-    start_z : f32 = 3
+    start_z : f32 = 4
 
     pen := vec2{
         pos_rect.x + padding,
@@ -89,6 +91,8 @@ draw_buffer_info_view :: proc() {
         vec2{},
         start_z + 1,
     )
+
+    draw_rects(&rect_cache)
 }
 
 @(private="package")

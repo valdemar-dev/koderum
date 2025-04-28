@@ -279,10 +279,13 @@ try_adding_character :: proc(missing_char: MissingCharacter) -> ^Character {
 
     character, error_msg := gen_glyph_bitmap(missing_char.char_code, missing_char.font_height)
 
-    if error_msg != "" {
-        fmt.println("Char Code:", rune(missing_char.char_code), missing_char.char_code)
+    when ODIN_DEBUG {
+        if error_msg != "" {
+            fmt.println("Char Code:", rune(missing_char.char_code), missing_char.char_code)
 
-        fmt.println(error_msg)
+            fmt.println(error_msg)
+        }
+
     }
 
     if character == nil {
@@ -315,7 +318,10 @@ find_char_in_faces :: proc(charcode: u64) -> (u32, ft.Face) {
 
 gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Character, error_msg: string) {
     glyph_index, face := find_char_in_faces(charcode)
-    if glyph_index == 0 do return nil, "glyph index 0"
+
+    if glyph_index == 0 && charcode != 0 {
+        return nil, "glyph index 0"
+    }
 
     error : ft.Error
 
@@ -353,7 +359,6 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     mem.copy(raw_data(new_buffer), raw_data(buffer_slice), size)
 
-    skibidi := new(context.allocator)
     char := new(Character, context.allocator)
 
     char^ = Character{

@@ -57,6 +57,8 @@ main :: proc() {
         render()
 
         update_fonts()
+
+        free_all(context.temp_allocator)
     }
 
     clear_fonts()

@@ -74,8 +74,28 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
         char := get_char(buffer_font_size, u64(r))
 
-        if char == nil {
+        if r == '\t' {
+            character := get_char(buffer_font_size, u64(' '))
+
+            if character == nil {
+                continue
+            }
+
+            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
+
+            new_x += advance_amount
+            last_width = advance_amount
+
             continue
+        }
+
+
+        if char == nil {
+            char = get_char(buffer_font_size, u64(0))
+            
+            if char == nil {
+                continue
+            }
         }
 
         new_x += (char.advance.x / 64) 

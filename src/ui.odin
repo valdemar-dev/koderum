@@ -5,6 +5,7 @@ import "vendor:glfw"
 import "core:unicode/utf8"
 import ft "../../alt-odin-freetype"
 
+ui_bigger_font_size :: 30
 ui_general_font_size :: 20
 ui_smaller_font_size :: 16
 
@@ -104,7 +105,7 @@ draw_ui :: proc() {
     add_text(&rect_cache,
         text_pos,
         TEXT_MAIN,
-        20,
+        ui_general_font_size,
         mode_string,
         ui_z_index + 1
     )
@@ -133,19 +134,36 @@ draw_ui :: proc() {
     if active_buffer != nil {
         file_name := active_buffer.info.name
 
-        file_name_size := measure_text(ui_general_font_size, file_name)
+        file_name_size := measure_text(ui_smaller_font_size, file_name)
 
         half_offset := file_name_size.x / 2
 
-        add_text(&rect_cache,
-            vec2{
-                status_bar_rect.x + (status_bar_rect.width / 2) - half_offset,
-                status_bar_rect.y,
+        pos := vec2{
+            status_bar_rect.x + (status_bar_rect.width / 2) - half_offset,
+            status_bar_rect.y,
+        }
+
+        padding : f32 : 10
+
+        add_rect(&rect_cache,
+            rect{
+                pos.x - padding,
+                status_bar_bg_rect.y,
+                file_name_size.x + padding * 2,
+                status_bar_bg_rect.height,
             },
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            ui_z_index + 2,
+        )
+
+        add_text(&rect_cache,
+            pos,
             TEXT_MAIN,
-            ui_general_font_size,
+            ui_smaller_font_size,
             file_name,
-            ui_z_index + 1,
+            ui_z_index + 3,
         )
     }
 

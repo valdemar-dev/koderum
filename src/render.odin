@@ -242,17 +242,143 @@ add_text :: proc(
     line_height := font_height * 1.2
 
     for r,i in text {
-        if r == '\n' {
-            pen.x = pos.x
-            pen.y = pen.y + font_height * line_height
+        if r == '\t' {
+            character := get_char(font_height, u64(' '))
+
+            if character == nil {
+                continue
+            }
+
+            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
+            pen.x += advance_amount
 
             continue
+        }
+
+        if pen.x > fb_size.x {
+            break
         }
 
         character := get_char(font_height, u64(r))
 
         if character == nil {
+            character = get_char(font_height, u64(0))
+
+            if character == nil {
+                continue
+            }
+        }
+        
+        if font_height in char_uv_maps == false {
             continue
+        }
+
+        index := char_uv_maps[font_height]
+
+        char_uv_map := char_uv_maps_array[index]
+
+        uvs_index := char_uv_map[u64(r)]
+        uvs := char_rects[uvs_index]
+      
+        height := f32(character.rows)
+        width := f32(character.width)
+
+        error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+        assert(error == .Ok)
+
+        ascend := primary_font.size.metrics.ascender >> 6
+       
+        add_rect(rect_cache,
+            rect{
+                pen.x + character.offset.x,
+                (pen.y - character.offset.y + f32(ascend)),
+                width,
+                height,
+            },
+            rect{
+                f32(uvs.x),
+                f32(uvs.y),
+                f32(uvs.w) - rect_pack_glyp_padding,
+                f32(uvs.h) - rect_pack_glyp_padding,
+            },
+            tint,
+            char_uv_map_size,
+            z_index,
+        )
+
+        pen.x = pen.x + (character.advance.x / 64)
+        pen.y = pen.y + character.advance.y
+    }
+
+    return pen
+}
+
+add_code_text :: proc(
+    rect_cache: ^RectCache,
+    pos: vec2,
+    tint : vec4,
+    font_height: f32,
+    text: string,
+    z_index : f32 = 0,
+) -> vec2 {
+    pen := vec2{
+        x=pos.x,
+        y=pos.y,
+    }
+
+    highlight_height : f32
+
+    if do_highlight_indents {
+        error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+        if error != .Ok do return pen
+
+        asc := primary_font.size.metrics.ascender >> 6
+        desc := primary_font.size.metrics.descender >> 6
+
+        highlight_height = f32(asc - desc)
+    }
+
+    line_height := font_height * 1.2
+
+    for r,i in text {
+        if r == '\t' {
+            character := get_char(font_height, u64(' '))
+
+            if character == nil {
+                continue
+            }
+
+            if do_highlight_indents {
+                add_rect(rect_cache,
+                    rect{
+                        pen.x,
+                        pen.y,
+                        5,
+                        line_height,
+                    },
+                    no_texture,
+                    BG_MAIN_20,
+                )
+            }
+
+            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
+            pen.x += advance_amount
+
+            continue
+        }
+
+        if pen.x > fb_size.x {
+            break
+        }
+
+        character := get_char(font_height, u64(r))
+
+        if character == nil {
+            character = get_char(font_height, u64(0))
+
+            if character == nil {
+                continue
+            }
         }
         
         if font_height in char_uv_maps == false {

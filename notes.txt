@@ -3,3 +3,12 @@ add t for persistant terminal instance
 add different dterminators for words
 
 add cwd auto setter
+
+add savestate checking
+add linelength checking
+dont panic if failing to save
+add controllable padding between lines and line count
+
+add configs for tab char handling
+tabs / spaces when andintg
+ADD SOMEWHERE IN DOCS: make sure to hit enter to set your CWD
