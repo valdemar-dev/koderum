@@ -34,10 +34,19 @@ init :: proc() {
     }
 
     os.set_current_directory(home_dir)
-    cwd = os.get_current_directory()
+    
+    if default_cwd != "" {
+        cwd = default_cwd
+    } else {
+        cwd = os.get_current_directory()
+    }
 }
 
-size_callback :: proc "c" (window_handle: glfw.WindowHandle, width: i32, height: i32) {
+size_callback :: proc "c" (
+    window_handle: glfw.WindowHandle,
+    width: i32,
+    height: i32
+) {
     fb_size = vec2{f32(width), f32(height)}
     gl.Viewport(0,0,width,height)
 }
@@ -120,19 +129,22 @@ init_opengl :: proc() {
     gl.GenBuffers(1, &ebo)
     gl.GenVertexArrays(1, &vao)
 
-    prog_id, ok := gl.load_shaders_file("./src/shaders/vertex.glsl", "./src/shaders/fragment.glsl")
+    prog_id, ok := gl.load_shaders_file(
+        "./src/shaders/vertex.glsl", 
+        "./src/shaders/fragment.glsl"
+    )
 
     shader_id = prog_id
 
     if !ok {
-        fmt.println("failed to load vertex and fragment shader")
+        fmt.println("Failed to load vertex and fragment shader")
 
         infoLog : [^]u8 = {}
         gl.GetShaderInfoLog(prog_id,512,nil,infoLog)
         
         fmt.println(infoLog)
 
-        return
+        panic("Critical failure.")
     }
 
     projection_loc = gl.GetUniformLocation(prog_id, "cameraProjection")
@@ -152,8 +164,6 @@ init_opengl :: proc() {
     gl.EnableVertexAttribArray(2)
 
     gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
-
-    fmt.println("Shader Uniform Locations:",projection_loc,view_loc,first_texture_loc)
 
     gl.GenTextures(1, &font_texture_id)
     gl.ActiveTexture(gl.TEXTURE0)

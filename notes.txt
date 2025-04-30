@@ -12,3 +12,9 @@ add controllable padding between lines and line count
 add configs for tab char handling
 tabs / spaces when andintg
 ADD SOMEWHERE IN DOCS: make sure to hit enter to set your CWD
+
+bug:
+    - lstat is annoying, need statx unix syscall instead of stat, but odin
+      uses stat. might write my own, idk.
+
+fix per char metric set its retardded

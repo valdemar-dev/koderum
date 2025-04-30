@@ -110,7 +110,7 @@ draw_ui :: proc() {
         ui_z_index + 1
     )
 
-    buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:])
+    buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:ui_sliding_buffer.count])
     defer delete(buf_data_string)
 
     end_pos := status_bar_rect.x + status_bar_rect.width

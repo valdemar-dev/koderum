@@ -12,8 +12,27 @@ import "core:unicode/utf8"
 import "core:strconv"
 import "core:path/filepath"
 
+@(private="package")
+WordDef :: struct {
+    start: i32,
+    end: i32,
+    word_type: WordType,
+}
+
+@(private="package")
+WordType :: enum {
+    GENERIC,
+    NUMBER,
+    KEYWORD,
+    STRING,
+    SPECIAL,
+    TYPEDEF,
+}
+
+@(private="package")
 BufferLine :: struct {
     characters: []rune,
+    words: []WordDef,
 }
 
 Buffer :: struct {
@@ -27,27 +46,22 @@ Buffer :: struct {
     height: f32,
 
     file_name: string,
+    ext: string,
 
     info: os.File_Info,
 
     is_saved: bool,
 }
 
+@(private="package")
 IndentType :: enum { 
     FORWARD,
     BACKWARD,
 }
 
+@(private="package")
 IndentRule :: struct {
     type: IndentType,
-}
-
-indent_rule_language_list : map[string]map[rune]IndentRule = {
-    ".txt"={
-        '{'=IndentRule{
-            type=.FORWARD,
-        },
-    }
 }
 
 @(private="package")
@@ -72,7 +86,7 @@ draw_buffers :: proc() {
 }
 
 draw_buffer_line :: proc(
-    buffer_line: BufferLine,
+    buffer_line: ^BufferLine,
     index: int,
     input_pen: vec2,
     line_buffer: ^[dynamic]byte,
@@ -98,10 +112,10 @@ draw_buffer_line :: proc(
     add_code_text(
         &rect_cache,
         line_pos,
-        long_line ? TEXT_WARN : TEXT_MAIN,
         buffer_font_size,
         string,
-        1
+        1,
+        buffer_line,
     )
 
     if do_draw_line_count {
@@ -121,11 +135,6 @@ draw_buffer_line :: proc(
         )
     }
 
-    is_long_line := len(buffer_line.characters) > long_line_required_characters
-
-    if do_highlight_long_lines && is_long_line {
-    }
-
     pen.y = pen.y + line_height
 
     return pen
@@ -137,12 +146,9 @@ draw_buffer :: proc() {
         return
     }
 
-
-    ext := filepath.ext(active_buffer.file_name)
-
-    switch ext {
+    switch active_buffer.ext {
     case ".png":
-        draw_image_buffer(ext)
+        draw_image_buffer(active_buffer.ext)
     case:
         draw_text_buffer()
     }
@@ -199,7 +205,9 @@ draw_text_buffer :: proc() {
     
     pen := vec2{0,0}
 
-    for buffer_line, index in buffer_lines {
+    clear(&encountered_string_chars)
+
+    for &buffer_line, index in buffer_lines {
         line_pos := vec2{
             pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             pen.y - buffer_scroll_position,
@@ -210,7 +218,7 @@ draw_text_buffer :: proc() {
         }
 
         pen = draw_buffer_line(
-            buffer_line,
+            &buffer_line,
             index,
             pen,
             &line_buffer,
@@ -262,9 +270,13 @@ open_file :: proc(file_name: string) {
     }
 
     new_buffer^.info = file_info
+    new_buffer^.ext = filepath.ext(new_buffer^.file_name)
+
+    active_buffer = new_buffer
 
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
+        fmt.println(new_buffer^)
     }
 
     for line in lines { 
@@ -278,12 +290,12 @@ open_file :: proc(file_name: string) {
             get_char(buffer_font_size, u64(r))
         }
 
+        set_line_word_defs(&buffer_line)
+
         append_elem(buffer_lines, buffer_line)
     }
 
     buffers[file_name] = new_buffer
-
-    active_buffer = new_buffer
 
     when ODIN_DEBUG {
         fmt.println("Updating fonts for buffer")
@@ -461,25 +473,6 @@ get_line_indent_level :: proc(line_num: int) -> int {
     return indent_level
 }
 
-/*
-
-get_current_line_block :: proc(line_num: int) -> int {
-    if line_num == 0 {
-        return 0
-    }
-
-    block_start := line_num
-
-    target_rune
-
-    for ; block_start > 0; block_start -= 1 {
-
-    }
-
-    return block_start 
-}
-*/
-
 determine_line_indent :: proc(line_num: int) -> int {
     if line_num == 0 {
         return 0
@@ -502,6 +495,10 @@ determine_line_indent :: proc(line_num: int) -> int {
     ext := filepath.ext(active_buffer.file_name)
 
     language_rules := indent_rule_language_list[ext]
+
+    if language_rules == nil {
+        return prev_line_indent_level * tab_spaces
+    }
 
     prev_line_last_char := prev_line.characters[index]
 
@@ -577,6 +574,70 @@ handle_text_input :: proc() -> bool {
     }
 
     return false
+}
+
+@(private="package") 
+set_line_word_defs :: proc(line: ^BufferLine) {
+    words := make([dynamic]WordDef)
+
+    start_idx : int = -1
+
+    for char,index in line.characters {
+        if char != ' ' && char != '\t' {
+            if start_idx < 0 {
+                start_idx = index
+            }
+
+            continue
+        } 
+
+        if start_idx < 0 {
+            continue
+        }
+
+        word_def := new(WordDef)
+        word_def^ = WordDef{
+            start=i32(start_idx),
+            end=i32(index),
+        }
+
+        set_word_type(word_def, line)
+
+        append(&words, word_def^)
+
+        start_idx = -1
+    }
+
+    if start_idx > -1 {
+        word_def := new(WordDef)
+        word_def^ = WordDef{
+            start=i32(start_idx),
+            end=i32(len(line.characters)),
+        }
+
+        set_word_type(word_def, line)
+
+        append(&words, word_def^)
+    }
+
+    line.words = words[:]
+}
+
+set_word_type :: proc(word_def: ^WordDef, buffer_line: ^BufferLine) {
+    word_runes := buffer_line.characters[word_def.start:word_def.end]
+    word_string := utf8.runes_to_string(word_runes)
+
+    keyword_list := keyword_language_list[active_buffer.ext]
+
+    if keyword_list != nil  {
+        if word_string not_in keyword_list {
+            return
+        }
+
+        word_def^.word_type = keyword_list[word_string]
+
+        return
+    }
 }
 
 @(private="package")

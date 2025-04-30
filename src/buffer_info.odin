@@ -2,6 +2,9 @@
 package main
 
 import "core:fmt"
+import "core:strings"
+import "core:os"
+import "core:time"
 
 show_buffer_info_view := false
 
@@ -12,11 +15,11 @@ suppress := true
 
 padding :: 20
 
+sb := strings.builder_make()
+sb_string : string
+
 @(private="package")
 toggle_buffer_info_view :: proc() {
-
-        fmt.println(show_buffer_info_view)
-
     if show_buffer_info_view {
         show_buffer_info_view = false
 
@@ -78,6 +81,95 @@ draw_buffer_info_view :: proc() {
     }
 
     pen.y += ui_smaller_font_size + padding
+
+    strings.write_string(&sb, "Bytes: ")
+    strings.write_i64(&sb, active_buffer.info.size)
+
+    size_string := strings.to_string(sb)
+    strings.builder_reset(&sb)
+
+    size = add_text_measure(&rect_cache,
+        pen,
+        TEXT_MAIN,
+        ui_smaller_font_size,
+        size_string,
+        start_z + 2
+    )
+
+    if size.x > buffer_info_view_width {
+        buffer_info_view_width = size.x
+    }
+
+    pen.y += ui_smaller_font_size + padding
+
+    strings.write_string(&sb, "Created: ")
+
+    creation_date,_ := time.time_to_datetime(active_buffer.info.creation_time) 
+
+    strings.write_i64(&sb, creation_date.year)
+    strings.write_string(&sb, "-")
+    strings.write_i64(&sb, i64(creation_date.month))
+    strings.write_string(&sb, "-")
+    strings.write_i64(&sb, i64(creation_date.day))
+    strings.write_string(&sb, " @ ")
+    strings.write_i64(&sb, i64(creation_date.hour))
+    strings.write_string(&sb, ":")
+    strings.write_i64(&sb, i64(creation_date.minute))
+    strings.write_string(&sb, ":")
+    strings.write_i64(&sb, i64(creation_date.second))
+
+    created_string := strings.to_string(sb)
+
+    strings.builder_reset(&sb)
+
+    size = add_text_measure(&rect_cache,
+        pen,
+        TEXT_MAIN,
+        ui_smaller_font_size,
+        created_string,
+        start_z + 2
+    )
+
+    if size.x > buffer_info_view_width {
+        buffer_info_view_width = size.x
+    }
+
+    pen.y += ui_smaller_font_size + padding
+
+    strings.write_string(&sb, "Modified: ")
+
+    edited_date ,_ := time.time_to_datetime(active_buffer.info.modification_time)
+
+    strings.write_i64(&sb, edited_date.year)
+    strings.write_string(&sb, "-")
+    strings.write_i64(&sb, i64(edited_date.month))
+    strings.write_string(&sb, "-")
+    strings.write_i64(&sb, i64(edited_date.day))
+    strings.write_string(&sb, " @ ")
+    strings.write_i64(&sb, i64(edited_date.hour))
+    strings.write_string(&sb, ":")
+    strings.write_i64(&sb, i64(edited_date.minute))
+    strings.write_string(&sb, ":")
+    strings.write_i64(&sb, i64(edited_date.second))
+
+    edited_string := strings.to_string(sb)
+
+    strings.builder_reset(&sb)
+
+    size = add_text_measure(&rect_cache,
+        pen,
+        TEXT_MAIN,
+        ui_smaller_font_size,
+        edited_string,
+        start_z + 2
+    )
+
+    if size.x > buffer_info_view_width {
+        buffer_info_view_width = size.x
+    }
+
+    pen.y += ui_smaller_font_size + padding
+
 
     add_rect(&rect_cache,
         rect{

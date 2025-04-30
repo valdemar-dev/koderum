@@ -205,6 +205,7 @@ add_text_measure :: proc(
     font_height: f32,
     text: string,
     z_index : f32 = 0,
+    draw_missing_glyphs : bool = true,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -233,6 +234,7 @@ add_text :: proc(
     font_height: f32,
     text: string,
     z_index : f32 = 0,
+    draw_missing_glyphs : bool = false, 
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -262,6 +264,10 @@ add_text :: proc(
         character := get_char(font_height, u64(r))
 
         if character == nil {
+            if draw_missing_glyphs == false {
+                continue
+            }
+
             character = get_char(font_height, u64(0))
 
             if character == nil {
@@ -313,13 +319,53 @@ add_text :: proc(
     return pen
 }
 
+@(private="package")
+encountered_string_chars : map[rune]int 
+
+is_char_in_string :: proc(
+    lang_string_chars: ^map[rune]StringVariant,
+) -> (bool, StringVariant) {
+    for char,count in encountered_string_chars {
+        if count % 2 != 0 {
+            assert(lang_string_chars != nil)
+
+            return true,lang_string_chars[char]
+        }
+    }
+
+    return false, .A
+}
+
+try_add_string_encounter :: proc(
+    r: rune,
+    lang_string_chars: ^map[rune]StringVariant
+) {
+    if lang_string_chars == nil {
+        return
+    }
+    
+    if r not_in lang_string_chars {
+        return
+    }
+
+    existing_encounter := &encountered_string_chars[r]
+
+    if existing_encounter != nil {
+        encountered_string_chars[r] = existing_encounter^ + 1
+
+        return
+    }
+
+    encountered_string_chars[r] = 1
+}
+
 add_code_text :: proc(
     rect_cache: ^RectCache,
     pos: vec2,
-    tint : vec4,
     font_height: f32,
     text: string,
-    z_index : f32 = 0,
+    z_index : f32,
+    buffer_line: ^BufferLine,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -340,7 +386,49 @@ add_code_text :: proc(
 
     line_height := font_height * 1.2
 
+    is_start_of_line := true
+
+    word_idx := 0
+    words_len := len(buffer_line.words)
+
+    word := words_len > 0 ? &buffer_line.words[word_idx] : nil
+
+    set_word :: proc(word: ^^WordDef, word_idx: ^int, buffer_line: ^BufferLine, i: int) {
+        if word^ == nil {
+            return
+        }
+
+        if i32(i) < word^.end {
+            return
+        }
+
+        word_idx^ += 1
+
+        if word_idx^ >= len(buffer_line.words) - 1 {
+            return
+        }
+
+        new_word := &buffer_line.words[word_idx^]
+
+        if new_word != nil {
+            word^ = new_word
+        } 
+    }
+ 
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+    assert(error == .Ok)
+
+    ascend := primary_font.size.metrics.ascender >> 6
+
+    lang_string_chars := string_char_language_list[active_buffer.ext]
+
     for r,i in text {
+        set_word(&word, &word_idx, buffer_line, i) 
+
+        if r != ' ' && is_start_of_line == true {
+            is_start_of_line = false
+        }
+
         if r == '\t' {
             character := get_char(font_height, u64(' '))
 
@@ -348,21 +436,44 @@ add_code_text :: proc(
                 continue
             }
 
+            color := differentiate_tab_and_spaces ? BG_MAIN_30 : BG_MAIN_20
+
             if do_highlight_indents {
                 add_rect(rect_cache,
                     rect{
                         pen.x,
                         pen.y,
-                        5,
+                        3,
                         line_height,
                     },
                     no_texture,
-                    BG_MAIN_20,
+                    color,
                 )
             }
 
             advance_amount := (character.advance.x / 64) * f32(tab_spaces)
             pen.x += advance_amount
+
+            continue
+        } else if r == ' ' && do_highlight_indents && i % tab_spaces == 0 && is_start_of_line {
+            character := get_char(font_height, u64(' '))
+
+            if character == nil {
+                continue
+            }
+
+            add_rect(rect_cache,
+                rect{
+                    pen.x,
+                    pen.y,
+                    3,
+                    line_height,
+                },
+                no_texture,
+                BG_MAIN_20,
+            )
+
+            pen.x += (character.advance.x / 64)
 
             continue
         }
@@ -385,27 +496,33 @@ add_code_text :: proc(
             continue
         }
 
+        try_add_string_encounter(r, lang_string_chars)
+
         index := char_uv_maps[font_height]
-
         char_uv_map := char_uv_maps_array[index]
-
         uvs_index := char_uv_map[u64(r)]
         uvs := char_rects[uvs_index]
-      
-        height := f32(character.rows)
-        width := f32(character.width)
 
-        error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
-        assert(error == .Ok)
+        color := TEXT_MAIN
 
-        ascend := primary_font.size.metrics.ascender >> 6
-       
+        is_in_string, variant := is_char_in_string(lang_string_chars)
+
+        if is_in_string {
+            color = string_variants[variant]
+        } else if word != nil {
+            hl_color := &highlight_colors[word.word_type]
+
+            if hl_color != nil {
+                color = hl_color^
+            }
+        }       
+
         add_rect(rect_cache,
             rect{
                 pen.x + character.offset.x,
                 (pen.y - character.offset.y + f32(ascend)),
-                width,
-                height,
+                f32(character.width),
+                f32(character.rows),
             },
             rect{
                 f32(uvs.x),
@@ -413,7 +530,7 @@ add_code_text :: proc(
                 f32(uvs.w) - rect_pack_glyp_padding,
                 f32(uvs.h) - rect_pack_glyp_padding,
             },
-            tint,
+            color,
             char_uv_map_size,
             z_index,
         )
