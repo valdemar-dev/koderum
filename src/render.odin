@@ -398,13 +398,13 @@ add_code_text :: proc(
             return
         }
 
-        if i32(i) < word^.end {
+        if i32(i) <= word^.end {
             return
         }
 
         word_idx^ += 1
 
-        if word_idx^ >= len(buffer_line.words) - 1 {
+        if word_idx^ > len(buffer_line.words) - 1 {
             return
         }
 
@@ -509,6 +509,10 @@ add_code_text :: proc(
 
         if is_in_string {
             color = string_variants[variant]
+        } else if r in special_chars {
+            color = special_chars[r]
+        } else if r in lang_string_chars{
+            color = string_variants[lang_string_chars[r]]
         } else if word != nil {
             hl_color := &highlight_colors[word.word_type]
 

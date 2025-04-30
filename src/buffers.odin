@@ -515,12 +515,19 @@ determine_line_indent :: proc(line_num: int) -> int {
 
 @(private="package")
 handle_text_input :: proc() -> bool {
+    line := &active_buffer.lines[buffer_cursor_line] 
+    
+    char_index := buffer_cursor_char_index
+
+
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
     }
 
     if is_key_pressed(glfw.KEY_TAB) {
         insert_tab_as_spaces()
+
+        set_line_word_defs(line)
 
         return false
     }
@@ -529,12 +536,9 @@ handle_text_input :: proc() -> bool {
         return false
     }
 
-    line := &active_buffer.lines[buffer_cursor_line] 
-    
-    char_index := buffer_cursor_char_index
-
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         remove_char()
+        set_line_word_defs(line)
 
         return false
     } 
@@ -569,6 +573,7 @@ handle_text_input :: proc() -> bool {
         )
 
         constrain_scroll_to_cursor()
+        set_line_word_defs(line)
 
         return false
     }
@@ -652,6 +657,8 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
     constrain_scroll_to_cursor()
+
+    set_line_word_defs(line)
 }
 
 constrain_scroll_to_cursor :: proc() {

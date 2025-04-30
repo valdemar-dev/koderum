@@ -2,4 +2,10 @@ return
 
 test thing
 
-+ "hi"
+test()+ "hi" 
+
+const thing = () => {
+    const someVariable = 'your mom is gay';
+    
+    const otherThing = 20;
+};
