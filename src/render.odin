@@ -323,8 +323,8 @@ add_text :: proc(
 encountered_string_chars : map[rune]int 
 
 is_char_in_string :: proc(
-    lang_string_chars: ^map[rune]StringVariant,
-) -> (bool, StringVariant) {
+    lang_string_chars: ^map[rune]vec4,
+) -> (bool, vec4) {
     for char,count in encountered_string_chars {
         if count % 2 != 0 {
             assert(lang_string_chars != nil)
@@ -333,12 +333,12 @@ is_char_in_string :: proc(
         }
     }
 
-    return false, .A
+    return false, vec4{},
 }
 
 try_add_string_encounter :: proc(
     r: rune,
-    lang_string_chars: ^map[rune]StringVariant
+    lang_string_chars: ^map[rune]vec4,
 ) {
     if lang_string_chars == nil {
         return
@@ -508,11 +508,11 @@ add_code_text :: proc(
         is_in_string, variant := is_char_in_string(lang_string_chars)
 
         if is_in_string {
-            color = string_variants[variant]
+            color = variant
         } else if r in special_chars {
             color = special_chars[r]
-        } else if r in lang_string_chars{
-            color = string_variants[lang_string_chars[r]]
+        } else if lang_string_chars != nil && r in lang_string_chars {
+            color = lang_string_chars[r]
         } else if word != nil {
             hl_color := &highlight_colors[word.word_type]
 

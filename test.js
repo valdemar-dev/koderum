@@ -1,11 +1,7 @@
-return
+const thing = "hi";
+const otherThing = 'other hi';
 
-test thing
-
-test()+ "hi" 
-
-const thing = () => {
-    const someVariable = 'your mom is gay';
-    
-    const otherThing = 20;
-};
+function someFuntion() {
+    let thing = 6;
+    var otherThing = 20;
+}

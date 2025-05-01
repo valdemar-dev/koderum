@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package main
 
 tab_spaces := 4
@@ -13,3 +14,9 @@ do_highlight_indents := true
 default_cwd := "/home/v/prog/projects/text-editor"
 
 differentiate_tab_and_spaces := true
+
+highlight_colors : map[WordType]vec4 = {
+    .KEYWORD=ORANGE,
+    .FUNCTION=CYAN,
+    .DECLARATION=RED,
+}

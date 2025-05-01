@@ -1,15 +1,14 @@
 #+feature dynamic-literals
 package main
 
-StringVariant :: enum {
-    A,
-    B,
-    C,
-}
-
-string_variants : map[StringVariant]vec4 = {
-    .A=RED,
-    .B=GREEN,
+WordType :: enum {
+    GENERIC,
+    NUMBER,
+    KEYWORD,
+    FUNCTION,
+    DECLARATION,
+    SPECIAL,
+    TYPE,
 }
 
 indent_rule_language_list : map[string]^map[rune]IndentRule = {
@@ -51,31 +50,30 @@ python_indent_rule_list : map[rune]IndentRule = {
 
 js_keyword_map : map[string]WordType = {
     "for"=.KEYWORD,
+
     "continue"=.KEYWORD,
-    "const"=.KEYWORD,
-    "let"=.KEYWORD,
     "return"=.KEYWORD,
     "with"=.KEYWORD,
+
+    "function"=.FUNCTION,
+
+    "const"=.DECLARATION,
+    "let"=.DECLARATION,
+    "var"=.DECLARATION,
 }
 
 keyword_language_list : map[string]^map[string]WordType = {
     ".js"=&js_keyword_map,
 }
 
-js_string_chars : map[rune]StringVariant = {
-    '"'=.A,
-    '\''=.B,
-    '`'=.A,
+js_string_chars : map[rune]vec4 = {
+    '"'=GREEN,
+    '\''=RED,
+    '`'=GREEN,
 }
 
-string_char_language_list : map[string]^map[rune]StringVariant = {
+string_char_language_list : map[string]^map[rune]vec4 = {
     ".js"=&js_string_chars,
-}
-
-highlight_colors : map[WordType]vec4 = {
-    .KEYWORD=ORANGE,
-
-    .STRING=GREEN,
 }
 
 special_chars : map[rune]vec4 = {

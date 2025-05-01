@@ -20,16 +20,6 @@ WordDef :: struct {
 }
 
 @(private="package")
-WordType :: enum {
-    GENERIC,
-    NUMBER,
-    KEYWORD,
-    STRING,
-    SPECIAL,
-    TYPEDEF,
-}
-
-@(private="package")
 BufferLine :: struct {
     characters: []rune,
     words: []WordDef,
@@ -427,6 +417,8 @@ remove_char :: proc() {
 
         prev_line^.characters = new_runes[:]
 
+        set_line_word_defs(prev_line)
+
         ordered_remove(active_buffer.lines, buffer_cursor_line)
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
 
@@ -436,21 +428,23 @@ remove_char :: proc() {
     current_indent := get_line_indent_level(buffer_cursor_line) 
 
     if target < current_indent * tab_spaces {
-
         for i in 0..<tab_spaces {
             line^.characters = remove_char_at_index(line.characters, target-i)
         }
+
+        set_line_word_defs(line)
 
         set_buffer_cursor_pos(
             buffer_cursor_line,
             char_index-tab_spaces,
         )
+
         return
     }
 
-
-
     line^.characters = remove_char_at_index(line.characters, target)
+
+    set_line_word_defs(line)
 
     set_buffer_cursor_pos(buffer_cursor_line, target)
 }
@@ -538,7 +532,6 @@ handle_text_input :: proc() -> bool {
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         remove_char()
-        set_line_word_defs(line)
 
         return false
     } 
@@ -565,6 +558,9 @@ handle_text_input :: proc() -> bool {
             )
         }
 
+        set_line_word_defs(line)
+        set_line_word_defs(&buffer_line)
+
         inject_at(active_buffer.lines, new_line_num, buffer_line)
 
         set_buffer_cursor_pos(
@@ -573,7 +569,6 @@ handle_text_input :: proc() -> bool {
         )
 
         constrain_scroll_to_cursor()
-        set_line_word_defs(line)
 
         return false
     }
