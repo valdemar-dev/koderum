@@ -65,19 +65,21 @@ init_window :: proc() {
         fmt.println("Initializing window.")
     }
 
+    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
+
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 2)
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 1)
+    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+    // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
+
     did_succeed := glfw.Init()
 
     if (!did_succeed) {
         fmt.println("failed to init glfw")
     }
 
-    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
 
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3)
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3)
-    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-    // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
-    // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
 
     primary_monitor := glfw.GetPrimaryMonitor()
     mode := glfw.GetVideoMode(primary_monitor)
