@@ -109,3 +109,13 @@ hex_string_to_vec4 :: proc(hex_str: string) -> vec4 {
     a := f32((hex)       & 0xFF) / 255.0
     return vec4{r, g, b, a}
 }
+
+rune_in_arr :: proc(el: rune, arr: []rune) -> (ok: bool) {
+    for element in arr {
+        if element == el {
+            return true
+        }
+    }
+
+    return false
+}

@@ -5,10 +5,6 @@ import "vendor:glfw"
 import "core:unicode/utf8"
 import ft "../../alt-odin-freetype"
 
-ui_bigger_font_size :: 30
-ui_general_font_size :: 20
-ui_smaller_font_size :: 16
-
 status_bar_rect : rect
 
 ui_sliding_buffer := SlidingBuffer([16]rune){

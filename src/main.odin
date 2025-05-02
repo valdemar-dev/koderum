@@ -18,6 +18,8 @@ target_frame_time :: 1.0 / target_fps
 second := time.Duration(1_000_000_000)
 
 main :: proc() {
+    fmt.println("Loading..")
+
     when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)

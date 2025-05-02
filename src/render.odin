@@ -514,11 +514,7 @@ add_code_text :: proc(
         } else if lang_string_chars != nil && r in lang_string_chars {
             color = lang_string_chars[r]
         } else if word != nil {
-            hl_color := &highlight_colors[word.word_type]
-
-            if hl_color != nil {
-                color = hl_color^
-            }
+            color = word.color
         }       
 
         add_rect(rect_cache,

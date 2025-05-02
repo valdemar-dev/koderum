@@ -15,6 +15,8 @@ window : glfw.WindowHandle
 fb_size := vec2{}
 
 init :: proc() {
+    load_configs()
+
     init_window()
     init_opengl()
     init_textures()

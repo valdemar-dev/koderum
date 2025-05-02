@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:mem"
 import gl "vendor:OpenGL"
 import "core:math"
+import "core:strings"
 
 import rp "vendor:stb/rect_pack"
 import image "vendor:stb/image"
@@ -78,34 +79,46 @@ character_maps_array : [dynamic]CharacterMap
 @(private="package")
 primary_font : ft.Face
 
-load_font :: proc(path: cstring) -> ft.Face {
-    face : ft.Face
-    
+load_font :: proc(path: cstring) -> (face: ft.Face, err: ft.Error) {
     error : ft.Error
 
     error = ft.init_free_type(&library)
-    if error != .Ok do return nil
+    if error != .Ok do return nil, error
 
     error = ft.new_face(library, path, 0, &face)
-    if error != .Ok do return nil
+    if error != .Ok do return nil, error
 
     error = ft.set_pixel_sizes(face, 0, 64)
-    if error != .Ok do return nil
+    if error != .Ok do return nil, error
 
-    return face
+    return face, .Ok
 }
 
-load_all_fonts :: proc() {
-    // lower index higher importance
-    font_list : []cstring = {
-        "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-        //"/usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf",
-    }
+@(private="package")
+font_list : [dynamic]string = {}
 
+load_all_fonts :: proc() {
     for font in font_list {
-        face := load_font(font)
+        c_string := cstring(raw_data(font))
+
+        face, err := load_font(c_string)
+
+        if face == nil {
+            fmt.eprintln(
+                "Failed to load font file,",
+                font,
+                "Got Err:",
+                err,
+            )
+
+            continue
+        }
 
         append_elem(&faces, face)
+    }
+
+    if len(faces) == 0 {
+        panic("No fonts could be loaded.")
     }
 
     primary_font = faces[0]
@@ -253,7 +266,7 @@ add_missing_characters :: proc() {
     upload_texture_buffer(raw_data(atlas), gl.RED, width, height, font_texture_id)
 
     when ODIN_DEBUG {
-        fmt.println("Success! Added missing characters:", missing_characters)
+        fmt.println("Success! Added missing characters.")
     }
 
     clear(&missing_characters)
@@ -306,7 +319,13 @@ find_char_in_faces :: proc(charcode: u64) -> (u32, ft.Face) {
     for i in 0..<len(faces) {
         face = faces[i]
 
-        glyph_index = ft.get_char_index(face, charcode)
+        when ODIN_OS == .Windows {
+            glyph_index = ft.get_char_index(face, u32(charcode))
+        }
+
+        when ODIN_OS == .Linux {
+            glyph_index = ft.get_char_index(face, charcode)
+        }
 
         if glyph_index != 0 {
             break

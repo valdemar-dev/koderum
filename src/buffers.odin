@@ -16,7 +16,7 @@ import "core:path/filepath"
 WordDef :: struct {
     start: i32,
     end: i32,
-    word_type: WordType,
+    color: vec4,
 }
 
 @(private="package")
@@ -56,9 +56,6 @@ IndentRule :: struct {
 
 @(private="package")
 buffers : map[string]^Buffer
-
-@(private="package")
-buffer_font_size : f32 = 24
 
 @(private="package")
 active_buffer : ^Buffer
@@ -583,13 +580,13 @@ set_line_word_defs :: proc(line: ^BufferLine) {
     start_idx : int = -1
 
     for char,index in line.characters {
-        if char != ' ' && char != '\t' {
+        if rune_in_arr(char, word_break_chars) == false {
             if start_idx < 0 {
                 start_idx = index
             }
 
             continue
-        } 
+        }
 
         if start_idx < 0 {
             continue
@@ -601,7 +598,7 @@ set_line_word_defs :: proc(line: ^BufferLine) {
             end=i32(index),
         }
 
-        set_word_type(word_def, line)
+        set_word_color(word_def, line)
 
         append(&words, word_def^)
 
@@ -615,7 +612,7 @@ set_line_word_defs :: proc(line: ^BufferLine) {
             end=i32(len(line.characters)),
         }
 
-        set_word_type(word_def, line)
+        set_word_color(word_def, line)
 
         append(&words, word_def^)
     }
@@ -623,21 +620,33 @@ set_line_word_defs :: proc(line: ^BufferLine) {
     line.words = words[:]
 }
 
-set_word_type :: proc(word_def: ^WordDef, buffer_line: ^BufferLine) {
+set_word_color :: proc(word_def: ^WordDef, buffer_line: ^BufferLine) {
     word_runes := buffer_line.characters[word_def.start:word_def.end]
     word_string := utf8.runes_to_string(word_runes)
 
     keyword_list := keyword_language_list[active_buffer.ext]
 
-    if keyword_list != nil  {
-        if word_string not_in keyword_list {
-            return
-        }
-
-        word_def^.word_type = keyword_list[word_string]
+    if keyword_list == nil {
+        word_def^.color = TEXT_MAIN    
 
         return
     }
+
+    for keyword,word_type in keyword_list {
+        assert(word_type.match_proc != nil)
+
+        does_match := word_type.match_proc(keyword, word_string)
+
+        if does_match == false {
+            continue
+        }
+
+        word_def^.color = word_type.color
+
+        return
+    }
+
+    word_def^.color = TEXT_MAIN    
 }
 
 @(private="package")
@@ -657,15 +666,13 @@ insert_into_buffer :: proc (key: rune) {
 }
 
 constrain_scroll_to_cursor :: proc() {
-    edge_padding : f32 = 200
-
-    amnt_above_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - edge_padding + cursor_height
+    amnt_above_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - cursor_edge_padding + cursor_height
 
     if amnt_above_offscreen < 0 {
         buffer_scroll_position -= -amnt_above_offscreen 
     }
 
-    amnt_below_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - edge_padding)
+    amnt_below_offscreen := (buffer_cursor_target_pos.y - buffer_scroll_position) - (fb_size.y - cursor_edge_padding)
 
     if amnt_below_offscreen >= 0 {
         buffer_scroll_position += amnt_below_offscreen 
@@ -677,7 +684,7 @@ constrain_scroll_to_cursor :: proc() {
         buffer_horizontal_scroll_position -= -amnt_left_offscreen 
     }
 
-    amnt_right_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position) - (fb_size.x - edge_padding)
+    amnt_right_offscreen := (buffer_cursor_target_pos.x - buffer_horizontal_scroll_position) - (fb_size.x - cursor_edge_padding)
 
     if amnt_right_offscreen >= 0 {
         buffer_horizontal_scroll_position += amnt_right_offscreen 
