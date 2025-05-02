@@ -39,7 +39,14 @@ load_configs :: proc() {
 
     data_string := string(bytes)
 
-    lines := strings.split(data_string, "\n")
+    lines : []string
+    when ODIN_OS == .Windows {
+        lines = strings.split(data_string, "\r\n")
+    }
+
+    when ODIN_OS == .Linux {
+        lines = strings.split(data_string, "\n")
+    }
 
     category : string
 
@@ -73,7 +80,6 @@ load_configs :: proc() {
 
         trimmed,_ := strings.replace_all(line, " ", "")
         values := strings.split(trimmed, "=")
-
 
         when ODIN_DEBUG {
             fmt.println("Loading option:", values)
