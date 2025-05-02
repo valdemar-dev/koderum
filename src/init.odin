@@ -86,9 +86,9 @@ init_window :: proc() {
     }
     
     window = glfw.CreateWindow(
-        mode.width,
-        mode.height,
-        "Visual Studio Goon",
+        640,
+        480,
+        "Test Test",
         nil,
         nil,
     )
