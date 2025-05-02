@@ -71,9 +71,11 @@ init_window :: proc() {
         fmt.println("failed to init glfw")
     }
 
-    // glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3)
-    // glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3)
-    // glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
+
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3)
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3)
+    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
     // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
 
