@@ -88,6 +88,10 @@ init_window :: proc() {
         nil,
     )
 
+    if window == nil {
+        panic("Could not create window.")
+    }
+
     glfw.SetFramebufferSizeCallback(window, size_callback)
 
     glfw.SetKeyCallback(window, key_callback)
