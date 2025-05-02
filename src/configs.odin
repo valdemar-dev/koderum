@@ -49,7 +49,21 @@ load_configs :: proc() {
         }
 
         start_char := line[0]
-        end_char := line[len(line)-1]
+        end_char : u8
+
+        when ODIN_OS == .Windows {
+            test_end := line[len(line)-1]
+
+            if rune(test_end) == '\r' {
+                end_char = line[len(line)-2]
+            } else {
+                end_char = test_end
+            }
+        }
+
+        when ODIN_OS == .Linux {
+            end_char = line[len(line)-1]
+        }
 
         if start_char == '[' && end_char == ']' {
             category = line[1:len(line)-1]
