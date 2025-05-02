@@ -5,7 +5,7 @@
 function Example(value) {
   this.value = value;
   this.array = [];
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i<5; i++) {
     this.array.push(i);
   }
   this.obj = { a: 1, b: 2 };

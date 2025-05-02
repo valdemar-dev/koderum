@@ -114,7 +114,7 @@ set_option :: proc(options: []string) {
     case "tab_spaces":
         tab_spaces = strconv.atoi(value)
     case "cursor_edge_padding":
-        cursor_edge_padding := f32(strconv.atof(value))
+        cursor_edge_padding = f32(strconv.atof(value))
     case "font":
         append(&font_list, value)
     case "ui_general_font_size":

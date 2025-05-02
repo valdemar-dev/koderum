@@ -2,4 +2,4 @@
 *.bin
 *.png
 *.args
-options.conf
+*.conf

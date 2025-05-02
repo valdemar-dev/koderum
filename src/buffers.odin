@@ -747,14 +747,19 @@ move_back_word :: proc() {
     line := active_buffer.lines[buffer_cursor_line]
 
     clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+    chars_before_cursor := line.characters[:clamped_index]
+ 
+    new_char_index := clamped_index
 
-    words_before_cursor := line.characters[:clamped_index]
-    
-    new_char_index : int
+    prev_was_break := false
 
-    #reverse for r,index in words_before_cursor {
-        if r == ' ' {
-            new_char_index = index
+    #reverse for r,index in chars_before_cursor {
+        if rune_in_arr(r, word_break_chars) {
+            new_char_index = index+1
+
+            if new_char_index == buffer_cursor_char_index {
+                new_char_index -= 1
+            }
 
             break
         }
@@ -773,25 +778,19 @@ move_forward_word :: proc() {
 
     clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
     chars_after_cursor := line.characters[clamped_index:]
-    
+
     new_char_index := clamped_index
 
     prev_was_space := false
     for r,index in chars_after_cursor {
-        if r == ' ' {
-            prev_was_space = true
+        if rune_in_arr(r, word_break_chars) {
+            if index == 0 {
+                new_char_index = index + buffer_cursor_char_index + 1
+            } else {
+                new_char_index = index + buffer_cursor_char_index
+            }
 
-            continue
-        }
-
-        if prev_was_space {
-            new_char_index = index + buffer_cursor_char_index
             break
-        }
-
-        if index+new_char_index == len(line.characters)-1 {
-            new_char_index = len(line.characters)
-
         }
     }
 

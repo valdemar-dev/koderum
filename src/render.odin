@@ -398,7 +398,7 @@ add_code_text :: proc(
             return
         }
 
-        if i32(i) <= word^.end {
+        if i32(i) < word^.end {
             return
         }
 
