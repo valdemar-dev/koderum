@@ -144,8 +144,8 @@ init_opengl :: proc() {
     gl.GenBuffers(1, &ebo)
     gl.GenVertexArrays(1, &vao)
 
-    vertex_source :: #load("./src/shaders/vertex.glsl")
-    fragment_source :: #load("./src/shaders/fragment.glsl")
+    vertex_source :: #load("./shaders/vertex.glsl")
+    fragment_source :: #load("./shaders/fragment.glsl")
 
     prog_id, ok := gl.load_shaders_source(
         vertex_source,
