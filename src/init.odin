@@ -19,15 +19,12 @@ init :: proc() {
 
     init_window()
     init_opengl()
-    init_textures()
     init_fonts()
 
     init_update_thread()
 
     fb_width, fb_height := glfw.GetFramebufferSize(window)
     fb_size = vec2{f32(fb_width), f32(fb_height)}
-
-    init_camera()
 
     home_dir := os.get_env("HOME")
 
@@ -51,12 +48,6 @@ size_callback :: proc "c" (
 ) {
     fb_size = vec2{f32(width), f32(height)}
     gl.Viewport(0,0,width,height)
-}
-
-init_camera :: proc() {
-}
-
-init_textures :: proc () {
 }
 
 init_update_thread :: proc() {
@@ -135,6 +126,10 @@ world_tint_loc : i32
 shader_id : u32
 
 init_opengl :: proc() {
+    when ODIN_DEBUG {
+        fmt.println("Initializing opengl.")
+    }
+
     gl.GenBuffers(1, &vbo)
     gl.GenBuffers(1, &ebo)
     gl.GenVertexArrays(1, &vao)
