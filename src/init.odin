@@ -28,11 +28,9 @@ init :: proc() {
 
     home_dir := os.get_env("HOME")
 
-    if home_dir == "" {
-        panic("Please set the HOME env variable.")
+    if home_dir != "" {
+        os.set_current_directory(home_dir)
     }
-
-    os.set_current_directory(home_dir)
     
     if default_cwd != "" {
         cwd = default_cwd
@@ -65,14 +63,6 @@ init_window :: proc() {
         fmt.println("Initializing window.")
     }
 
-    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
-
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 2)
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 1)
-    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-    // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
-    // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
-
     did_succeed := glfw.Init()
 
     if (!did_succeed) {
@@ -80,6 +70,13 @@ init_window :: proc() {
     }
 
 
+    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
+
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 2)
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 1)
+    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+    // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
 
     primary_monitor := glfw.GetPrimaryMonitor()
     mode := glfw.GetVideoMode(primary_monitor)
