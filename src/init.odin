@@ -148,8 +148,8 @@ init_opengl :: proc() {
     fragment_source :: #load("./shaders/fragment.glsl")
 
     prog_id, ok := gl.load_shaders_source(
-        vertex_source,
-        fragment_source,
+        string(vertex_source),
+        string(fragment_source),
     )
 
     shader_id = prog_id
