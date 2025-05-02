@@ -60,12 +60,20 @@ init_textures :: proc () {
 }
 
 init_update_thread :: proc() {
+    when ODIN_DEBUG {
+        fmt.println("Initializing update thread.")
+    }
+
     update_thread := thread.create(update)
 
     thread.start(update_thread)
 }
 
 init_window :: proc() {
+    when ODIN_DEBUG {
+        fmt.println("Initializing window.")
+    }
+
     did_succeed := glfw.Init()
 
     if (!did_succeed) {
