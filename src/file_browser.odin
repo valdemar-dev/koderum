@@ -37,9 +37,16 @@ handle_browser_input :: proc() {
 
         end_idx := len(runes)-1
 
-        if end_idx == -1 {
-            return
+        when ODIN_OS == .Windows {
+            if end_idx == -1 {
+                return
+            }
+        } else {
+            if end_idx == 0 {
+                return
+            }
         }
+        
 
         runes = runes[:end_idx]
 
@@ -273,11 +280,25 @@ draw_browser_view :: proc() {
         pen,
         TEXT_MAIN, 
         ui_general_font_size,
-        "File Search",
+        "Search",
         start_z + 1,
     )
 
     pen.y += (ui_general_font_size + padding)
+
+    if len(search_term) == 0 {
+        add_text(&rect_cache,
+            pen,
+            TEXT_MAIN,
+            font_size,
+            "Enter the name of a directory to start searching.",
+            start_z + 1,
+        )
+
+        draw_rects(&rect_cache)
+
+        return
+    }
 
     dir := fp.dir(search_term, context.temp_allocator)
 
