@@ -288,6 +288,8 @@ draw_browser_view :: proc() {
         ui_smaller_font_size,
         search_term,
         start_z + 2,
+        true,
+        bg_rect.width - padding * 2,
     )
 
     pen.y += (ui_general_font_size + padding * 2)
@@ -297,7 +299,7 @@ draw_browser_view :: proc() {
             pen,
             TEXT_MAIN,
             font_size,
-            "Enter the name of a directory to start searching.",
+            "Enter a drive or directory.",
             start_z + 1,
         )
 
