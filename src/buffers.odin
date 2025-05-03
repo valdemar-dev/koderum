@@ -491,7 +491,8 @@ determine_line_indent :: proc(line_num: int) -> int {
         return prev_line_indent_level * tab_spaces
     }
 
-    prev_line_last_char := prev_line.characters[index]
+    prev_line_last_char := utf8.runes_to_string(prev_line.characters[index:index])
+    defer delete(prev_line_last_char)
 
     if prev_line_last_char in language_rules {
         rule := language_rules[prev_line_last_char]
@@ -635,7 +636,7 @@ set_word_color :: proc(word_def: ^WordDef, buffer_line: ^BufferLine) {
     for keyword,word_type in keyword_list {
         assert(word_type.match_proc != nil)
 
-        does_match := word_type.match_proc(keyword, word_string)
+        does_match := word_type.match_proc(keyword, word_string, buffer_line)
 
         if does_match == false {
             continue

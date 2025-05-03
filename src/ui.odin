@@ -62,10 +62,12 @@ draw_ui :: proc() {
     one_width_percentage := fb_size.x / 100
     one_height_percentage := fb_size.y / 100
 
+    margin := one_width_percentage * 20
+
     status_bar_rect = rect{
-        one_width_percentage * 20,
+        margin,
         20,
-        fb_size.x - (one_width_percentage * 40),
+        fb_size.x - (margin * 2),
         f32(status_bar_height),
     }
 

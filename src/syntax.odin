@@ -1,190 +1,70 @@
 #+feature dynamic-literals
 package main
 
+import "core:unicode/utf8"
+
 WordType :: struct {
-    match_proc: proc (comp: string, value: string) -> bool,
+    match_proc: proc (comp: string, value: string, buffer_line: ^BufferLine) -> bool,
     color: vec4,
 }
 
-//WordType :: enum {
-//    GENERIC,
-//    NUMBER,
-//   WordType{,
-//    FUNCTION,
-//    DECLARATION,
-//    SPECIAL,
-//    TYPE,
-//    BOOL,
-//}
-
-indent_rule_language_list : map[string]^map[rune]IndentRule = {
+indent_rule_language_list : map[string]^map[string]IndentRule = {
     ".txt"=&generic_indent_rule_list,
     ".odin"=&generic_indent_rule_list,
     ".glsl"=&generic_indent_rule_list,
     ".c"=&generic_indent_rule_list,
     ".cpp"=&generic_indent_rule_list,
-
     ".js"=&generic_indent_rule_list,
     ".ts"=&generic_indent_rule_list,
-
-    ".python"=&python_indent_rule_list,
 }
 
-generic_indent_rule_list : map[rune]IndentRule = {
-    '{'=IndentRule{
+generic_indent_rule_list : map[string]IndentRule = {
+    "{"=IndentRule{
         type=.FORWARD,
     },
 
-    '('=IndentRule{
+    "("=IndentRule{
         type=.FORWARD,
     },
 
-    '['=IndentRule{
-        type=.FORWARD,
-    },
-}
-
-python_indent_rule_list : map[rune]IndentRule = {
-    ':'=IndentRule{
-        type=.FORWARD,
-    },
-
-    '('=IndentRule{
-        type=.FORWARD,
-    },
-
-    '{'=IndentRule{
-        type=.FORWARD,
-    },
-
-    '['=IndentRule{
+    "["=IndentRule{
         type=.FORWARD,
     },
 }
 
-match_all :: proc(comp: string, target: string) -> bool {
+match_all :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
     return true
 }
 
-whole_word_match :: proc(comp: string, target: string) -> bool {
+whole_word_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
     return comp == target
 }
 
-js_keyword_map : map[string]WordType = {
-    "for"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "continue"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "return"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "with"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "function"=WordType{
-        match_proc=whole_word_match,
-        color=CYAN,
-    },
-
-    "const"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "let"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "var"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "if"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "try"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "catch"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "finally"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "this"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "switch"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "case"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "default"=WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "break"=WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "throw" = WordType{
-        match_proc=whole_word_match,
-        color=RED,
-    },
-
-    "new" = WordType{
-        match_proc=whole_word_match,
-        color=ORANGE,
-    },
-
-    "in" = WordType {
-        match_proc=whole_word_match,
-        color=ORANGE,
+line_starts_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
+    if len(buffer_line.characters) < len(comp) {
+        return false
     }
+
+    string_val := utf8.runes_to_string(buffer_line.characters[0:len(comp)])
+    defer delete(string_val)
+
+    if string_val == comp {
+        return true
+    }
+
+    return false
 }
 
-
+@(private="package")
 keyword_language_list : map[string]^map[string]WordType = {
-    ".js"=&js_keyword_map,
+    ".js"=&js_keywords_map,
+    ".c"=&c_keywords_map,
 }
 
-js_string_chars : map[rune]vec4 = {
-    '"'=GREEN,
-    '\''=RED,
-    '`'=GREEN,
-}
-
+@(private="package")
 string_char_language_list : map[string]^map[rune]vec4 = {
     ".js"=&js_string_chars,
+    ".c"=&c_string_chars
 }
 
 special_chars : map[rune]vec4 = {
@@ -199,9 +79,11 @@ special_chars : map[rune]vec4 = {
     '.'=GRAY,
     ':'=GRAY,
     ';'=GRAY,
+    '+'=GRAY,
     '='=GRAY,
     '>'=GRAY,
     '<'=GRAY,
+    '|'=GRAY,
     '1'=CYAN,
     '2'=CYAN,
     '3'=CYAN,
@@ -230,4 +112,5 @@ word_break_chars : []rune = {
     '/',
     '<',
     '>',
+    '|',
 }

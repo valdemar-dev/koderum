@@ -37,7 +37,7 @@ handle_browser_input :: proc() {
 
         end_idx := len(runes)-1
 
-        if end_idx == 0 {
+        if end_idx == -1 {
             return
         }
 

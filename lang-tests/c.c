@@ -29,16 +29,25 @@ int compute(int x) {
 
 int main(void) {
     int a = 5, b = 10;
+    
     float c = (float)a / b;
+    
     int arr[] = {1, 2, 3, 4, 5};
+    
     int *dyn_arr = malloc(5 * sizeof(int));
+    
     if (!dyn_arr) return EXIT_FAILURE;
+    
     for (int i = 0; i < 5; ++i) dyn_arr[i] = i * i;
+    
     print_array(dyn_arr, 5);
     free(dyn_arr);
 
     Example ex = { .a = 1, .b = 2.5f };
+    
     enum Status s = OK;
+    
     printf("SQUARE(3): %d\n", SQUARE(3));
+    
     return 0;
 }

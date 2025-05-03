@@ -1,5 +1,9 @@
 // JavaScript standard syntax showcase
 
+/*
+    This is a multiline comment.
+*/
+
 "use strict";
 
 function Example(value) {
