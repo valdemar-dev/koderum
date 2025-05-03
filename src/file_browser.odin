@@ -239,10 +239,16 @@ draw_browser_view :: proc() {
     one_width_percentage := fb_size.x / 100
     one_height_percentage := fb_size.y / 100
 
+    margin := one_width_percentage * 20
+
+    if fb_size.x < 900 {
+        margin = 20
+    }
+
     bg_rect = rect{
-        one_width_percentage * 20,
+        margin,
         browser_view_y,
-        fb_size.x - (one_width_percentage * 40),
+        fb_size.x - (margin * 2),
         80 * one_height_percentage,
     }
 
@@ -263,28 +269,28 @@ draw_browser_view :: proc() {
         start_z,
     )
 
-    st_size := measure_text(ui_general_font_size, search_term)
+    add_rect(&rect_cache,
+        rect{
+            bg_rect.x,
+            bg_rect.y,
+            bg_rect.width,
+            ui_general_font_size + padding * 2,
+        },
+        no_texture,
+        BG_MAIN_30,
+        vec2{},
+        start_z + 1,
+    )
 
     add_text(&rect_cache,
-        vec2{
-            bg_rect.x + bg_rect.width - st_size.x - padding,
-            bg_rect.y + padding,
-        },
-        TEXT_MAIN,
-        ui_general_font_size,
-        search_term,
-        start_z + 1,
-    )
-
-    size := add_text_measure(&rect_cache,
         pen,
-        TEXT_MAIN, 
-        ui_general_font_size,
-        "Search",
-        start_z + 1,
+        TEXT_MAIN,
+        ui_smaller_font_size,
+        search_term,
+        start_z + 2,
     )
 
-    pen.y += (ui_general_font_size + padding)
+    pen.y += (ui_general_font_size + padding * 2)
 
     if len(search_term) == 0 {
         add_text(&rect_cache,
@@ -313,6 +319,9 @@ draw_browser_view :: proc() {
             font_size,
             found_file[len(dir):],
             start_z + 1,
+            true,
+            bg_rect.width - padding * 2,
+            false,
         )
 
         pen.y += font_size + gap

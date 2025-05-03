@@ -235,6 +235,8 @@ add_text :: proc(
     text: string,
     z_index : f32 = 0,
     draw_missing_glyphs : bool = false, 
+    max_width: f32 = -1,
+    do_wrap: bool = false,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -255,6 +257,10 @@ add_text :: proc(
             pen.x += advance_amount
 
             continue
+        }
+
+        if pen.x - pos.x > max_width && max_width > -1 {
+            break
         }
 
         if pen.x > fb_size.x {
