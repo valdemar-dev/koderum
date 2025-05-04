@@ -867,13 +867,15 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_A) {
+        glfw.WaitEvents()
+
         append_to_line()
 
         return true
     }
 
     if is_key_pressed(glfw.KEY_I) {
-        glfw.PollEvents()
+        glfw.WaitEvents()
 
         input_mode = .BUFFER_INPUT
 

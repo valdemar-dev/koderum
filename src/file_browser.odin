@@ -118,11 +118,9 @@ toggle_browser_view :: proc() {
         suppress = false
         show_browser_view = true
 
-        input_mode = .BROWSER_SEARCH
+        glfw.WaitEvents()
 
-        when ODIN_OS == .Linux {
-            do_suppress_next_char_event = true
-        }
+        input_mode = .BROWSER_SEARCH
 
         search_term = strings.concatenate({
             cwd, "/",
