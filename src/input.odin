@@ -43,9 +43,6 @@ key_store : map[i32]ActiveKey = {}
 pressed_chars : [dynamic]rune = {}
 
 @(private="package")
-do_suppress_next_char_event := false
-
-@(private="package")
 is_key_down :: proc(key: i32) -> bool {
     return key_store[key].is_down
 }
@@ -85,16 +82,14 @@ process_input :: proc() {
 char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
 
-    if do_suppress_next_char_event {
-        do_suppress_next_char_event = false
-
-        return
-    }
-
     switch input_mode {
     case .COMMAND:
         return
     case .BUFFER_INPUT:
+        if is_key_down(glfw.KEY_LEFT_CONTROL) {
+            return
+        }
+
         insert_into_buffer(key)
     case .BROWSER_SEARCH:
         browser_append_to_search_term(key)

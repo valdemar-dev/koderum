@@ -115,7 +115,7 @@ draw_buffer_line :: proc(
 
         add_text(&rect_cache,
             line_pos,
-            TEXT_TRANSPARENT,
+            TEXT_DARKER,
             buffer_font_size,
             line_string,
             3,
@@ -820,8 +820,6 @@ append_to_line :: proc() {
     )
 
     input_mode = .BUFFER_INPUT
-
-    do_suppress_next_char_event = true
 }
 
 @(private="package")

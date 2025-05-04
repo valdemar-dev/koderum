@@ -57,6 +57,10 @@ handle_browser_input :: proc() {
         set_found_files()
     }
 
+    if is_key_pressed(glfw.KEY_G) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        fmt.println("hi")
+    }
+
     if is_key_pressed(glfw.KEY_ENTER) {
         change_dir :: proc(dir: string) {
             os.set_current_directory(dir)
@@ -358,7 +362,7 @@ tick_browser_view :: proc() {
             frame_time,
         )
 
-        if int(fb_size.x) - int(browser_view_y) < 5 {
+        if int(fb_size.y) - int(browser_view_y) < 5 {
         }
     }
 }
