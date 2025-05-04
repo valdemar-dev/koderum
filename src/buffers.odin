@@ -873,9 +873,11 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_I) {
+        glfw.PollEvents()
+
         input_mode = .BUFFER_INPUT
 
-        do_suppress_next_char_event = true
+        //do_suppress_next_char_event = true
 
         return false
     }

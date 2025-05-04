@@ -1,16 +1,8 @@
 add t for persistant terminal instance
 
-add different dterminators for words
-
-add cwd auto setter
-
 add savestate checking
-add linelength checking
 dont panic if failing to save
-add controllable padding between lines and line count
 
-add configs for tab char handling
-tabs / spaces when andintg
 ADD SOMEWHERE IN DOCS: make sure to hit enter to set your CWD
 
 bug:
@@ -20,3 +12,7 @@ bug:
 add multiline and singleline comments
 add godef, find instanes, and replace all
 add file creation to file browser, file deleteion and renaming also
+
+very annoying, gnome requires supression of char event.
+win and other unix dont.
+find a way to determine either the DE, or to handle the ignore on non gnome DE's

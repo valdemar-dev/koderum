@@ -521,7 +521,7 @@ add_code_text :: proc(
             color = lang_string_chars[r]
         } else if word != nil {
             color = word.color
-        }       
+        }
 
         add_rect(rect_cache,
             rect{
