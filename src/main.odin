@@ -46,6 +46,18 @@ main :: proc() {
     init()
 
     for !glfw.WindowShouldClose(window) {
+        glfw.PollEvents()
+        
+        focused := glfw.GetWindowAttrib(window, glfw.FOCUSED)
+
+        if focused == 0 {
+            glfw.WaitEventsTimeout(0.1)
+
+            glfw.SwapBuffers(window)
+
+            continue
+        }
+
         process_input()
 
         set_camera_ui()
@@ -56,12 +68,15 @@ main :: proc() {
         tick_browser_view()
 
         update_camera()
-       
-        render()
 
         update_fonts()
+ 
+        render()
 
         free_all(context.temp_allocator)
+
+        glfw.SwapBuffers(window)
+        glfw.PollEvents()
     }
 
     clear_fonts()

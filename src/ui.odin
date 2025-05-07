@@ -96,7 +96,7 @@ draw_ui :: proc() {
     switch input_mode {
     case .COMMAND:
         mode_string = "Command"
-    case .BUFFER_INPUT, .BROWSER_SEARCH:
+    case .BUFFER_INPUT, .BROWSER_SEARCH, .FILE_CREATE, .FILE_RENAME:
         mode_string = "Text Input"
     }
 

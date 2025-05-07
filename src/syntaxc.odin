@@ -92,7 +92,7 @@ c_keywords_map : map[string]WordType = {
 
     "int" = WordType {
         match_proc=whole_word_match,
-        color=RED,
+        color=PURPLE,
     },
 
     "float" = WordType {

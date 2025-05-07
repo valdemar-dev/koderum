@@ -75,8 +75,13 @@ init_window :: proc() {
     glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3)
     glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3)
     glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-    // //glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
-    // glfw.WindowHint(glfw.MAXIMIZED, glfw.FALSE)
+    glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+    glfw.WindowHint(glfw.MAXIMIZED, glfw.TRUE)
+
+    glfw.WindowHintString(glfw.WAYLAND_APP_ID, "Visual Studio Goon")
+
+    glfw.WindowHintString(glfw.X11_CLASS_NAME,    "Visual Studio Goon")
+    glfw.WindowHintString(glfw.X11_INSTANCE_NAME, "Visual Studio Goon")
 
     primary_monitor := glfw.GetPrimaryMonitor()
     mode := glfw.GetVideoMode(primary_monitor)
@@ -111,7 +116,7 @@ init_window :: proc() {
 
     glfw.SwapInterval(1)
 
-    glfw.SetWindowSizeLimits(window, 640, 480, glfw.DONT_CARE, glfw.DONT_CARE)
+    glfw.SetWindowSizeLimits(window, 900, 500, glfw.DONT_CARE, glfw.DONT_CARE)
 
     gl.load_up_to(3, 3, glfw.gl_set_proc_address)
 }

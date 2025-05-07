@@ -66,6 +66,9 @@ for (var key in obj) {
   }
 }
 
+const constant = "This is a constant value.";
+let variable = "This is a variable value.";
+
 (function() {
   console.log("IIFE");
 })();

@@ -13,6 +13,19 @@ add multiline and singleline comments
 add godef, find instanes, and replace all
 add file creation to file browser, file deleteion and renaming also
 
-very annoying, gnome requires supression of char event.
-win and other unix dont.
-find a way to determine either the DE, or to handle the ignore on non gnome DE's
+c-jk for file offset in file browser
+c-d for create file (if ends in /, make dir instead)
+c-f for rename (if ends in /, make into dir)
+
+add priority to HL:
+for example, comments //, should take priority
+over strings. this is basic programming.
+each language rule set will, and can determine
+its own priorities. default priority 0.
+string clauses will have 1.
+
+to strings, change them from runes to strings.
+define a start&end string separately.
+this allows for easy single and multi-line comments.
+eg. // \n, /* */
+which is not only more versatile, but easier to check.

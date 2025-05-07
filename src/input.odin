@@ -29,6 +29,8 @@ InputMode :: enum {
     COMMAND,
     BUFFER_INPUT,
     BROWSER_SEARCH,
+    FILE_RENAME,
+    FILE_CREATE,
 }
 
 @(private="package")
@@ -82,17 +84,23 @@ process_input :: proc() {
 char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
 
-    switch input_mode {
-    case .COMMAND:
-        return
+    #partial switch input_mode {
     case .BUFFER_INPUT:
         if is_key_down(glfw.KEY_LEFT_CONTROL) {
             return
         }
 
         insert_into_buffer(key)
+
+        break
     case .BROWSER_SEARCH:
         browser_append_to_search_term(key)
+
+        break
+    case .FILE_RENAME:
+        break
+    case .FILE_CREATE:
+        break
     }
 }
 

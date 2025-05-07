@@ -44,9 +44,6 @@ render :: proc() {
     draw_ui()
     draw_buffer_info_view()
     draw_browser_view()
-
-    glfw.SwapBuffers(window)
-    glfw.PollEvents()
 }
 
 indices_rawptr := rawptr(uintptr(0))

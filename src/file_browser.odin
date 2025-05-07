@@ -30,6 +30,25 @@ cached_dirs : map[string][]os.File_Info
 
 search_term := ""
 
+item_offset := 0 
+
+change_dir :: proc(dir: string) {
+    os.set_current_directory(dir)
+    cwd = os.get_current_directory()
+
+    search_term = strings.concatenate({
+        cwd, "/",
+    })
+
+    when ODIN_DEBUG {
+        fmt.println("CD'd to", cwd)
+    }
+
+    set_found_files()
+
+    return
+}
+
 @(private="package")
 handle_browser_input :: proc() {
     if is_key_pressed(glfw.KEY_BACKSPACE) {
@@ -54,49 +73,51 @@ handle_browser_input :: proc() {
 
         delete(runes)
 
+        item_offset = 0
+
         set_found_files()
     }
 
-    if is_key_pressed(glfw.KEY_G) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        fmt.println("hi")
+    if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
+
+        set_found_files()
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        item_offset = clamp(item_offset - 1, 0, len(found_files)-1)
+
+        set_found_files()
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_S) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        dir := fp.dir(search_term, context.temp_allocator)
+
+        os.set_current_directory(dir)
+        cwd = os.get_current_directory()
+
+        return
     }
 
     if is_key_pressed(glfw.KEY_ENTER) {
-        change_dir :: proc(dir: string) {
-            os.set_current_directory(dir)
-            cwd = os.get_current_directory()
-
-            search_term = strings.concatenate({
-                cwd, "/",
-            })
-
-            when ODIN_DEBUG {
-                fmt.println("CD'd to", cwd)
-            }
-
-            set_found_files()
-
-            return
-        }
-
-        if os.is_dir(search_term) {
-            change_dir(search_term)
-
-            return
-        }
-
         if len(found_files) < 1 {
             return
         }
 
-        if os.is_dir(found_files[0]) {
-            change_dir(found_files[0])
+        target := item_offset
+
+        if os.is_dir(found_files[target]) {
+            change_dir(found_files[target])
 
             return
         }
 
 
-        open_file(found_files[0])
+        open_file(found_files[target])
 
         toggle_browser_view()
         
@@ -140,11 +161,13 @@ set_found_files :: proc() {
     clear(&found_files)
 
     dirs_searched := 0
+    file_index := 0
 
     get_dir_files :: proc(
         dir: string,
         glob: string, 
         dirs_searched: ^int, 
+        file_index: ^int
     ) {
         fd, err := os.open(dir)
         defer os.close(fd)
@@ -169,17 +192,18 @@ set_found_files :: proc() {
             if strings.contains(hit.name, glob) {
                 if hit.name == glob {
                     inject_at(&found_files, 0, hit.fullpath)
-
                 } else {
                     append_elem(&found_files, hit.fullpath)
                 }
             }
 
+            file_index^ += 1
+
             if hit.is_dir == false {
                 continue
             }
 
-            if len(found_files) >= 50 {
+            if file_index^ >= 50 {
                 break
             }
 
@@ -188,7 +212,7 @@ set_found_files :: proc() {
                 continue
             }
 
-            get_dir_files(hit.fullpath, glob, dirs_searched) 
+            get_dir_files(hit.fullpath, glob, dirs_searched, file_index) 
         } 
     }
 
@@ -206,7 +230,7 @@ set_found_files :: proc() {
 
     defer delete(dir)
 
-    get_dir_files(dir, base, &dirs_searched)
+    get_dir_files(dir, base, &dirs_searched, &file_index)
 }
 
 @(private="package")
@@ -233,6 +257,8 @@ browser_append_to_search_term :: proc(key: rune) {
     set_found_files()
 
     delete(runes)
+
+    item_offset = 0
 }
 
 @(private="package")
@@ -297,12 +323,28 @@ draw_browser_view :: proc() {
         bg_rect.width - padding * 2,
     )
 
-    pen.y += (ui_general_font_size + padding * 2)
+    pen.y += (ui_general_font_size + 5)
+
+    dir := fp.dir(search_term, context.temp_allocator)
+
+    if dir == cwd {
+        add_text(&rect_cache,
+            pen,
+            TEXT_DARKER,
+            ui_smaller_font_size,
+            "CWD",
+            start_z + 2,
+            true,
+            bg_rect.width - padding * 2,
+        )
+    }
+
+    pen.y += ui_smaller_font_size + (padding * 2)
 
     if len(search_term) == 0 {
         add_text(&rect_cache,
             pen,
-            TEXT_MAIN,
+            TEXT_DARKER,
             font_size,
             "Enter a drive or directory.",
             start_z + 1,
@@ -313,16 +355,20 @@ draw_browser_view :: proc() {
         return
     }
 
-    dir := fp.dir(search_term, context.temp_allocator)
+    start_idx := item_offset
 
     for found_file,index in found_files {
-        font_size : f32 = (index == 0) ? ui_bigger_font_size : ui_smaller_font_size
+        if index < start_idx {
+            continue
+        }
+
+        font_size : f32 = (index == start_idx) ? ui_bigger_font_size : ui_smaller_font_size
 
         gap := font_size * .5
 
         add_text(&rect_cache,
             pen,
-            TEXT_MAIN,
+            (index == start_idx) ? TEXT_MAIN : TEXT_DARKER,
             font_size,
             found_file[len(dir):],
             start_z + 1,
