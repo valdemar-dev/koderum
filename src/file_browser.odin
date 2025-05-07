@@ -58,18 +58,18 @@ handle_browser_input :: proc() {
             is_key_pressed(glfw.KEY_ENTER) &&
             is_key_down(glfw.KEY_LEFT_CONTROL)
         ) {
-            if os.exists(search_term) == false {
-                return
-            }
+            target := item_offset
 
-            if os.is_dir(search_term) {
-                err := os.remove_directory(search_term)
+            file := found_files[target]
+
+            if os.is_dir(file) {
+                err := os.remove_directory(file)
 
                 if err != os.General_Error.None {
                     return
                 }
             } else {
-                err := os.remove(search_term)
+                err := os.remove(file)
 
                 if err != os.General_Error.None {
                     return
