@@ -234,6 +234,7 @@ add_text :: proc(
     draw_missing_glyphs : bool = false, 
     max_width: f32 = -1,
     do_wrap: bool = false,
+    split_new_lines : bool = false,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -243,6 +244,13 @@ add_text :: proc(
     line_height := font_height * 1.2
 
     for r,i in text {
+        if split_new_lines == true && r == '\n' {
+            pen.y += line_height
+            pen.x = pos.x
+
+            continue
+        }
+
         if r == '\t' {
             character := get_char(font_height, u64(' '))
 

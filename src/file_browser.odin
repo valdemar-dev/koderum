@@ -53,47 +53,48 @@ attempting_file_deletion : bool = false
 
 @(private="package")
 handle_browser_input :: proc() {
-    if (
-        attempting_file_deletion &&
-        is_key_pressed(glfw.KEY_ENTER) &&
-        is_key_down(glfw.KEY_LEFT_CONTROL)
-    ) {
-        if os.exists(search_term) == false {
+    if attempting_file_deletion {
+        if (
+            is_key_pressed(glfw.KEY_ENTER) &&
+            is_key_down(glfw.KEY_LEFT_CONTROL)
+        ) {
+            if os.exists(search_term) == false {
+                return
+            }
+
+            if os.is_dir(search_term) {
+                err := os.remove_directory(search_term)
+
+                if err != os.General_Error.None {
+                    return
+                }
+            } else {
+                err := os.remove(search_term)
+
+                if err != os.General_Error.None {
+                    return
+                }
+            }
+
+            dir := fp.dir(search_term, context.temp_allocator)
+            delete_key(&cached_dirs, dir)
+
+            attempting_file_deletion = false
+
+            set_found_files()
+
             return
         }
 
-        if os.is_dir(search_term) {
-            err := os.remove_directory(search_term)
+        if is_key_pressed(glfw.KEY_ESCAPE) {
+            attempting_file_deletion = false
 
-            if err != os.General_Error.None {
-                return
-            }
-        } else {
-            err := os.remove(search_term)
-
-            if err != os.General_Error.None {
-                return
-            }
+            return
         }
 
-        dir := fp.dir(search_term, context.temp_allocator)
-        delete_key(&cached_dirs, dir)
-
-        attempting_file_deletion = false
-
-        set_found_files()
-
         return
     }
-
-    if (
-        attempting_file_deletion &&
-        is_key_pressed(glfw.KEY_ESCAPE)
-    ) {
-        attempting_file_deletion = false
-
-        return
-    }
+   
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         runes := utf8.string_to_runes(search_term)
@@ -307,6 +308,10 @@ set_found_files :: proc() {
 
 @(private="package")
 browser_append_to_search_term :: proc(key: rune) {
+    if attempting_file_deletion {
+        return
+    }
+
     buf := make([dynamic]rune)
 
     runes := utf8.string_to_runes(search_term)
@@ -430,10 +435,14 @@ draw_browser_view :: proc() {
     if attempting_file_deletion {
         add_text(&rect_cache,
             pen,
-            TEXT_DARKER,
+            TEXT_MAIN,
             font_size,
             "Are you sure you want to delete this file?\nCtrl+Enter to confirm, ESC to cancel.",
             start_z + 1,
+            false,
+            -1,
+            false,
+            true,
         )
 
         draw_rects(&rect_cache)
@@ -455,7 +464,7 @@ draw_browser_view :: proc() {
 
         add_text(&rect_cache,
             pen,
-            (index == start_idx) ? TEXT_MAIN : TEXT_DARKER,
+            TEXT_MAIN,
             font_size,
             found_file[len(dir):],
             start_z + 1,
