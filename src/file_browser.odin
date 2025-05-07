@@ -51,6 +51,9 @@ change_dir :: proc(dir: string) {
 
 attempting_file_deletion : bool = false
 
+attempting_rename : bool = false
+renaming_file_name : string
+
 @(private="package")
 handle_browser_input :: proc() {
     if attempting_file_deletion {
@@ -94,7 +97,6 @@ handle_browser_input :: proc() {
 
         return
     }
-   
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         runes := utf8.string_to_runes(search_term)
@@ -123,6 +125,47 @@ handle_browser_input :: proc() {
         set_found_files()
     }
 
+    if attempting_rename {
+        if is_key_pressed(glfw.KEY_ESCAPE) {
+            attempting_rename = false
+
+            return
+        }
+
+        if is_key_pressed(glfw.KEY_ENTER) {
+            os.rename(renaming_file_name, search_term)
+
+            attempting_rename = false
+
+            dir := fp.dir(search_term)
+
+            delete_key(&cached_dirs, dir)
+
+            search_term = strings.concatenate({dir, "/"})
+
+            set_found_files()
+
+            return
+        }
+
+        return
+    }
+   
+    if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        attempting_rename = true
+
+        if len(found_files) < 1 {
+            return
+        }
+
+        old := found_files[item_offset]
+
+        renaming_file_name = old
+        search_term = old
+
+        return
+    }
+
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
 
@@ -149,12 +192,6 @@ handle_browser_input :: proc() {
     }
 
     if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        if len(found_files) < 1 {
-            return
-        }
-
-        target := item_offset
-
         attempting_file_deletion = true
     }
 
