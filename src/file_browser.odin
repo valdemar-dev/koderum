@@ -49,8 +49,52 @@ change_dir :: proc(dir: string) {
     return
 }
 
+attempting_file_deletion : bool = false
+
 @(private="package")
 handle_browser_input :: proc() {
+    if (
+        attempting_file_deletion &&
+        is_key_pressed(glfw.KEY_ENTER) &&
+        is_key_down(glfw.KEY_LEFT_CONTROL)
+    ) {
+        if os.exists(search_term) == false {
+            return
+        }
+
+        if os.is_dir(search_term) {
+            err := os.remove_directory(search_term)
+
+            if err != os.General_Error.None {
+                return
+            }
+        } else {
+            err := os.remove(search_term)
+
+            if err != os.General_Error.None {
+                return
+            }
+        }
+
+        dir := fp.dir(search_term, context.temp_allocator)
+        delete_key(&cached_dirs, dir)
+
+        attempting_file_deletion = false
+
+        set_found_files()
+
+        return
+    }
+
+    if (
+        attempting_file_deletion &&
+        is_key_pressed(glfw.KEY_ESCAPE)
+    ) {
+        attempting_file_deletion = false
+
+        return
+    }
+
     if is_key_pressed(glfw.KEY_BACKSPACE) {
         runes := utf8.string_to_runes(search_term)
 
@@ -103,6 +147,36 @@ handle_browser_input :: proc() {
         return
     }
 
+    if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if len(found_files) < 1 {
+            return
+        }
+
+        target := item_offset
+
+        attempting_file_deletion = true
+    }
+
+    if is_key_pressed(glfw.KEY_G) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if os.exists(search_term) {
+            return
+        }
+
+        success := os.write_entire_file(search_term, {})
+
+        if !success {
+            return
+        }
+
+        dir := fp.dir(search_term, context.temp_allocator)
+        delete_key(&cached_dirs, dir)
+
+        toggle_browser_view()
+        open_file(search_term)
+
+        return
+    }
+
     if is_key_pressed(glfw.KEY_ENTER) {
         if len(found_files) < 1 {
             return
@@ -116,9 +190,7 @@ handle_browser_input :: proc() {
             return
         }
 
-
         open_file(found_files[target])
-
         toggle_browser_view()
         
         return
@@ -351,6 +423,21 @@ draw_browser_view :: proc() {
         )
 
         draw_rects(&rect_cache)
+
+        return
+    }
+
+    if attempting_file_deletion {
+        add_text(&rect_cache,
+            pen,
+            TEXT_DARKER,
+            font_size,
+            "Are you sure you want to delete this file?\nCtrl+Enter to confirm, ESC to cancel.",
+            start_z + 1,
+        )
+
+        draw_rects(&rect_cache)
+
 
         return
     }
