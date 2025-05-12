@@ -129,6 +129,14 @@ handle_browser_input :: proc() {
         if is_key_pressed(glfw.KEY_ESCAPE) {
             attempting_rename = false
 
+            concat := strings.concatenate({
+                cwd, "/",
+            })
+
+            search_term = concat
+
+            set_found_files()
+
             return
         }
 
@@ -484,6 +492,23 @@ draw_browser_view :: proc() {
 
         draw_rects(&rect_cache)
 
+        return
+    }
+
+    if attempting_rename {
+        add_text(&rect_cache,
+            pen,
+            TEXT_MAIN,
+            font_size,
+            "Enter the new path for this file.\nPress Enter to confirm, ESC to cancel.",
+            start_z + 1,
+            false,
+            -1,
+            false,
+            true,
+        )
+
+        draw_rects(&rect_cache)
 
         return
     }

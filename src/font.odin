@@ -402,7 +402,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 @(private="package")
 report_missing_character :: proc(char_code: u64, font_height: f32) {
     index := known_non_existing_char_maps[font_height]
-
+   
     if font_height in known_non_existing_char_maps == false {
         new_map := make(NonExistingCharacterMap)
 
@@ -506,6 +506,43 @@ get_char :: proc(font_height: f32, char_code: u64) -> ^Character {
     char_map := character_maps_array[index]
 
     character, ok := char_map[char_code]
+
+    if character == nil {
+        report_missing_character(char_code, font_height) 
+
+        return nil
+    }
+
+    return character
+}
+
+@(private="package")
+get_char_map :: proc(font_height: f32) -> ^CharacterMap {
+    index := character_maps[font_height]
+
+    if font_height in character_maps == false {
+        new_map := make(CharacterMap, context.allocator)
+
+        append(&character_maps_array, new_map)
+
+        new_index := len(character_maps_array) - 1
+
+        character_maps[font_height] = new_index
+        index = new_index
+    }
+
+    char_map := &character_maps_array[index]
+
+    return char_map
+}
+
+@(private="package")
+get_char_with_char_map :: proc(
+    char_map: ^CharacterMap,
+    font_height: f32,
+    char_code: u64,
+) -> ^Character {
+    character, ok := char_map^[char_code]
 
     if character == nil {
         report_missing_character(char_code, font_height) 

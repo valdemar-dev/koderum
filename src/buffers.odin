@@ -11,6 +11,7 @@ import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
 import "core:path/filepath"
+import ft "../../alt-odin-freetype"
 
 @(private="package")
 WordDef :: struct {
@@ -78,6 +79,10 @@ draw_buffer_line :: proc(
     input_pen: vec2,
     line_buffer: ^[dynamic]byte,
     line_pos: vec2,
+    ascender: f32,
+    descender: f32,
+    char_map: ^CharacterMap,
+    font_size: f32,
 ) -> vec2 {
     pen := input_pen
 
@@ -91,18 +96,18 @@ draw_buffer_line :: proc(
 
     chars := buffer_line.characters
 
-    string := utf8.runes_to_string(chars[:])
-    defer delete(string)
-
     long_line := do_highlight_long_lines && (len(chars) >= long_line_required_characters)
 
     add_code_text(
         &rect_cache,
         line_pos,
-        buffer_font_size,
-        string,
+        font_size,
+        &chars,
         1,
         buffer_line,
+        char_map,
+        ascender,
+        descender,
     )
 
     if do_draw_line_count {
@@ -116,7 +121,7 @@ draw_buffer_line :: proc(
         add_text(&rect_cache,
             line_pos,
             TEXT_DARKER,
-            buffer_font_size,
+            font_size,
             line_string,
             3,
         )
@@ -193,6 +198,23 @@ draw_text_buffer :: proc() {
     pen := vec2{0,0}
 
     clear(&encountered_string_chars)
+   
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    assert(error == .Ok)
+
+    ascender := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+
+    char_map := get_char_map(buffer_font_size)
+
+    buf : [8]byte = {}
+
+    add_text(&rect_cache,
+        vec2{0,0},
+        TEXT_MAIN,
+        20,
+        strconv.itoa(buf[:], int(buffer_font_size)),
+    )
 
     for &buffer_line, index in buffer_lines {
         line_pos := vec2{
@@ -210,6 +232,10 @@ draw_text_buffer :: proc() {
             pen,
             &line_buffer,
             line_pos,
+            ascender,
+            descender,
+            char_map,
+            buffer_font_size,
         )
     }
 

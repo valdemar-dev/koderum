@@ -13,7 +13,7 @@ import "core:strings"
 import "core:time"
 import "core:thread"
 
-target_fps :: 60.0
+target_fps :: 240.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
@@ -45,18 +45,20 @@ main :: proc() {
 	
     init()
 
+    last_time := glfw.GetTime()
+
     for !glfw.WindowShouldClose(window) {
-        glfw.PollEvents()
-        
-        focused := glfw.GetWindowAttrib(window, glfw.FOCUSED)
+        current_time := glfw.GetTime()
+        local_frame_time := current_time - last_time
 
-        if focused == 0 {
-            glfw.WaitEventsTimeout(0.1)
-
-            glfw.SwapBuffers(window)
+        if local_frame_time < target_frame_time {
+            sleep_duration := (target_frame_time - local_frame_time) * f64(second)
+            time.sleep(time.Duration(sleep_duration))
 
             continue
         }
+
+        last_time = current_time
 
         process_input()
 

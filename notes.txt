@@ -1,1 +1,18 @@
-this file is not real
+undo-redo history
+
+requirements:
+    must be practically infinite
+    
+    must be able to retain knowledge of
+    undo-redo, even after closing a buffer, or even the application.
+    should be minimal in its storage usage.
+    
+ideas:
+    index undo history via file names.
+    
+    
+thoughts:
+    somehow, the user needs to be able to restore precisely what they have done.
+    this means, storing change.
+    how would one store change?
+    

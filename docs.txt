@@ -8,7 +8,13 @@ This is slightly different to VIM-like W-B movement, since going back goes to th
 and going forward goes to the *start* of a word.
 
 (I) -> Go into Text Insert mode.
-(A) -> Move buffer cursor character index to the end, and go into Text Insert Mode.
+(A) -> Move buffer cursor to the end of the current line, and go into Text Insert Mode.
 (Esc) -> Go into Command mode.
 
 (Ctrl + S) -> Save active buffer.
+
+(O) -> Open File Explorer.
+(Ctrl + S) -> Store File Explorer CWD.
+(Ctrl + D) -> Delete Selected File.
+(Ctrl + F) -> Rename Selected File.
+(Ctrl + G) -> Create file using current Search Term, (if a file with search term is not already found.)
