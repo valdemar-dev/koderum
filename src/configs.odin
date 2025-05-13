@@ -5,6 +5,7 @@ import "core:os"
 import "core:strings"
 import "core:strconv"
 import "core:fmt"
+import fp "core:path/filepath"
 
 tab_spaces : int
 long_line_required_characters : int
@@ -23,8 +24,19 @@ ui_bigger_font_size : f32
 ui_general_font_size : f32
 ui_smaller_font_size : f32
 
+program_dir : string
+
 load_configs :: proc() {
-    config_file := "./config/options.conf"
+    exe_path := os.args[0]
+
+    program_dir = fp.dir(exe_path)
+
+    config_file := strings.concatenate({
+        program_dir,
+        "/config/options.conf",
+    })
+
+    defer delete(config_file)
 
     bytes, ok := os.read_entire_file_from_filename(config_file)
 
