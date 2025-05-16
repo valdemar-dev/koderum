@@ -98,6 +98,8 @@ draw_ui :: proc() {
         mode_string = "Command"
     case .BUFFER_INPUT, .BROWSER_SEARCH, .FILE_CREATE, .FILE_RENAME:
         mode_string = "Text Input"
+    case .HIGHLIGHT:
+        mode_string = "Highlighting"
     }
 
     add_text(&rect_cache,

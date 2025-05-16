@@ -28,7 +28,7 @@ render :: proc() {
     gl.Uniform1i(first_texture_loc, 0)
 
     gl.Enable(gl.BLEND)
-    gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    gl.BlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.Enable(gl.DEPTH_TEST)
     gl.DepthFunc(gl.LEQUAL)
@@ -44,6 +44,13 @@ render :: proc() {
     draw_ui()
     draw_buffer_info_view()
     draw_browser_view()
+
+    when ODIN_DEBUG {
+        draw_debug()
+    }
+
+    gl.Disable(gl.BLEND)
+    gl.Disable(gl.DEPTH_TEST)
 }
 
 indices_rawptr := rawptr(uintptr(0))
@@ -91,7 +98,7 @@ normalize_to_texture_coords :: proc(texture_rect: rect, atlas_size: vec2) -> [4]
 
 add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4, atlas_size := vec2{512,512}, z_index : f32 = 0, invert_x : bool = false) {
 
-    z_pos := z_index / 256
+    z_pos := z_index / 1000000
 
     rectangle := rect{
         input_rect.x,
@@ -370,38 +377,123 @@ try_add_string_encounter :: proc(
     encountered_string_chars[r] = 1
 }
 
-add_code_text_al :: proc(
-    rect_cache: ^RectCache,
-    pos: vec2,
-    font_height: f32,
-    text: ^[]rune,
-    z_index : f32,
+set_word :: proc(
+    word: ^^WordDef,
+    word_idx: ^int,
     buffer_line: ^BufferLine,
-) -> vec2 {
-    return pos
+    i: int,
+) {
+    pos := i32(i)
+    ws  := buffer_line.words
+
+    if word^ != nil {
+        cur := word^
+        if pos >= cur.start && pos < cur.end {
+            return
+        }
+    }
+
+    startIdx := 0
+
+    if word^ != nil {
+        startIdx = word_idx^ + 1
+    }
+
+    for idx := startIdx; idx < len(ws); idx += 1 {
+        w := &ws[idx]
+
+        if pos < w.start {
+            break
+        }
+
+        if pos < w.end {
+            word^     = w
+            word_idx^ = idx
+            return
+        }
+    }
+
+    word^ = nil
 }
 
-set_word :: proc(word: ^^WordDef, word_idx: ^int, buffer_line: ^BufferLine, i: int) {
-    if word^ == nil {
-        return
+process_highlights :: proc(i: int, is_hl_start,positive_dir,negative_dir,is_hl_end: bool, advance_amount: f32, highlight_width,highlight_offset: ^f32) -> (was_highlighted: bool) {
+    if input_mode != .HIGHLIGHT {
+        return false
+    }        
+
+    if (is_hl_end) && (is_hl_start) {
+        positive_dir := buffer_cursor_char_index >= highlight_start_char
+
+        if positive_dir {
+            if i < highlight_start_char {
+                highlight_offset^ += advance_amount
+
+                return false
+            } else if i >= buffer_cursor_char_index {
+                return false
+            }
+
+            highlight_width^ += advance_amount
+
+            return true
+        } else {
+            if i < buffer_cursor_char_index {
+                highlight_offset^ += advance_amount
+
+                return false
+            } else if i >= highlight_start_char {
+                return false
+            }
+
+            highlight_width^ += advance_amount
+
+            return true
+        }
     }
 
-    if i32(i) < word^.end {
-        return
+    if (is_hl_start) && (positive_dir) && (!is_hl_end) {
+        if i < highlight_start_char {
+            highlight_offset^ += advance_amount
+
+            return false
+        }
+
+        highlight_width^ += advance_amount
+
+        return true
+    } else if (is_hl_end) && (positive_dir) && (!is_hl_start) {
+        if i >= buffer_cursor_char_index {
+            return false
+        }
+
+        highlight_width^  += advance_amount
+
+        return true
     }
 
-    word_idx^ += 1
+    if (is_hl_end) && (negative_dir) && (!is_hl_start) {
+        if i < buffer_cursor_char_index {
+            highlight_offset^ += advance_amount
 
-    if word_idx^ > len(buffer_line.words) - 1 {
-        return
+            return false
+        }
+
+        highlight_width^ += advance_amount
+
+        return true
+    } else if (is_hl_start) && (negative_dir) && (!is_hl_end) {
+        if i >= highlight_start_char {
+            return false
+        }
+
+        highlight_width^ += advance_amount
+
+        return true
     }
-
-    new_word := &buffer_line.words[word_idx^]
-
-    if new_word != nil {
-        word^ = new_word
-    } 
+    
+    return false
 }
+
 
 add_code_text :: proc(
     rect_cache: ^RectCache,
@@ -413,7 +505,8 @@ add_code_text :: proc(
     char_map: ^CharacterMap,
     ascender: f32,
     descender: f32,
-) -> vec2 {
+    line_number: int,
+) -> (offset: f32, width: f32) {
     pen := vec2{
         x=pos.x,
         y=pos.y,
@@ -428,9 +521,18 @@ add_code_text :: proc(
     word_idx := 0
     words_len := len(buffer_line.words)
 
-    word := words_len > 0 ? &buffer_line.words[word_idx] : nil
+    word : ^WordDef
 
     lang_string_chars := string_char_language_list[active_buffer.ext]
+
+    highlight_width : f32 = 0
+    highlight_offset : f32 = 0
+
+    is_hl_start := line_number == highlight_start_line
+    is_hl_end := line_number == buffer_cursor_line
+
+    positive_dir := buffer_cursor_line >= highlight_start_line
+    negative_dir := buffer_cursor_line < highlight_start_line
 
     for r,i in text {
         set_word(&word, &word_idx, buffer_line, i) 
@@ -438,55 +540,41 @@ add_code_text :: proc(
         if r != ' ' && is_start_of_line == true {
             is_start_of_line = false
         } 
-        
-        if r == '\t' {
+
+        is_tab := (r == '\t')  
+        is_space := (r == ' ' && is_start_of_line)
+
+        if is_space || is_tab {
             character := get_char_with_char_map(char_map, font_height, u64(' '))
 
             if character == nil {
                 continue
             }
 
-            color := differentiate_tab_and_spaces ? BG_MAIN_30 : BG_MAIN_20
+            if do_highlight_indents && i % tab_spaces == 0 {
+                color := (differentiate_tab_and_spaces && is_tab) ? BG_MAIN_30 : BG_MAIN_20
 
-            if do_highlight_indents {
                 add_rect(rect_cache,
-                    rect{
-                        pen.x,
-                        pen.y,
-                        3,
-                        line_height,
-                    },
+                    rect{ pen.x, pen.y, 3, line_height },
                     no_texture,
                     color,
                 )
             }
 
-            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
-            pen.x += advance_amount
+            advance_amount : f32
 
-            continue
-        } else if r == ' ' && do_highlight_indents && i % tab_spaces == 0 && is_start_of_line {
-            character := get_char_with_char_map(char_map, font_height, u64(' '))
-
-            if character == nil {
-                continue
+            if is_space {
+                advance_amount = (character.advance.x/64)
+            } else if is_tab {
+                advance_amount = (character.advance.x / 64) * f32(tab_spaces)
             }
 
-            add_rect(rect_cache,
-                rect{
-                    pen.x,
-                    pen.y,
-                    3,
-                    line_height,
-                },
-                no_texture,
-                BG_MAIN_20,
-            )
+            pen.x += advance_amount
 
-            pen.x += (character.advance.x / 64)
+            process_highlights(i,is_hl_start,positive_dir,negative_dir,is_hl_end,advance_amount,&highlight_width,&highlight_offset)
 
             continue
-        } 
+        }
 
         character := get_char_with_char_map(char_map, font_height, u64(r))
 
@@ -511,16 +599,26 @@ add_code_text :: proc(
 
         color := TEXT_MAIN
 
+        advance_amount := (character.advance.x / 64)
+        was_highlighted := process_highlights(
+                             i,is_hl_start,positive_dir,
+                             negative_dir,is_hl_end,
+                             advance_amount,
+                             &highlight_width,&highlight_offset,
+                             )
+
         is_in_string, variant := is_char_in_string(lang_string_chars)
 
-        if is_in_string {
+        if was_highlighted {
+            color = text_highlight_color
+        } else if is_in_string {
             color = variant
-        } else if r in special_chars {
-            color = special_chars[r]
         } else if lang_string_chars != nil && r in lang_string_chars {
             color = lang_string_chars[r]
         } else if word != nil {
             color = word.color
+        } else if r in special_chars {
+            color = special_chars[r]
         }
 
         add_rect(rect_cache,
@@ -541,9 +639,28 @@ add_code_text :: proc(
             z_index,
         )
 
-        pen.x = pen.x + (character.advance.x / 64)
+        pen.x = pen.x + advance_amount
         pen.y = pen.y + character.advance.y
     }
 
-    return pen
+    if input_mode != .HIGHLIGHT {
+        return 0,0
+    }
+
+    // PARTIAL LINE HL's
+    if buffer_cursor_line == line_number {
+        return highlight_offset, highlight_width
+    } else if line_number == highlight_start_line {
+        return highlight_offset, highlight_width
+    }
+
+    // FULL LINE HL'S
+    if line_number > buffer_cursor_line && line_number < highlight_start_line {
+        return 0,pen.x - pos.x
+    } else if line_number < buffer_cursor_line && line_number > highlight_start_line {
+        return 0,pen.x - pos.x
+    }
+
+    // all other lines that are unhighlighted end up here
+    return 0,0
 }

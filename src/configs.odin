@@ -26,6 +26,9 @@ ui_smaller_font_size : f32
 
 program_dir : string
 
+text_highlight_color : vec4 = TEXT_MAIN
+text_highlight_bg : vec4 = BG_MAIN_40
+
 load_configs :: proc() {
     exe_path := os.args[0]
 
@@ -145,6 +148,10 @@ set_option :: proc(options: []string) {
         do_highlight_indents = value == "true"
     case "default_cwd":
         default_cwd = value
+    case "text_highlight_color":
+        text_highlight_color = hex_string_to_vec4(value)
+    case "text_highlight_bg":
+        text_highlight_bg = hex_string_to_vec4(value)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }

@@ -1,0 +1,28 @@
+package main
+
+import "core:os"
+import "core:fmt"
+import "core:strings"
+import gl "vendor:OpenGL"
+import "vendor:glfw"
+import "base:runtime"
+import "core:unicode/utf8"
+import "core:strconv"
+import "core:path/filepath"
+import ft "../../alt-odin-freetype"
+
+highlight_start_line : int
+highlight_start_char : int
+
+@(private="package")
+handle_highlight_input :: proc() {
+    if is_key_pressed(glfw.KEY_ESCAPE) {
+        input_mode = .COMMAND
+
+        return
+    } 
+
+    //TODO: do other stuff
+
+    handle_movement_input()
+}

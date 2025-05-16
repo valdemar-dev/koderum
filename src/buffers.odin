@@ -98,7 +98,7 @@ draw_buffer_line :: proc(
 
     long_line := do_highlight_long_lines && (len(chars) >= long_line_required_characters)
 
-    add_code_text(
+    highlight_offset, highlight_width := add_code_text(
         &rect_cache,
         line_pos,
         font_size,
@@ -107,8 +107,24 @@ draw_buffer_line :: proc(
         buffer_line,
         char_map,
         ascender,
-        descender,
+        descender, 
+        index,
     )
+
+    if (
+        input_mode == .HIGHLIGHT
+    ) {
+        add_rect(&rect_cache,
+            rect{
+                line_pos.x + highlight_offset,
+                line_pos.y,
+                highlight_width,
+                line_height,
+            },
+            no_texture,
+            text_highlight_bg,
+        )
+    }
 
     if do_draw_line_count {
         line_pos := vec2{
@@ -206,15 +222,6 @@ draw_text_buffer :: proc() {
     descender := f32(primary_font.size.metrics.descender >> 6)
 
     char_map := get_char_map(buffer_font_size)
-
-    buf : [8]byte = {}
-
-    add_text(&rect_cache,
-        vec2{0,0},
-        TEXT_MAIN,
-        20,
-        strconv.itoa(buf[:], int(buffer_font_size)),
-    )
 
     for &buffer_line, index in buffer_lines {
         line_pos := vec2{
@@ -860,6 +867,15 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
+    if is_key_pressed(glfw.KEY_V) {
+        input_mode = .HIGHLIGHT
+
+        highlight_start_line = buffer_cursor_line 
+        highlight_start_char = buffer_cursor_char_index
+
+        return true
+    }
+
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
 
@@ -903,11 +919,22 @@ handle_buffer_input :: proc() -> bool {
 
         input_mode = .BUFFER_INPUT
 
-        //do_suppress_next_char_event = true
+        return false
+    }
+
+    handle_movement_input()
+
+    if is_key_pressed(glfw.KEY_Q) {
+        toggle_buffer_info_view()
 
         return false
     }
 
+    return false
+}
+
+@(private="package")
+handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_J) {
         key := key_store[glfw.KEY_J]
 
@@ -964,12 +991,5 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_pressed(glfw.KEY_Q) {
-        toggle_buffer_info_view()
-
-        return false
-    }
-
     return false
 }
-

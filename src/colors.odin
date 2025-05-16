@@ -1,12 +1,14 @@
 package main
 
 BG_MAIN_10 := hex_string_to_vec4("1F242FFF")
+
 BG_MAIN_20 := hex_string_to_vec4("282F3EFF")
 BG_MAIN_30 := hex_string_to_vec4("282F3EFF")
 BG_MAIN_40 := hex_string_to_vec4("282F3EFF")
 BG_MAIN_50 := hex_string_to_vec4("282F3EFF")
 
 TEXT_MAIN := hex_string_to_vec4("E6E8E6FF")
+
 TEXT_DARKER := hex_string_to_vec4("AAAAAAFF")
 
 RED := hex_string_to_vec4("F06449ff")

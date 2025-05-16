@@ -13,7 +13,7 @@ import "core:strings"
 import "core:time"
 import "core:thread"
 
-target_fps :: 240.0
+target_fps :: 60.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)

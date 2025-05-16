@@ -1,0 +1,6 @@
+idea:
+    grep thing with g
+    enter search term
+    hit enter
+    df next/back
+    j toggle case sensitive

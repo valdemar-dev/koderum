@@ -31,6 +31,7 @@ InputMode :: enum {
     BROWSER_SEARCH,
     FILE_RENAME,
     FILE_CREATE,
+    HIGHLIGHT,
 }
 
 @(private="package")
@@ -62,6 +63,8 @@ check_inputs :: proc() -> bool {
         handle_text_input() or_return
     case .BROWSER_SEARCH:
         handle_browser_input()
+    case .HIGHLIGHT:
+        handle_highlight_input()
     }
 
     return false
