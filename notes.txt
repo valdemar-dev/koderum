@@ -12,6 +12,7 @@ todo:
     - Ctrl +DFJK movement for in-buffer movement
     - add always loaded characters configurable in .conf
     - add lerp anim to text hl
+    - should retain clipboard history
     
 
 requirements:

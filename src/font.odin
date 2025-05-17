@@ -17,9 +17,6 @@ import "core:c"
 rect_pack_glyp_padding : f32 = 16
 
 @(private="package")
-font_size : f32 = 20
-
-@(private="package")
 library : ft.Library
 
 @(private="package")
@@ -90,6 +87,8 @@ load_font :: proc(path: cstring) -> (face: ft.Face, err: ft.Error) {
 
     error = ft.set_pixel_sizes(face, 0, 64)
     if error != .Ok do return nil, error
+
+    fmt.println(face)
 
     return face, .Ok
 }
@@ -348,7 +347,6 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
     if error != .Ok do return nil, "failed to set glyph pixel size"
 
     load_flags := ft.Load_Flags{
-        .Force_Autohint,
     }
 
     error = ft.load_glyph(face, glyph_index, load_flags)

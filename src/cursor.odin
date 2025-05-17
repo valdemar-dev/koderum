@@ -38,7 +38,7 @@ draw_cursor :: proc() {
         rect{
             buffer_cursor_pos.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
             buffer_cursor_pos.y - buffer_scroll_position,
-            5,
+            3,
             cursor_height,
         },
         no_texture,
@@ -104,7 +104,13 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     cursor_width = last_width
 
-    line_height := buffer_font_size * 1.2
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    if error != .Ok do return
+
+    asc := primary_font.size.metrics.ascender >> 6
+    desc := primary_font.size.metrics.descender >> 6
+
+    line_height := f32(asc - desc)
 
     buffer_cursor_target_pos.x = new_x
     buffer_cursor_target_pos.y = f32(line) * line_height

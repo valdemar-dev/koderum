@@ -86,7 +86,9 @@ draw_buffer_line :: proc(
 ) -> vec2 {
     pen := input_pen
 
-    line_height := buffer_font_size * 1.2
+    true_font_height := ascender - descender
+
+    line_height := true_font_height
 
     if line_pos.y < 0 {
         pen.y = pen.y + line_height
@@ -119,7 +121,7 @@ draw_buffer_line :: proc(
                 line_pos.x + highlight_offset,
                 line_pos.y,
                 highlight_width,
-                line_height,
+                true_font_height,
             },
             no_texture,
             text_highlight_bg,

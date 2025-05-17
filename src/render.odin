@@ -28,7 +28,7 @@ render :: proc() {
     gl.Uniform1i(first_texture_loc, 0)
 
     gl.Enable(gl.BLEND)
-    gl.BlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.Enable(gl.DEPTH_TEST)
     gl.DepthFunc(gl.LEQUAL)
@@ -629,10 +629,10 @@ add_code_text :: proc(
                 f32(character.rows),
             },
             rect{
-                f32(uvs.x),
-                f32(uvs.y),
-                f32(uvs.w) - rect_pack_glyp_padding,
-                f32(uvs.h) - rect_pack_glyp_padding,
+              math.round_f32(f32(uvs.x)),
+               math.round_f32( f32(uvs.y)),
+                math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
+               math.round_f32( f32(uvs.h) - rect_pack_glyp_padding),
             },
             color,
             char_uv_map_size,
