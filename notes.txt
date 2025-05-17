@@ -1,5 +1,7 @@
 undo-redo history
 
+/ols.json
+
 todo:
     - n/b term search case sensitive within buffer
     - selections with v mode

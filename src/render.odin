@@ -314,16 +314,16 @@ add_text :: proc(
        
         add_rect(rect_cache,
             rect{
-                pen.x + character.offset.x,
-                (pen.y - character.offset.y + f32(ascend)),
-                width,
-                height,
+                math.round_f32(pen.x + character.offset.x),
+                math.round_f32((pen.y - character.offset.y + f32(ascend))),
+                math.round_f32(width),
+                math.round_f32(height),
             },
             rect{
-                f32(uvs.x),
-                f32(uvs.y),
-                f32(uvs.w) - rect_pack_glyp_padding,
-                f32(uvs.h) - rect_pack_glyp_padding,
+                math.round_f32(f32(uvs.x)),
+                math.round_f32(f32(uvs.y)),
+                math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
+                math.round_f32(f32(uvs.h) - rect_pack_glyp_padding),
             },
             tint,
             char_uv_map_size,
@@ -623,10 +623,10 @@ add_code_text :: proc(
 
         add_rect(rect_cache,
             rect{
-                pen.x + character.offset.x,
-                (pen.y - character.offset.y + ascender),
-                f32(character.width),
-                f32(character.rows),
+                math.round_f32(pen.x + character.offset.x),
+                math.round_f32((pen.y - character.offset.y + ascender)),
+                math.round_f32(f32(character.width)),
+                math.round_f32(f32(character.rows)),
             },
             rect{
               math.round_f32(f32(uvs.x)),
