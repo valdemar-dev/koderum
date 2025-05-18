@@ -22,7 +22,27 @@ handle_highlight_input :: proc() {
         return
     } 
 
-    //TODO: do other stuff
+    if is_key_pressed(glfw.KEY_Y) {
+        key := key_store[glfw.KEY_Y]
+
+        if key.modifiers == 2 {
+            copy_to_clipboard(
+                highlight_start_line,
+                buffer_cursor_line,
+                highlight_start_char,
+                buffer_cursor_char_index,
+            )
+        } else {
+            copy_to_yank_buffer(
+                highlight_start_line,
+                buffer_cursor_line,
+                highlight_start_char,
+                buffer_cursor_char_index,
+            )
+        }
+
+        return
+    }
 
     handle_movement_input()
 }
