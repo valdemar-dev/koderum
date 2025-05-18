@@ -538,6 +538,22 @@ add_code_text :: proc(
     positive_dir := buffer_cursor_line >= highlight_start_line
     negative_dir := buffer_cursor_line < highlight_start_line
 
+    is_line_fully_highlighted : bool
+
+    if (
+        input_mode == .HIGHLIGHT &&
+        line_number > buffer_cursor_line &&
+        line_number < highlight_start_line
+    ) {
+        is_line_fully_highlighted = true
+    } else if (
+        input_mode == .HIGHLIGHT &&
+        line_number < buffer_cursor_line &&
+        line_number > highlight_start_line
+    ) {
+        is_line_fully_highlighted = true
+    }
+
     for r,i in text {
         set_word(&word, &word_idx, buffer_line, i) 
 
@@ -555,27 +571,45 @@ add_code_text :: proc(
                 continue
             }
 
-            if do_highlight_indents && i % tab_spaces == 0 {
-                color := (differentiate_tab_and_spaces && is_tab) ? BG_MAIN_30 : BG_MAIN_20
-
-                add_rect(&rect_cache,
-                    rect{ pen.x, pen.y, 3, line_height },
-                    no_texture,
-                    color,
-                )
-            }
-
             advance_amount : f32
 
             if is_space {
-                advance_amount = (character.advance.x/64)
+                advance_amount = (character.advance.x / 64)
             } else if is_tab {
                 advance_amount = (character.advance.x / 64) * f32(tab_spaces)
             }
 
-            pen.x += advance_amount
+            was_highlighted := process_highlights(
+                i,is_hl_start,positive_dir,
+                negative_dir,is_hl_end,
+                advance_amount,
+                &highlight_width,&highlight_offset,
+            )
 
-            process_highlights(i,is_hl_start,positive_dir,negative_dir,is_hl_end,advance_amount,&highlight_width,&highlight_offset)
+            if was_highlighted || is_line_fully_highlighted {
+                add_rect(&rect_cache,
+                    rect{
+                        pen.x,
+                        pen.y + (highlight_height / 2) - 2,
+                        4,
+                        4,
+                    },
+                    no_texture,
+                    BG_MAIN_30,
+                    vec2{},
+                    z_index,
+                )
+            } else if do_highlight_indents && i % tab_spaces == 0 {
+                add_rect(&rect_cache,
+                    rect{ pen.x, pen.y, general_line_thickness_px, highlight_height },
+                    no_texture,
+                    BG_MAIN_30,
+                    vec2{},
+                    z_index,
+                )
+            } 
+
+            pen.x += advance_amount
 
             continue
         }
@@ -604,12 +638,13 @@ add_code_text :: proc(
         color := TEXT_MAIN
 
         advance_amount := (character.advance.x / 64)
+
         was_highlighted := process_highlights(
-                             i,is_hl_start,positive_dir,
-                             negative_dir,is_hl_end,
-                             advance_amount,
-                             &highlight_width,&highlight_offset,
-                             )
+            i,is_hl_start,positive_dir,
+            negative_dir,is_hl_end,
+            advance_amount,
+            &highlight_width,&highlight_offset,
+        )
 
         is_in_string, variant := is_char_in_string(lang_string_chars)
 
@@ -633,10 +668,10 @@ add_code_text :: proc(
                 math.round_f32(f32(character.rows)),
             },
             rect{
-              math.round_f32(f32(uvs.x)),
-               math.round_f32( f32(uvs.y)),
+                math.round_f32(f32(uvs.x)),
+                math.round_f32( f32(uvs.y)),
                 math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
-               math.round_f32( f32(uvs.h) - rect_pack_glyp_padding),
+                math.round_f32( f32(uvs.h) - rect_pack_glyp_padding),
             },
             color,
             char_uv_map_size,
@@ -651,20 +686,15 @@ add_code_text :: proc(
         return 0,0
     }
 
-    // PARTIAL LINE HL's
     if buffer_cursor_line == line_number {
         return highlight_offset, highlight_width
     } else if line_number == highlight_start_line {
         return highlight_offset, highlight_width
     }
 
-    // FULL LINE HL'S
-    if line_number > buffer_cursor_line && line_number < highlight_start_line {
-        return 0,pen.x - pos.x
-    } else if line_number < buffer_cursor_line && line_number > highlight_start_line {
+    if is_line_fully_highlighted {
         return 0,pen.x - pos.x
     }
 
-    // all other lines that are unhighlighted end up here
     return 0,0
 }

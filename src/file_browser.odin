@@ -405,7 +405,7 @@ draw_browser_view :: proc() {
         80 * one_height_percentage,
     }
 
-    start_z : f32 = 3
+    start_z : f32 = 6
 
     pen := vec2{
         bg_rect.x + padding,

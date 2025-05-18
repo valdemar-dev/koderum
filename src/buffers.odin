@@ -105,7 +105,6 @@ draw_buffer_line :: proc(
         font_size,
         &chars,
         3,
-
         buffer_line,
         char_map,
         ascender,
@@ -128,9 +127,7 @@ draw_buffer_line :: proc(
             vec2{},
             2,
         )
-    }
-
-    if do_highlight_current_line && buffer_cursor_line == index {
+    } else if do_highlight_current_line && buffer_cursor_line == index {
         add_rect(&rect_cache,
             rect{
                 line_pos.x,
@@ -139,16 +136,41 @@ draw_buffer_line :: proc(
                 true_font_height,
             },
             no_texture,
-            //TODO: conf this
             BG_MAIN_20,
             vec2{},
             2,
+        )
+
+        add_rect(&rect_cache,
+            rect{
+                line_pos.x,
+                line_pos.y + true_font_height - general_line_thickness_px,
+                active_buffer.width,
+                general_line_thickness_px,
+            },
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            2.5,
+        )
+
+        add_rect(&rect_cache,
+            rect{
+                line_pos.x,
+                line_pos.y,
+                active_buffer.width,
+                general_line_thickness_px,
+            },
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            2.5,
         )
     } 
 
     if do_draw_line_count {
         line_pos := vec2{
-            pen.x,
+            pen.x + line_count_padding_px,
             pen.y - buffer_scroll_position
         }
 
@@ -156,7 +178,7 @@ draw_buffer_line :: proc(
 
         add_text(&rect_cache,
             line_pos,
-            TEXT_DARKER,
+            long_line ? TEXT_ERROR : TEXT_DARKER,
             font_size,
             line_string,
             5,
@@ -197,6 +219,7 @@ draw_text_buffer :: proc() {
     highest_line_string := strings.to_string(sb)
 
     max_line_size := measure_text(buffer_font_size, highest_line_string)
+    max_line_size.x += line_count_padding_px * 2
 
     active_buffer^.x_offset = (max_line_size.x) + (buffer_font_size * .5)
 
@@ -209,7 +232,7 @@ draw_text_buffer :: proc() {
                 f32(len(buffer_lines)) * (line_height),
             },
             no_texture,
-            BG_MAIN_20,
+            BG_MAIN_05,
             vec2{},
             4,
         )
@@ -802,6 +825,10 @@ move_back_word :: proc() {
     prev_was_break := false
 
     #reverse for r,index in chars_before_cursor {
+        if index == 0 {
+            new_char_index = 0
+        }
+
         if rune_in_arr(r, word_break_chars) {
             new_char_index = index+1
 
@@ -831,6 +858,10 @@ move_forward_word :: proc() {
 
     prev_was_space := false
     for r,index in chars_after_cursor {
+        if index == len(chars_after_cursor) - 1 {
+            new_char_index = index + buffer_cursor_char_index + 1
+        }
+
         if rune_in_arr(r, word_break_chars) {
             if index == 0 {
                 new_char_index = index + buffer_cursor_char_index + 1

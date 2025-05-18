@@ -1,5 +1,7 @@
 package main
 
+BG_MAIN_00 := hex_string_to_vec4("171A21FF")
+BG_MAIN_05 := hex_string_to_vec4("1B1F28FF")
 
 BG_MAIN_10 := hex_string_to_vec4("1F242FFF")
 //BG_MAIN_10 := hex_string_to_vec4("FFFFFFFF")
@@ -14,6 +16,8 @@ BG_MAIN_50 := hex_string_to_vec4("43506BFF")
 TEXT_MAIN := hex_string_to_vec4("FFFFFFFF")
 
 TEXT_DARKER := hex_string_to_vec4("AAAAAAFF")
+
+TEXT_ERROR := RED
 
 RED := hex_string_to_vec4("F06449ff")
 GREEN := hex_string_to_vec4("ADFF88ff")

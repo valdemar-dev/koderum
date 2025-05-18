@@ -31,6 +31,9 @@ text_highlight_color : vec4 = TEXT_MAIN
 text_highlight_bg : vec4 = BG_MAIN_40
 //text_highlight_bg : vec4 = vec4{1,1,1,1}
 
+general_line_thickness_px : f32
+line_count_padding_px : f32
+
 load_configs :: proc() {
     exe_path := os.args[0]
 
@@ -155,6 +158,10 @@ set_option :: proc(options: []string) {
         text_highlight_bg = hex_string_to_vec4(value)
     case "do_highlight_current_line":
         do_highlight_current_line = value == "true" 
+    case "general_line_thickness_px":
+        general_line_thickness_px = f32(strconv.atoi(value))
+    case "line_count_padding_px":
+        line_count_padding_px = f32(strconv.atoi(value))
     case:
         fmt.eprintln("Unknown option,", option_name)
 

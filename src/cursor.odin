@@ -44,7 +44,7 @@ draw_cursor :: proc() {
         no_texture,
         vec4{1,1,1,1},
         vec2{},
-        2,
+        3,
     )
 
     draw_rects(&rect_cache)

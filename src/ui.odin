@@ -12,7 +12,6 @@ ui_sliding_buffer := SlidingBuffer([16]rune){
     data=new([16]rune),
 }
 
-
 @(private="package")
 handle_ui_input :: proc(key, scancode, action, mods: i32) {
     if action == glfw.RELEASE {
