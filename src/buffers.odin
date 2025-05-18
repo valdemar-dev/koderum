@@ -42,6 +42,10 @@ Buffer :: struct {
     info: os.File_Info,
 
     is_saved: bool,
+
+    cursor_line: int,
+    cursor_char_index: int,
+    scroll_position: f32,
 }
 
 @(private="package")
@@ -290,8 +294,22 @@ draw_text_buffer :: proc() {
 
 @(private="package")
 open_file :: proc(file_name: string) {
+    if active_buffer != nil {
+        active_buffer^.cursor_char_index = buffer_cursor_char_index
+        active_buffer^.cursor_line = buffer_cursor_line
+        active_buffer^.scroll_position = buffer_scroll_position
+    }
+
     if file_name in buffers {
-        active_buffer = buffers[file_name]
+        new_buf := buffers[file_name]
+        active_buffer = new_buf
+
+        set_buffer_cursor_pos(
+            new_buf.cursor_line,
+            new_buf.cursor_char_index,
+        )
+
+        buffer_scroll_position = new_buf.scroll_position
 
         return
     }
