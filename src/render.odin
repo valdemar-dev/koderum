@@ -16,12 +16,18 @@ frame_time : f32
 @(private="package")
 rect_cache := RectCache{}
 
+@(private="package")
+text_rect_cache := RectCache{}
+
 prev_time : f64
 
 @(private="package")
 render :: proc() {
-    gl.ClearColor(BG_MAIN_10.x, BG_MAIN_10.y, BG_MAIN_10.z, 1)
-    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.ClearColor(BG_MAIN_10.x, BG_MAIN_10.y,BG_MAIN_10.z,1)
+    // no touchy
+    //gl.ClearColor(1,1,1,1)
+
+    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
 
     gl.UseProgram(shader_id)
     gl.ActiveTexture(gl.TEXTURE0)
@@ -31,17 +37,17 @@ render :: proc() {
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.Enable(gl.DEPTH_TEST)
-    gl.DepthFunc(gl.LEQUAL)
+    gl.DepthFunc(gl.LESS)
 
     time := glfw.GetTime()
-
     frame_time = f32(time - prev_time)
-
     prev_time = time
 
-    draw_buffer()
     draw_cursor()
     draw_ui()
+
+    draw_buffer()
+
     draw_buffer_info_view()
     draw_browser_view()
 
@@ -97,7 +103,6 @@ normalize_to_texture_coords :: proc(texture_rect: rect, atlas_size: vec2) -> [4]
 }
 
 add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4, atlas_size := vec2{512,512}, z_index : f32 = 0, invert_x : bool = false) {
-
     z_pos := z_index / 1000000
 
     rectangle := rect{
@@ -496,7 +501,6 @@ process_highlights :: proc(i: int, is_hl_start,positive_dir,negative_dir,is_hl_e
 
 
 add_code_text :: proc(
-    rect_cache: ^RectCache,
     pos: vec2,
     font_height: f32,
     text: ^[]rune,
@@ -554,7 +558,7 @@ add_code_text :: proc(
             if do_highlight_indents && i % tab_spaces == 0 {
                 color := (differentiate_tab_and_spaces && is_tab) ? BG_MAIN_30 : BG_MAIN_20
 
-                add_rect(rect_cache,
+                add_rect(&rect_cache,
                     rect{ pen.x, pen.y, 3, line_height },
                     no_texture,
                     color,
@@ -621,7 +625,7 @@ add_code_text :: proc(
             color = special_chars[r]
         }
 
-        add_rect(rect_cache,
+        add_rect(&text_rect_cache,
             rect{
                 math.round_f32(pen.x + character.offset.x),
                 math.round_f32((pen.y - character.offset.y + ascender)),

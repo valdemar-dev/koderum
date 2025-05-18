@@ -421,13 +421,16 @@ draw_browser_view :: proc() {
         vec2{},
         start_z,
     )
+    
+    dir := fp.dir(search_term, context.temp_allocator)
+    is_cwd := dir == cwd 
 
     add_rect(&rect_cache,
         rect{
             bg_rect.x,
             bg_rect.y,
             bg_rect.width,
-            ui_general_font_size + padding * 2,
+            (ui_general_font_size) + padding * (is_cwd ? 3 : 2),
         },
         no_texture,
         BG_MAIN_30,
@@ -447,9 +450,7 @@ draw_browser_view :: proc() {
 
     pen.y += (ui_general_font_size + 5)
 
-    dir := fp.dir(search_term, context.temp_allocator)
-
-    if dir == cwd {
+    if is_cwd {
         add_text(&rect_cache,
             pen,
             TEXT_DARKER,
@@ -459,9 +460,11 @@ draw_browser_view :: proc() {
             true,
             bg_rect.width - padding * 2,
         )
-    }
 
-    pen.y += ui_smaller_font_size + (padding * 2)
+        pen.y += ui_smaller_font_size + (padding * 2)
+    } else {
+        pen.y += ui_smaller_font_size + (padding)
+    }
 
     if len(search_term) == 0 {
         add_text(&rect_cache,

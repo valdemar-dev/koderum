@@ -27,7 +27,9 @@ ui_smaller_font_size : f32
 program_dir : string
 
 text_highlight_color : vec4 = TEXT_MAIN
+
 text_highlight_bg : vec4 = BG_MAIN_40
+//text_highlight_bg : vec4 = vec4{1,1,1,1}
 
 load_configs :: proc() {
     exe_path := os.args[0]
@@ -104,6 +106,7 @@ load_configs :: proc() {
     }
 }
 
+//TODO: Megajank omegalul
 set_option :: proc(options: []string) {
     if len(options) < 2 {
         fmt.eprintf("option,", options, "is improper, must be at least len 2.")
@@ -122,8 +125,6 @@ set_option :: proc(options: []string) {
         long_line_required_characters = strconv.atoi(value)
     case "do_draw_line_count":
         do_draw_line_count = value == "true"
-    case "do_highlight_current_line":
-        do_highlight_current_line = value == "true"
     case "differentiate_tab_and_spaces":
         differentiate_tab_and_spaces = value == "true"
     case "tab_spaces":
@@ -152,8 +153,11 @@ set_option :: proc(options: []string) {
         text_highlight_color = hex_string_to_vec4(value)
     case "text_highlight_bg":
         text_highlight_bg = hex_string_to_vec4(value)
+    case "do_highlight_current_line":
+        do_highlight_current_line = value == "true" 
     case:
         fmt.eprintln("Unknown option,", option_name)
+
     }
 }
 

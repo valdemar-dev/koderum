@@ -15,6 +15,7 @@ todo:
     - add always loaded characters configurable in .conf
     - add lerp anim to text hl
     - should retain clipboard history
+    - start of line keybind
     
 
 requirements:

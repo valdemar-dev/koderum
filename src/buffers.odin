@@ -101,11 +101,11 @@ draw_buffer_line :: proc(
     long_line := do_highlight_long_lines && (len(chars) >= long_line_required_characters)
 
     highlight_offset, highlight_width := add_code_text(
-        &rect_cache,
         line_pos,
         font_size,
         &chars,
-        1,
+        3,
+
         buffer_line,
         char_map,
         ascender,
@@ -125,8 +125,26 @@ draw_buffer_line :: proc(
             },
             no_texture,
             text_highlight_bg,
+            vec2{},
+            2,
         )
     }
+
+    if do_highlight_current_line && buffer_cursor_line == index {
+        add_rect(&rect_cache,
+            rect{
+                line_pos.x,
+                line_pos.y,
+                active_buffer.width,
+                true_font_height,
+            },
+            no_texture,
+            //TODO: conf this
+            BG_MAIN_20,
+            vec2{},
+            2,
+        )
+    } 
 
     if do_draw_line_count {
         line_pos := vec2{
@@ -141,7 +159,7 @@ draw_buffer_line :: proc(
             TEXT_DARKER,
             font_size,
             line_string,
-            3,
+            5,
         )
     }
 
@@ -181,19 +199,6 @@ draw_text_buffer :: proc() {
     max_line_size := measure_text(buffer_font_size, highest_line_string)
 
     active_buffer^.x_offset = (max_line_size.x) + (buffer_font_size * .5)
-    
-    add_rect(&rect_cache,
-        rect{
-            active_buffer.x_pos,
-            active_buffer.y_pos,
-            active_buffer.width,
-            active_buffer.height,
-        },
-        no_texture,
-        BG_MAIN_10,
-        vec2{},
-        0,
-    )
 
     if do_draw_line_count {
         add_rect(&rect_cache,
@@ -206,7 +211,7 @@ draw_text_buffer :: proc() {
             no_texture,
             BG_MAIN_20,
             vec2{},
-            2,
+            4,
         )
     }
 
@@ -249,8 +254,15 @@ draw_text_buffer :: proc() {
     }
 
     draw_rects(&rect_cache)
-
     reset_rect_cache(&rect_cache)
+
+    /*
+        TEXT, especially code text (which has unknown variable background colours)
+        must be drawn on a separate pass, otherwise blending is not possible.
+        thanks opengl
+    */
+    draw_rects(&text_rect_cache)
+    reset_rect_cache(&text_rect_cache)
 }
 
 @(private="package")

@@ -88,6 +88,11 @@ load_font :: proc(path: cstring) -> (face: ft.Face, err: ft.Error) {
     error = ft.set_pixel_sizes(face, 0, 64)
     if error != .Ok do return nil, error
 
+    error = ft.set_lcd_filter(library, ft.FT_LcdFilter.Default)
+    if err == ft.Error.Unimplemented_Feature {
+        panic("AHH")
+    }
+
     fmt.println(face)
 
     return face, .Ok
@@ -346,25 +351,34 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
     error = ft.set_pixel_sizes(face, 0, u32(font_size))
     if error != .Ok do return nil, "failed to set glyph pixel size"
 
-    load_flags := ft.Load_Flags{
-    }
+    load_flags := int(ft.Load_Flags{
+        .Render,
+    })
 
-    error = ft.load_glyph(face, glyph_index, load_flags)
+    FT_LOAD_TARGET_LCD := i32(ft.Render_Mode.LCD) << 16
+    flags := i32(ft.Load_Flags.Render) | FT_LOAD_TARGET_LCD
+       
+    error = ft.load_glyph(face, glyph_index, flags)
     if error != .Ok {
         return nil, "failed to load glyph"
     }
 
     error = ft.render_glyph(face.glyph, ft.Render_Mode.Normal)
+
     if error != .Ok {
         return nil, "Failed to render glyph"
     }
 
     orig_bmp := face.glyph.bitmap
+    /*
+
 
     if orig_bmp.pixel_mode != 2 { // 2 = FT_PIXEL_MODE_GRAY
         return nil, "Wrong pixel mode"
     }
 
+
+     */
     size := int(orig_bmp.rows) * int(orig_bmp.pitch)
     if size < 0 {
         return nil, "Invalid bitmap size"
