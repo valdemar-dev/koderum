@@ -16,6 +16,7 @@ todo:
     - add lerp anim to text hl
     - should retain clipboard history
     - start of line keybind
+    - v to highlight search term
 
 requirements:
     must be practically infinite

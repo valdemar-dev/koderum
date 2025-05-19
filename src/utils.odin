@@ -119,3 +119,27 @@ rune_in_arr :: proc(el: rune, arr: []rune) -> (ok: bool) {
 
     return false
 }
+
+contains_runes :: proc(main: []rune, subset: []rune) -> (found: bool, start: int) {
+    n := len(main)
+    m := len(subset)
+    if m == 0 || m > n {
+        return false, -1
+    }
+
+    for i in 0..<(n - m + 1) {
+        ok := true
+
+        for j in 0..<m {
+            if main[i + j] != subset[j] {
+                ok = false
+                break
+            }
+        }
+        if ok {
+            return true, i
+        }
+    }
+    return false, -1
+}
+

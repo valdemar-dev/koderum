@@ -554,6 +554,8 @@ add_code_text :: proc(
         is_line_fully_highlighted = true
     }
 
+    is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
+
     for r,i in text {
         set_word(&word, &word_idx, buffer_line, i) 
 
@@ -648,7 +650,9 @@ add_code_text :: proc(
 
         is_in_string, variant := is_char_in_string(lang_string_chars)
 
-        if was_highlighted || is_line_fully_highlighted {
+        if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
+            color = RED
+        } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
         } else if is_in_string {
             color = variant
@@ -662,16 +666,16 @@ add_code_text :: proc(
 
         add_rect(&text_rect_cache,
             rect{
-                math.round_f32(pen.x + character.offset.x),
-                math.round_f32((pen.y - character.offset.y + ascender)),
-                math.round_f32(f32(character.width)),
-                math.round_f32(f32(character.rows)),
+                pen.x + character.offset.x,
+                pen.y - character.offset.y + ascender,
+                f32(character.width),
+                f32(character.rows),
             },
             rect{
-                math.round_f32(f32(uvs.x)),
-                math.round_f32( f32(uvs.y)),
-                math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
-                math.round_f32( f32(uvs.h) - rect_pack_glyp_padding),
+                f32(uvs.x),
+                f32(uvs.y),
+                f32(uvs.w) - rect_pack_glyp_padding,
+                f32(uvs.h) - rect_pack_glyp_padding,
             },
             color,
             char_uv_map_size,

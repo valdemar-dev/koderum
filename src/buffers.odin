@@ -73,6 +73,66 @@ buffer_horizontal_scroll_position : f32
 
 sb := strings.builder_make()
 
+SearchHit :: struct{
+    line: int,
+    start_char: int,
+    end_char: int,
+}
+
+search_hits : [dynamic]SearchHit
+
+@(private="package")
+selected_hit : ^SearchHit = nil
+
+@(private="package")
+buffer_search_term : string
+
+find_hits :: proc() {
+    clear(&search_hits)
+
+    runes := utf8.string_to_runes(buffer_search_term)
+
+    for line,i in active_buffer.lines {
+        found, idx := contains_runes(line.characters, runes)
+
+        if found {
+            append_elem(&search_hits, SearchHit{
+                line=i,
+                start_char=idx,
+                end_char=idx + len(runes),
+            })
+        }
+    }
+
+    delete(runes)
+
+    if len(search_hits) > 0 {
+        set_hit_index(0)
+    }
+}
+
+hit_index := 0
+set_hit_index :: proc(index: int) {
+    idx := index
+
+    if idx > len(search_hits) - 1 {
+        idx = 0
+    } else if idx == -1 {
+        idx = len(search_hits) - 1
+    }
+
+    selected_hit = &search_hits[idx]
+
+    set_buffer_cursor_pos(
+        selected_hit.line,
+        selected_hit.start_char,
+    )
+
+    constrain_scroll_to_cursor()
+
+    hit_index = idx
+}
+
 @(private="package")
 draw_buffers :: proc() {
 }
@@ -940,9 +1000,23 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_P) {
-        key := key_store[glfw.KEY_J]
+        //key := key_store[glfw.KEY_P]
 
         paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+
+        return false
+    }
+
+    if is_key_pressed(glfw.KEY_G) {
+        de := os.get_env("XDG_CURRENT_DESKTOP") 
+
+        if de == "GNOME" {
+            glfw.WaitEvents()
+        }
+
+        delete(de)
+
+        input_mode = .SEARCH
 
         return false
     }
@@ -978,7 +1052,13 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_A) {
-        glfw.WaitEvents()
+        de := os.get_env("XDG_CURRENT_DESKTOP") 
+
+        if de == "GNOME" {
+            glfw.WaitEvents()
+        }
+
+        delete(de)
 
         append_to_line()
 
@@ -1135,4 +1215,71 @@ handle_movement_input :: proc() -> bool {
     }
 
     return false
+}
+
+@(private="package")
+buffer_append_to_search_term :: proc(key: rune) {
+    buf := make([dynamic]rune)
+
+    runes := utf8.string_to_runes(buffer_search_term)
+    
+    append_elems(&buf, ..runes)
+    append_elem(&buf, key)
+
+    buffer_search_term = utf8.runes_to_string(buf[:])
+}
+
+@(private="package")
+handle_search_input :: proc() {
+    if is_key_pressed(glfw.KEY_ESCAPE) {
+        buffer_search_term = ""
+
+        selected_hit = nil
+
+        clear(&search_hits)
+
+        input_mode = .COMMAND
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_BACKSPACE) {
+        runes := utf8.string_to_runes(buffer_search_term)
+
+        end_idx := len(runes)-1        
+
+        runes = runes[:end_idx]
+
+        buffer_search_term = utf8.runes_to_string(runes)
+
+        delete(runes)
+    }
+
+    if is_key_pressed(glfw.KEY_ENTER) {
+        selected_hit = nil
+
+        find_hits()
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_J) {
+        key := key_store[glfw.KEY_J]
+
+        if key.modifiers == 2 {
+            set_hit_index(hit_index + 1)
+        }
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_K) {
+        key := key_store[glfw.KEY_K]
+
+        if key.modifiers == 2 {
+            set_hit_index(hit_index - 1)
+        }
+
+        return
+    }
 }

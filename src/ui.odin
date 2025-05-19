@@ -49,6 +49,7 @@ ui_z_index :: 10
 
 draw_ui :: proc() {
     reset_rect_cache(&rect_cache)
+    reset_rect_cache(&text_rect_cache)
 
     error := ft.set_pixel_sizes(primary_font, 0, u32(ui_general_font_size))
     if error != .Ok do return
@@ -99,6 +100,8 @@ draw_ui :: proc() {
         mode_string = "Text Input"
     case .HIGHLIGHT:
         mode_string = "Highlighting"
+    case .SEARCH:
+        mode_string = "Search"
     }
 
     add_text(&rect_cache,
@@ -166,5 +169,42 @@ draw_ui :: proc() {
         )
     }
 
+    if input_mode == .SEARCH {
+        term := buffer_search_term == "" ? "Type to Search" : buffer_search_term
+
+        size := measure_text(ui_general_font_size, term)
+
+        middle := fb_size.x / 2 - size.x / 2
+
+        padding :: 10
+
+        add_rect(&rect_cache,
+            rect{
+                middle - (padding * 1.5),
+                fb_size.y - padding - 20 - size.y,
+                size.x + padding * 3,
+                size.y + padding * 2,
+            },
+            no_texture,
+            BG_MAIN_20,
+            vec2{},
+            ui_z_index + 3,
+        )
+
+        add_text(&text_rect_cache,
+            vec2{
+                middle,
+                fb_size.y - 20 - size.y,
+            },
+            TEXT_MAIN,
+            ui_general_font_size,
+            term,
+            ui_z_index + 4,
+        )
+    }
+
     draw_rects(&rect_cache)
+
+    draw_rects(&text_rect_cache)
+    reset_rect_cache(&text_rect_cache)
 }

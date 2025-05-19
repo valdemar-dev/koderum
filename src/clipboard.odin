@@ -103,5 +103,5 @@ copy_to_clipboard :: proc(
  
     bindings.SetClipboardString(window, cstr)
 
-    fmt.println(cstr)
+    delete(result)
 }

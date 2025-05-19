@@ -31,6 +31,7 @@ InputMode :: enum {
     BROWSER_SEARCH,
     FILE_RENAME,
     FILE_CREATE,
+    SEARCH,
     HIGHLIGHT,
 }
 
@@ -63,8 +64,11 @@ check_inputs :: proc() -> bool {
         handle_text_input() or_return
     case .BROWSER_SEARCH:
         handle_browser_input()
+    case .SEARCH:
+        handle_search_input()
     case .HIGHLIGHT:
         handle_highlight_input()
+
     }
 
     return false
@@ -98,8 +102,9 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         break
     case .BROWSER_SEARCH:
         browser_append_to_search_term(key)
-
         break
+    case .SEARCH:
+        buffer_append_to_search_term(key)
     case .FILE_RENAME:
         break
     case .FILE_CREATE:

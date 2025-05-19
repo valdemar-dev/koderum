@@ -18,3 +18,6 @@ and going forward goes to the *start* of a word.
 (Ctrl + D) -> Delete Selected File.
 (Ctrl + F) -> Rename Selected File.
 (Ctrl + G) -> Create file using current Search Term, (if a file with search term is not already found.)
+
+(G) -> Enable Search Mode
+(ANY CHAR) -> Type Search Term

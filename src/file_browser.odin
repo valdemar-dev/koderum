@@ -261,7 +261,14 @@ toggle_browser_view :: proc() {
         suppress = false
         show_browser_view = true
 
-        glfw.WaitEvents()
+        de := os.get_env("XDG_CURRENT_DESKTOP") 
+
+        if de == "GNOME" {
+            glfw.WaitEvents()
+        }
+
+        delete(de)
+
 
         input_mode = .BROWSER_SEARCH
 
