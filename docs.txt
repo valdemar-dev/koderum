@@ -4,14 +4,12 @@
 (R) -> Move backwards in the current bufferline until a word-break character is detected.
 (U) -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
 
-This is slightly different to VIM-like W-B movement, since going back goes to the *end* of a word,
-and going forward goes to the *start* of a word.
-
 (I) -> Go into Text Insert mode.
 (A) -> Move buffer cursor to the end of the current line, and go into Text Insert Mode.
-(Esc) -> Go into Command mode.
 
 (Ctrl + S) -> Save active buffer.
+
+(Q) -> Toggle File Info View
 
 (O) -> Open File Explorer.
 (Ctrl + S) -> Store File Explorer CWD.
@@ -21,3 +19,6 @@ and going forward goes to the *start* of a word.
 
 (G) -> Enable Search Mode
 (ANY CHAR) -> Type Search Term
+(Enter) -> Get Results
+(Ctrl + J) -> Next Hit
+(Ctrl + K) -> Prev Hit

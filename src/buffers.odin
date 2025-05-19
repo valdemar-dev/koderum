@@ -478,8 +478,6 @@ open_file :: proc(file_name: string) {
         fmt.println("Updating fonts for buffer")
     }
 
-    update_fonts()
-
     set_buffer_cursor_pos(0,0)
     constrain_scroll_to_cursor()
 }
@@ -1335,16 +1333,12 @@ paste_string :: proc(str: string, line: int, char: int) {
     prev := buffer_line.characters[:clamped]
     after := buffer_line.characters[clamped:]
 
+    /*
     for i in 0..<len(split) {
         line_index := line + i
 
         if line_index == line {
-            runes := utf8.string_to_runes(split[i])
-            
-            buffer_line^.characters = prev
-            buffer_line^.characters = insert_chars_at_index(buffer_line.characters, char, runes)
-
-            continue
+                        continue
         }
 
         runes := utf8.string_to_runes(split[i])
@@ -1372,6 +1366,39 @@ paste_string :: proc(str: string, line: int, char: int) {
             )
         }
     }
+    */
+
+    for i in 0..<len(split) {
+        line_index := line + i
+
+        if i == 0 {
+            runes := utf8.string_to_runes(split[i])
+            
+            buffer_line^.characters = prev
+            buffer_line^.characters = insert_chars_at_index(buffer_line.characters, char, runes)
+
+
+            continue
+        }
+
+        // for each subsequent fragment, insert at exactly line + i
+        runes := utf8.string_to_runes(split[i])
+        inserted := BufferLine{ characters = runes }
+
+        if i == len(split)-1 {
+            // append the ‘after’ suffix on the last fragment
+            inserted.characters = insert_chars_at_index(runes, len(runes), after)
+        }
+
+        set_line_word_defs(&inserted)
+        inject_at(active_buffer.lines, line_index, inserted)
+        constrain_scroll_to_cursor()
+
+        if i == len(split)-1 {
+            set_buffer_cursor_pos(line_index, len(runes))
+        }
+    }
+
 }
 
 @(private="package")

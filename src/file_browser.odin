@@ -86,6 +86,8 @@ handle_browser_input :: proc() {
 
             set_found_files()
 
+            delete(dir)
+
             return
         }
 
@@ -412,7 +414,7 @@ draw_browser_view :: proc() {
         80 * one_height_percentage,
     }
 
-    start_z : f32 = 6
+    start_z : f32 = 20
 
     pen := vec2{
         bg_rect.x + padding,

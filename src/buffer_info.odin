@@ -47,7 +47,7 @@ draw_buffer_info_view :: proc() {
         0,
     }
 
-    start_z : f32 = 4
+    start_z : f32 = 30
 
     pen := vec2{
         pos_rect.x + padding,

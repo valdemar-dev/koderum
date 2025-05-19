@@ -464,16 +464,13 @@ clear_fonts :: proc() {
     for size,index in character_maps {
         character_map := character_maps_array[index]
 
-        when ODIN_DEBUG == false {
-            for char_code, character in character_map {
-                delete(character.buffer)
+        for char_code, character in character_map {
+            delete(character.buffer)
 
-                if character != nil {
-                    free(character, context.allocator)
-                }
+            if character != nil {
+                free(character, context.allocator)
             }
         }
-        
 
         delete(character_map)
     }
@@ -496,6 +493,10 @@ clear_fonts :: proc() {
 
     delete(character_maps_array)
     delete(char_uv_maps_array)
+
+    for fl in font_list {
+        delete(fl)
+    }
 }
 
 @(private="package")

@@ -48,12 +48,14 @@ size_callback :: proc "c" (
     gl.Viewport(0,0,width,height)
 }
 
+@(private="package")
+update_thread : ^thread.Thread
 init_update_thread :: proc() {
     when ODIN_DEBUG {
         fmt.println("Initializing update thread.")
     }
 
-    update_thread := thread.create(update)
+    update_thread = thread.create(update)
 
     thread.start(update_thread)
 }

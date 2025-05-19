@@ -34,4 +34,3 @@ thoughts:
     somehow, the user needs to be able to restore precisely what they have done.
     this means, storing change.
     how would one store change?
-    

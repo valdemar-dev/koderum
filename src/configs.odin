@@ -71,6 +71,7 @@ load_configs :: proc() {
     }
 
     category : string
+    values : []string
 
     for line, index in lines {
         if len(line) == 0 {
@@ -108,7 +109,13 @@ load_configs :: proc() {
         }
 
         set_option(values)
+
+        delete(values)
+        delete(trimmed)
     }
+
+    delete(bytes)
+    delete(lines)
 }
 
 //TODO: Megajank omegalul
@@ -137,7 +144,7 @@ set_option :: proc(options: []string) {
     case "cursor_edge_padding":
         cursor_edge_padding = f32(strconv.atof(value))
     case "font":
-        append(&font_list, value)
+        append(&font_list, strings.clone(value))
     case "ui_general_font_size":
         font_size := strconv.atof(value)
         ui_general_font_size = f32(font_size)
@@ -153,7 +160,7 @@ set_option :: proc(options: []string) {
     case "do_highlight_indents":
         do_highlight_indents = value == "true"
     case "default_cwd":
-        default_cwd = value
+        default_cwd = strings.clone(value)
     case "text_highlight_color":
         text_highlight_color = hex_string_to_vec4(value)
     case "text_highlight_bg":
