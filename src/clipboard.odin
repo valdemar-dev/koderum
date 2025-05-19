@@ -38,22 +38,31 @@ generate_highlight_string :: proc(
         if i == start && i == end {
             forward := start_char <= end_char
 
+            clamped_end := min(end_char, len(line.characters))
+            clamped_start := min(start_char, len(line.characters))
+
             if forward {
-                str = utf8.runes_to_string(line.characters[start_char:end_char])
+                str = utf8.runes_to_string(line.characters[clamped_start:clamped_end])
             } else {
-                str = utf8.runes_to_string(line.characters[end_char:start_char])
+                str = utf8.runes_to_string(line.characters[clamped_end:clamped_start])
             }
         } else if i == end {
             if is_negative_highlight {
-                str = utf8.runes_to_string(line.characters[:end_char])
+                clamped := min(start_char, len(line.characters))
+                str = utf8.runes_to_string(line.characters[:clamped])
             } else {
-                str = utf8.runes_to_string(line.characters[:end_char])
+                clamped := min(end_char, len(line.characters))
+                str = utf8.runes_to_string(line.characters[:clamped])
             }
         } else if i == start {
             if is_negative_highlight {
-                str = utf8.runes_to_string(line.characters[start_char:])
+                clamped := clamp(end_char, 0, len(line.characters))
+
+                str = utf8.runes_to_string(line.characters[clamped:])
             } else {
-                str = utf8.runes_to_string(line.characters[start_char:])
+                clamped := clamp(start_char, 0, len(line.characters))
+
+                str = utf8.runes_to_string(line.characters[clamped:])
             }
         } else {
             str = utf8.runes_to_string(line.characters[:])
@@ -90,8 +99,9 @@ copy_to_clipboard :: proc(
 ) {
     result := generate_highlight_string(start_line, end_line, start_char, end_char)
 
-   
-    bindings.SetClipboardString(window, strings.clone_to_cstring(result))
+    cstr := strings.clone_to_cstring(result)
+ 
+    bindings.SetClipboardString(window, cstr)
 
-    delete(result)
+    fmt.println(cstr)
 }

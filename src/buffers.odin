@@ -939,6 +939,14 @@ handle_buffer_input :: proc() -> bool {
         return true
     }
 
+    if is_key_pressed(glfw.KEY_P) {
+        key := key_store[glfw.KEY_J]
+
+        paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+
+        return false
+    }
+
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
 
@@ -978,7 +986,13 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_I) {
-        glfw.WaitEvents()
+        de := os.get_env("XDG_CURRENT_DESKTOP") 
+
+        if de == "GNOME" {
+            glfw.WaitEvents()
+        }
+
+        delete(de)
 
         input_mode = .BUFFER_INPUT
 
@@ -994,6 +1008,72 @@ handle_buffer_input :: proc() -> bool {
     }
 
     return false
+}
+
+@(private="package")
+paste_string :: proc(str: string, line: int, char: int) {
+    split := strings.split(str, "\n")
+
+    defer delete(split)
+
+    buffer_line := &active_buffer.lines[line]
+
+    if len(split) == 1 {
+        runes := utf8.string_to_runes(str)
+
+        buffer_line^.characters = insert_chars_at_index(buffer_line.characters, char, runes)
+
+        set_buffer_cursor_pos(
+            line,
+            buffer_cursor_char_index + len(str),
+        )
+
+        return
+    }
+
+
+    clamped := clamp(char, 0, len(buffer_line.characters))
+
+    prev := buffer_line.characters[:clamped]
+    after := buffer_line.characters[clamped:]
+
+    for i in 0..<len(split) {
+        line_index := line + i
+
+        if line_index == line {
+            runes := utf8.string_to_runes(split[i])
+            
+            buffer_line^.characters = prev
+            buffer_line^.characters = insert_chars_at_index(buffer_line.characters, char, runes)
+
+            continue
+        }
+
+        runes := utf8.string_to_runes(split[i])
+
+        buffer_line := BufferLine{
+            characters=runes,
+        }
+
+        if i == len(split) - 1 {
+            buffer_line.characters = insert_chars_at_index(buffer_line.characters, len(runes), after)
+        }
+
+        new_line_num := buffer_cursor_line+1
+
+        set_line_word_defs(&buffer_line)
+
+        inject_at(active_buffer.lines, new_line_num, buffer_line)
+
+        constrain_scroll_to_cursor()
+
+        if i == len(split) - 1 {
+            set_buffer_cursor_pos(
+                new_line_num,
+                len(runes),
+            )
+        }
+    }
 }
 
 @(private="package")

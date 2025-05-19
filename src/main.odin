@@ -47,7 +47,11 @@ main :: proc() {
 
     last_time := glfw.GetTime()
 
+    glfw.SwapBuffers(window)
+
     for !glfw.WindowShouldClose(window) {
+        glfw.PollEvents()
+
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
 
@@ -77,8 +81,13 @@ main :: proc() {
 
         free_all(context.temp_allocator)
 
-        glfw.SwapBuffers(window)
-        glfw.PollEvents()
+        if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
+           glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1
+        {
+            glfw.SwapBuffers(window)
+
+            continue
+        }
     }
 
     clear_fonts()

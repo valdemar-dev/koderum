@@ -34,6 +34,8 @@ text_highlight_bg : vec4 = BG_MAIN_40
 general_line_thickness_px : f32
 line_count_padding_px : f32
 
+ui_scale : f32
+
 load_configs :: proc() {
     exe_path := os.args[0]
 
@@ -162,9 +164,10 @@ set_option :: proc(options: []string) {
         general_line_thickness_px = f32(strconv.atoi(value))
     case "line_count_padding_px":
         line_count_padding_px = f32(strconv.atoi(value))
+    case "ui_scale":
+        ui_scale = f32(strconv.atoi(value))
     case:
         fmt.eprintln("Unknown option,", option_name)
-
     }
 }
 

@@ -16,7 +16,6 @@ todo:
     - add lerp anim to text hl
     - should retain clipboard history
     - start of line keybind
-    
 
 requirements:
     must be practically infinite

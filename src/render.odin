@@ -589,13 +589,13 @@ add_code_text :: proc(
             if was_highlighted || is_line_fully_highlighted {
                 add_rect(&rect_cache,
                     rect{
-                        pen.x,
-                        pen.y + (highlight_height / 2) - 2,
-                        4,
-                        4,
+                        pen.x + (advance_amount / 2) - 1,
+                        pen.y + (highlight_height / 2) - 1,
+                        2,
+                        2,
                     },
                     no_texture,
-                    BG_MAIN_30,
+                    text_highlight_color,
                     vec2{},
                     z_index,
                 )
@@ -648,7 +648,7 @@ add_code_text :: proc(
 
         is_in_string, variant := is_char_in_string(lang_string_chars)
 
-        if was_highlighted {
+        if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
         } else if is_in_string {
             color = variant

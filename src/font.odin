@@ -93,8 +93,6 @@ load_font :: proc(path: cstring) -> (face: ft.Face, err: ft.Error) {
         panic("AHH")
     }
 
-    fmt.println(face)
-
     return face, .Ok
 }
 

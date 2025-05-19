@@ -189,6 +189,12 @@ draw_buffer_info_view :: proc() {
 
 @(private="package")
 tick_buffer_info_view :: proc() {
+    if suppress == true {
+        buffer_info_view_x = fb_size.x
+
+        return
+    }
+
     if show_buffer_info_view {
         buffer_info_view_x = smooth_lerp(
             buffer_info_view_x,
@@ -206,6 +212,7 @@ tick_buffer_info_view :: proc() {
 
         if int(fb_size.x) - int(buffer_info_view_x) < 5 {
             suppress = true
+
         }
     }
 }
