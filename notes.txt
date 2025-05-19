@@ -17,6 +17,7 @@ todo:
     - should retain clipboard history
     - start of line keybind
     - v to highlight search term
+    - add ctrl + r reload
 
 requirements:
     must be practically infinite

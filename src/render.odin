@@ -23,10 +23,7 @@ prev_time : f64
 
 @(private="package")
 render :: proc() {
-    gl.ClearColor(BG_MAIN_10.x, BG_MAIN_10.y,BG_MAIN_10.z,1)
-    // no touchy
-    //gl.ClearColor(1,1,1,1)
-
+    gl.ClearColor(1,0,0,1)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
 
     gl.UseProgram(shader_id)
@@ -54,9 +51,6 @@ render :: proc() {
     when ODIN_DEBUG {
         draw_debug()
     }
-
-    gl.Disable(gl.BLEND)
-    gl.Disable(gl.DEPTH_TEST)
 }
 
 indices_rawptr := rawptr(uintptr(0))

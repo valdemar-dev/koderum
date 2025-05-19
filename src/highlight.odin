@@ -44,5 +44,25 @@ handle_highlight_input :: proc() {
         return
     }
 
+    if is_key_pressed(glfw.KEY_C) {
+        copy_to_yank_buffer(
+            highlight_start_line,
+            buffer_cursor_line,
+            highlight_start_char,
+            buffer_cursor_char_index,
+        )
+
+        remove_selection(
+            highlight_start_line,
+            buffer_cursor_line,
+            highlight_start_char,
+            buffer_cursor_char_index,
+        )
+
+        input_mode = .COMMAND
+
+        return
+    }
+
     handle_movement_input()
 }

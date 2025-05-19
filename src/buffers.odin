@@ -254,9 +254,41 @@ draw_buffer_line :: proc(
     return pen
 }
 
+draw_no_buffer :: proc() {
+    reset_rect_cache(&rect_cache)
+    reset_rect_cache(&text_rect_cache)
+
+    add_rect(&rect_cache,
+        rect{
+            0,0,fb_size.x,fb_size.y,
+        },
+        no_texture,
+        BG_MAIN_10,
+        vec2{},
+        -2,
+    )
+
+    size := measure_text(ui_bigger_font_size, "Press O to open a file.")
+
+    add_text(&text_rect_cache,
+        vec2{
+            fb_size.x / 2 - size.x / 2,
+            fb_size.y / 2 - size.y / 2,
+        },
+        TEXT_MAIN,
+        ui_bigger_font_size,
+        "Press O to open a file.",
+    )
+
+    draw_rects(&rect_cache)
+    draw_rects(&text_rect_cache)
+}
+
 @(private="package")
 draw_buffer :: proc() {
     if active_buffer == nil {
+        draw_no_buffer()
+
         return
     }
 
@@ -286,6 +318,16 @@ draw_text_buffer :: proc() {
     max_line_size.x += line_count_padding_px * 2
 
     active_buffer^.x_offset = (max_line_size.x) + (buffer_font_size * .5)
+
+    add_rect(&rect_cache,
+        rect{
+            0,0,fb_size.x,fb_size.y,
+        },
+        no_texture,
+        BG_MAIN_10,
+        vec2{},
+        -2,
+    )
 
     if do_draw_line_count {
         add_rect(&rect_cache,
@@ -978,6 +1020,178 @@ append_to_line :: proc() {
     input_mode = .BUFFER_INPUT
 }
 
+/*
+@(private="package")
+remove_selection :: proc(
+    start_line: int,
+    end_line: int,
+    start_char: int,
+    end_char: int,
+) {
+    start := start_line
+    end := end_line
+
+    is_negative_highlight := start_line >= end_line
+    if is_negative_highlight {
+        temp := start
+        start = end
+        end = temp
+    }
+
+    lines_to_remove : [dynamic]int
+
+    for i in start..=end {
+        line := &active_buffer.lines[i]
+
+        if i == start && i == end {
+            forward := start_char <= end_char
+
+            clamped_end := min(end_char, len(line.characters))
+            clamped_start := min(start_char, len(line.characters))
+
+            if forward {
+                before := line.characters[:clamped_start]
+                after := line.characters[clamped_end:]
+
+                new_runes := new([dynamic]rune)
+
+                append_elems(new_runes, ..before)
+                append_elems(new_runes, ..after)
+
+                fmt.println(before, after, i)
+
+                line^.characters = new_runes^[:]
+            } else {
+                line^.characters = line.characters[clamped_end:clamped_start]
+            }
+        } else if i == end {
+            if is_negative_highlight {
+                if len(line.characters) == 0 {
+                    ordered_remove(active_buffer.lines, i)
+                } else {
+                    clamped := min(start_char, len(line.characters))
+
+                    if clamped == len(line.characters) {
+                        append(&lines_to_remove, i)
+                    } else {
+                        line^.characters = line.characters[clamped:]
+                    }
+                }
+            } else {
+                if len(line.characters) == 0 {
+                    append(&lines_to_remove, i)
+                } else {
+                    clamped := min(end_char, len(line.characters))
+
+                    if clamped == len(line.characters) {
+                        append(&lines_to_remove, i)
+                    } else {
+                        line^.characters = line.characters[clamped:]
+                    }
+                }
+            }
+        } else if i == start {
+            if is_negative_highlight {
+                if len(line.characters) == 0 {
+                    append(&lines_to_remove, i)
+                } else {
+                    clamped := clamp(end_char, 0, len(line.characters))
+
+                    if clamped == len(line.characters) {
+                        append(&lines_to_remove, i)
+                    } else {
+                        line^.characters = line.characters[:clamped]
+                    }
+                }
+            } else {
+                if len(line.characters) == 0 {
+                    append(&lines_to_remove, i)
+                } else {
+                    clamped := clamp(start_char, 0, len(line.characters))
+
+                    if clamped == len(line.characters) {
+                        append(&lines_to_remove, i)
+                    } else {
+                        line^.characters = line.characters[:clamped]
+                    }
+                }
+            }
+        } else {
+            append(&lines_to_remove, i)
+        }
+    }
+
+    set_buffer_cursor_pos(
+        start_line,
+        start_char,
+    )
+}
+*/
+
+@(private="package")
+remove_selection :: proc(
+    start_line: int, end_line: int,
+    start_char: int, end_char: int,
+) {
+    a_line, a_char := start_line, start_char
+    b_line, b_char := end_line,   end_char
+    if a_line > b_line || (a_line == b_line && a_char > b_char) {
+        a_line, b_line = b_line, a_line
+        a_char, b_char = b_char, a_char
+    }
+
+    lines_to_remove := [dynamic]int{}
+
+    if a_line == b_line {
+        line := &active_buffer.lines[a_line]
+        s := min(a_char, len(line.characters))
+        e := min(b_char, len(line.characters))
+        new_chars := [dynamic]rune{}
+        runtime.append_elems(&new_chars, ..line.characters[:s])
+        runtime.append_elems(&new_chars, ..line.characters[e:])
+
+        line^.characters = new_chars[:]
+
+        set_buffer_cursor_pos(a_line, a_char)
+        return
+    }
+
+    for i in a_line..=b_line {
+        line := &active_buffer.lines[i]
+        count := len(line.characters)
+        s := min(a_char, count)
+        e := min(b_char, count)
+
+        if i == a_line {
+            if s == 0 {
+                runtime.append_elem(&lines_to_remove, i)
+            } else {
+                line.characters = line.characters[:s]
+            }
+
+        } else if i == b_line {
+            if e == count {
+                runtime.append_elem(&lines_to_remove, i)
+            } else {
+                line.characters = line.characters[e:]
+            }
+
+        } else {
+            runtime.append_elem(&lines_to_remove, i)
+        }
+    }
+    
+    j := len(lines_to_remove)
+    for j > 0 {
+        j -= 1
+        ordered_remove(active_buffer.lines, lines_to_remove[j])
+    }
+
+    set_buffer_cursor_pos(a_line, a_char)
+}
+
+
+
 @(private="package")
 handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_S) {
@@ -988,6 +1202,10 @@ handle_buffer_input :: proc() -> bool {
         }
 
         return false
+    }
+
+    if is_key_down(glfw.KEY_R) {
+        // add reload logic
     }
 
     if is_key_pressed(glfw.KEY_V) {
