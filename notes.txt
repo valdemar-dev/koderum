@@ -18,6 +18,8 @@ todo:
     - start of line keybind
     - v to highlight search term
     - add ctrl + r reload
+    
+    - Ctrl + DF buffer scrolling
 
 requirements:
     must be practically infinite

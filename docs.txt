@@ -5,7 +5,8 @@
 (U) -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
 
 (I) -> Go into Text Insert mode.
-(A) -> Move buffer cursor to the end of the current line, and go into Text Insert Mode.
+(A) -> Go to end of line.
+(Z) -> Go to start of line.
 
 (Ctrl + S) -> Save active buffer.
 

@@ -1,7 +1,6 @@
 #+private file
 #+feature dynamic-literals
 package main
-
 import "core:os"
 import "core:fmt"
 import "core:strings"
@@ -45,7 +44,9 @@ Buffer :: struct {
 
     cursor_line: int,
     cursor_char_index: int,
+
     scroll_position: f32,
+    horizontal_scroll_position: f32,
 }
 
 @(private="package")
@@ -400,6 +401,7 @@ open_file :: proc(file_name: string) {
         active_buffer^.cursor_char_index = buffer_cursor_char_index
         active_buffer^.cursor_line = buffer_cursor_line
         active_buffer^.scroll_position = buffer_scroll_position
+        active_buffer^.horizontal_scroll_position = buffer_horizontal_scroll_position
     }
 
     if file_name in buffers {
@@ -412,6 +414,7 @@ open_file :: proc(file_name: string) {
         )
 
         buffer_scroll_position = new_buf.scroll_position
+        buffer_horizontal_scroll_position = new_buf.horizontal_scroll_position
 
         return
     }
@@ -1007,6 +1010,17 @@ scroll_up :: proc() {
     buffer_scroll_position -= ((buffer_font_size * 1.2) * 80) * frame_time
 }
 
+scroll_left :: proc() {
+    buffer_horizontal_scroll_position = max(
+        buffer_horizontal_scroll_position - ((buffer_font_size * 1.2) * 80) * frame_time,
+        0
+    )
+}
+
+scroll_right :: proc() {
+    buffer_horizontal_scroll_position += ((buffer_font_size * 1.2) * 80) * frame_time
+}
+
 append_to_line :: proc() {
     line := active_buffer.lines[buffer_cursor_line]
 
@@ -1202,8 +1216,18 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_down(glfw.KEY_R) {
+    if is_key_pressed (glfw.KEY_R) {
         // add reload logic
+    }
+
+
+    if is_key_pressed(glfw.KEY_Z) {
+        key := key_store[glfw.KEY_Z]
+
+        set_buffer_cursor_pos(
+            key.modifiers == 1 ? 0 : buffer_cursor_line,
+            0,
+        )
     }
 
     if is_key_pressed(glfw.KEY_V) {
@@ -1268,15 +1292,12 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_A) {
-        de := os.get_env("XDG_CURRENT_DESKTOP") 
+        line := active_buffer.lines[buffer_cursor_line]
 
-        if de == "GNOME" {
-            glfw.WaitEvents()
-        }
-
-        delete(de)
-
-        append_to_line()
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            len(line.characters),
+        )
 
         return true
     }
@@ -1435,10 +1456,30 @@ handle_movement_input :: proc() -> bool {
         return false
     }
 
+    if is_key_down(glfw.KEY_D) {
+        key := key_store[glfw.KEY_D]
+
+        if key.modifiers == 1 {
+            scroll_left()
+
+            return false
+        }
+    }
+
     if is_key_pressed(glfw.KEY_D) {
         move_left()
 
         return false
+    }
+
+    if is_key_down(glfw.KEY_F) {
+        key := key_store[glfw.KEY_F]
+
+        if key.modifiers == 1 {
+            scroll_right()
+
+            return false
+        }
     }
 
     if is_key_pressed(glfw.KEY_F) {
