@@ -506,8 +506,8 @@ add_code_text :: proc(
     line_number: int,
 ) -> (offset: f32, width: f32) {
     pen := vec2{
-        x=pos.x,
-        y=pos.y,
+        x=math.round_f32(pos.x),
+        y=math.round_f32(pos.y),
     }
 
     highlight_height := ascender - descender

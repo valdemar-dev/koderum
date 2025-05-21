@@ -11,7 +11,7 @@ import "core:unicode/utf8"
 import "core:strconv"
 import "core:path/filepath"
 import ft "../../alt-odin-freetype"
-
+    
 @(private="package")
 WordDef :: struct {
     start: i32,
@@ -159,8 +159,16 @@ set_hit_index :: proc(index: int) {
 
     if idx > len(search_hits) - 1 {
         idx = 0
+        
+        if idx > len(search_hits) - 1 {
+            return
+        }
     } else if idx == -1 {
         idx = len(search_hits) - 1
+        
+        if idx == -1 {
+            return
+        }
     }
 
     selected_hit = &search_hits[idx]
@@ -577,6 +585,11 @@ insert_chars_at_index :: proc(runes: []rune, index: int, chars: []rune) -> []run
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
+    buffer_to_close : ^Buffer
+    
+    for buffer in buffers {
+    
+    }
     return true
 }
 
@@ -721,6 +734,7 @@ determine_line_indent :: proc(line_num: int) -> int {
     language_rules := indent_rule_language_list[ext]
 
     if language_rules == nil {
+        fmt.println("hi")
         return prev_line_indent_level * tab_spaces
     }
 
@@ -1121,7 +1135,6 @@ remove_selection :: proc(
             } else {
                 line.characters = line.characters[e:]
             }
-
         } else {
             runtime.append_elem(&lines_to_remove, i)
         }
@@ -1142,6 +1155,27 @@ remove_selection :: proc(
 
 delete_line :: proc(line: int) {
     ordered_remove(active_buffer.lines, line)
+}
+
+inject_line :: proc() {
+    indent := determine_line_indent(buffer_cursor_line + 1)
+    
+    buffer_line := BufferLine{}
+        
+    indent_spaces := determine_line_indent(buffer_cursor_line + 1)
+
+    for i in 0..<indent_spaces {
+        buffer_line.characters = insert_char_at_index(
+            buffer_line.characters, 0, ' ',
+        )        
+    }
+    
+    inject_at(active_buffer.lines, buffer_cursor_line + 1, buffer_line)
+    
+    set_buffer_cursor_pos(
+        buffer_cursor_line + 1,
+        indent_spaces, 
+    )
 }
 
 @(private="package")
@@ -1173,15 +1207,9 @@ handle_buffer_input :: proc() -> bool {
             delete_line(buffer_cursor_line)
         }
     }
-
-
-    if is_key_pressed(glfw.KEY_Z) {
-        key := key_store[glfw.KEY_Z]
-
-        set_buffer_cursor_pos(
-            key.modifiers == SHIFT ? 0 : buffer_cursor_line,
-            0,
-        )
+    
+    if is_key_pressed(glfw.KEY_L) {
+        inject_line()
     }
 
     if is_key_pressed(glfw.KEY_V) {
@@ -1215,6 +1243,9 @@ handle_buffer_input :: proc() -> bool {
         delete(de)
 
         input_mode = .SEARCH
+        
+        cached_buffer_cursor_line = buffer_cursor_line
+        cached_buffer_cursor_char_index = buffer_cursor_char_index
 
         return false
     }
@@ -1247,17 +1278,6 @@ handle_buffer_input :: proc() -> bool {
         )
 
         return false
-    }
-
-    if is_key_pressed(glfw.KEY_A) {
-        line := active_buffer.lines[buffer_cursor_line]
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            len(line.characters),
-        )
-
-        return true
     }
 
     if is_key_pressed(glfw.KEY_I) {
@@ -1476,6 +1496,44 @@ handle_movement_input :: proc() -> bool {
 
         return false
     }
+    
+    if is_key_pressed(glfw.KEY_A) {
+        key := key_store[glfw.KEY_A]
+        
+        if key.modifiers == SHIFT {
+            set_buffer_cursor_pos(
+                len(active_buffer.lines) - 1,
+                buffer_cursor_char_index,
+            )
+            
+            constrain_scroll_to_cursor()
+        
+            return true
+        }
+        
+        
+        line := active_buffer.lines[buffer_cursor_line]
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            len(line.characters),
+        )
+        
+        constrain_scroll_to_cursor()
+
+        return true
+    }
+    
+    if is_key_pressed(glfw.KEY_Z) {
+        key := key_store[glfw.KEY_Z]
+
+        set_buffer_cursor_pos(
+            key.modifiers == SHIFT ? 0 : buffer_cursor_line,
+            0,
+        )
+        
+        constrain_scroll_to_cursor()
+    }
 
     return false
 }
@@ -1492,6 +1550,9 @@ buffer_append_to_search_term :: proc(key: rune) {
     buffer_search_term = utf8.runes_to_string(buf[:])
 }
 
+cached_buffer_cursor_line : int = -1
+cached_buffer_cursor_char_index : int = -1
+
 @(private="package")
 handle_search_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) {
@@ -1502,6 +1563,9 @@ handle_search_input :: proc() {
         clear(&search_hits)
 
         input_mode = .COMMAND
+        
+        cached_buffer_cursor_line = -1
+        cached_buffer_cursor_char_index = -1
 
         return
     }
@@ -1522,6 +1586,34 @@ handle_search_input :: proc() {
         selected_hit = nil
 
         find_search_hits()
+
+        return
+    }
+    
+    if is_key_pressed(glfw.KEY_B) {
+        key := key_store[glfw.KEY_B]
+        
+        if key.modifiers != CTRL {
+            return
+        }
+        
+        buffer_search_term = ""
+
+        selected_hit = nil
+
+        clear(&search_hits)
+
+        input_mode = .COMMAND
+        
+        set_buffer_cursor_pos(
+            cached_buffer_cursor_line,
+            cached_buffer_cursor_char_index,
+        )
+        
+        constrain_scroll_to_cursor()
+        
+        cached_buffer_cursor_line = -1
+        cached_buffer_cursor_char_index = -1
 
         return
     }

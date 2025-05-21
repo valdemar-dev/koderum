@@ -1,19 +1,17 @@
 undo-redo history
 
-/ols.json
-
 todo:
     - n/b term search case sensitive within buffer
     - selections with v mode
-    - yank selection with y (into buffer, into clipboard with Ctrl-y)
     - close buffer with Ctrl-q
-    - string encounters in word split
     literally just move everything to word split
     - Ctrl +DFJK movement for in-buffer movement
-    - add always loaded characters configurable in .conf
+    - add always loaded characters configurable in .conf 
     - add lerp anim to text hl
-    - should retain clipboard history
+    - should retain clipboard history (not yank)
     - add ctrl + r reload
+    - store where you were pre search, go back with b
+    - dedent indent selection
 
 bugs:    
     - hl only works for 1 item per line
