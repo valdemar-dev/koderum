@@ -6,8 +6,6 @@ todo:
     - n/b term search case sensitive within buffer
     - selections with v mode
     - yank selection with y (into buffer, into clipboard with Ctrl-y)
-    - shortcut for deleting entire line
-    - paste buffer with p (clipboard with Ctrl-p)
     - close buffer with Ctrl-q
     - string encounters in word split
     literally just move everything to word split
@@ -15,8 +13,10 @@ todo:
     - add always loaded characters configurable in .conf
     - add lerp anim to text hl
     - should retain clipboard history
-    - v to highlight search term
     - add ctrl + r reload
+
+bugs:    
+    - hl only works for 1 item per line
     
 requirements:
     must be practically infinite

@@ -64,5 +64,18 @@ handle_highlight_input :: proc() {
         return
     }
 
+    if is_key_pressed(glfw.KEY_G) {
+        buffer_search_term = generate_highlight_string(
+            highlight_start_line,
+            buffer_cursor_line,
+            highlight_start_char,
+            buffer_cursor_char_index,
+        ) 
+
+        input_mode = .SEARCH
+
+        find_search_hits()
+    }
+
     handle_movement_input()
 }

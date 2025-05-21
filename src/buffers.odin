@@ -128,7 +128,8 @@ prev_buffer :: proc() {
     }
 }
 
-find_hits :: proc() {
+@(private="package")
+find_search_hits :: proc() {
     clear(&search_hits)
 
     runes := utf8.string_to_runes(buffer_search_term)
@@ -1243,7 +1244,9 @@ remove_selection :: proc(
     set_buffer_cursor_pos(a_line, a_char)
 }
 
-
+delete_line :: proc(line: int) {
+    ordered_remove(active_buffer.lines, line)
+}
 
 @(private="package")
 handle_buffer_input :: proc() -> bool {
@@ -1259,6 +1262,15 @@ handle_buffer_input :: proc() -> bool {
 
     if is_key_pressed (glfw.KEY_R) {
         // add reload logic
+    }
+
+    if is_key_pressed(glfw.KEY_C) {
+        key := key_store[glfw.KEY_C]
+
+
+        if key.modifiers == 1 {
+            delete_line(buffer_cursor_line)
+        }
     }
 
 
@@ -1281,9 +1293,13 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_P) {
-        //key := key_store[glfw.KEY_P]
+        key := key_store[glfw.KEY_P]
 
-        paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+        if key.modifiers == 2 {
+            paste_string(glfw.GetClipboardString(window), buffer_cursor_line, buffer_cursor_char_index)
+        } else {
+            paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+        }
 
         return false
     }
@@ -1447,41 +1463,6 @@ paste_string :: proc(str: string, line: int, char: int) {
     prev := buffer_line.characters[:clamped]
     after := buffer_line.characters[clamped:]
 
-    /*
-    for i in 0..<len(split) {
-        line_index := line + i
-
-        if line_index == line {
-                        continue
-        }
-
-        runes := utf8.string_to_runes(split[i])
-
-        buffer_line := BufferLine{
-            characters=runes,
-        }
-
-        if i == len(split) - 1 {
-            buffer_line.characters = insert_chars_at_index(buffer_line.characters, len(runes), after)
-        }
-
-        new_line_num := buffer_cursor_line+1
-
-        set_line_word_defs(&buffer_line)
-
-        inject_at(active_buffer.lines, new_line_num, buffer_line)
-
-        constrain_scroll_to_cursor()
-
-        if i == len(split) - 1 {
-            set_buffer_cursor_pos(
-                new_line_num,
-                len(runes),
-            )
-        }
-    }
-    */
-
     for i in 0..<len(split) {
         line_index := line + i
 
@@ -1495,12 +1476,10 @@ paste_string :: proc(str: string, line: int, char: int) {
             continue
         }
 
-        // for each subsequent fragment, insert at exactly line + i
         runes := utf8.string_to_runes(split[i])
         inserted := BufferLine{ characters = runes }
 
         if i == len(split)-1 {
-            // append the ‘after’ suffix on the last fragment
             inserted.characters = insert_chars_at_index(runes, len(runes), after)
         }
 
@@ -1637,7 +1616,7 @@ handle_search_input :: proc() {
     if is_key_pressed(glfw.KEY_ENTER) {
         selected_hit = nil
 
-        find_hits()
+        find_search_hits()
 
         return
     }

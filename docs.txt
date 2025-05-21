@@ -1,25 +1,31 @@
+Buffer Motions
 (D)&(F) -> Left-Right Movement.
 (J)&(K) -> Up-Down Movement.
-
 (R) -> Move backwards in the current bufferline until a word-break character is detected.
 (U) -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
-
 (I) -> Go into Text Insert mode.
 (A) -> Go to end of line.
 (Z) -> Go to start of line.
-
+(Shift + C) -> Delete Current Line
 (Ctrl + S) -> Save active buffer.
-
 (Q) -> Toggle File Info View
 
+File Explorer
 (O) -> Open File Explorer.
 (Ctrl + S) -> Store File Explorer CWD.
 (Ctrl + D) -> Delete Selected File.
 (Ctrl + F) -> Rename Selected File.
 (Ctrl + G) -> Create file using current Search Term, (if a file with search term is not already found.)
 
+Highlight
+(V) -> Enable Highlight mode
+(C) -> Delete highlighted area and put into Yank Sliding Buffer
+(G) -> Search for highlighted area
+
+Search
 (G) -> Enable Search Mode
 (ANY CHAR) -> Type Search Term
 (Enter) -> Get Results
 (Ctrl + J) -> Next Hit
 (Ctrl + K) -> Prev Hit
+(V) -> Highlight search term
