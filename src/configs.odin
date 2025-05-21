@@ -6,6 +6,7 @@ import "core:strings"
 import "core:strconv"
 import "core:fmt"
 import fp "core:path/filepath"
+import "core:unicode/utf8"
 
 tab_spaces : int
 long_line_required_characters : int
@@ -173,6 +174,21 @@ set_option :: proc(options: []string) {
         line_count_padding_px = f32(strconv.atoi(value))
     case "ui_scale":
         ui_scale = f32(strconv.atoi(value))
+    case "always_loaded_characters":
+        chars := strings.split(value, "")
+
+        for char in chars {
+            r := utf8.string_to_runes(char)
+
+            get_char(buffer_font_size, u64(r[0]))
+            get_char(ui_general_font_size, u64(r[0]))
+            get_char(ui_smaller_font_size, u64(r[0]))
+            get_char(ui_bigger_font_size, u64(r[0]))
+
+            delete(r)
+        }
+
+        delete(chars)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }

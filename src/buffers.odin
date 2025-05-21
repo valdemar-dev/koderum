@@ -1074,114 +1074,6 @@ append_to_line :: proc() {
     input_mode = .BUFFER_INPUT
 }
 
-/*
-@(private="package")
-remove_selection :: proc(
-    start_line: int,
-    end_line: int,
-    start_char: int,
-    end_char: int,
-) {
-    start := start_line
-    end := end_line
-
-    is_negative_highlight := start_line >= end_line
-    if is_negative_highlight {
-        temp := start
-        start = end
-        end = temp
-    }
-
-    lines_to_remove : [dynamic]int
-
-    for i in start..=end {
-        line := &active_buffer.lines[i]
-
-        if i == start && i == end {
-            forward := start_char <= end_char
-
-            clamped_end := min(end_char, len(line.characters))
-            clamped_start := min(start_char, len(line.characters))
-
-            if forward {
-                before := line.characters[:clamped_start]
-                after := line.characters[clamped_end:]
-
-                new_runes := new([dynamic]rune)
-
-                append_elems(new_runes, ..before)
-                append_elems(new_runes, ..after)
-
-                fmt.println(before, after, i)
-
-                line^.characters = new_runes^[:]
-            } else {
-                line^.characters = line.characters[clamped_end:clamped_start]
-            }
-        } else if i == end {
-            if is_negative_highlight {
-                if len(line.characters) == 0 {
-                    ordered_remove(active_buffer.lines, i)
-                } else {
-                    clamped := min(start_char, len(line.characters))
-
-                    if clamped == len(line.characters) {
-                        append(&lines_to_remove, i)
-                    } else {
-                        line^.characters = line.characters[clamped:]
-                    }
-                }
-            } else {
-                if len(line.characters) == 0 {
-                    append(&lines_to_remove, i)
-                } else {
-                    clamped := min(end_char, len(line.characters))
-
-                    if clamped == len(line.characters) {
-                        append(&lines_to_remove, i)
-                    } else {
-                        line^.characters = line.characters[clamped:]
-                    }
-                }
-            }
-        } else if i == start {
-            if is_negative_highlight {
-                if len(line.characters) == 0 {
-                    append(&lines_to_remove, i)
-                } else {
-                    clamped := clamp(end_char, 0, len(line.characters))
-
-                    if clamped == len(line.characters) {
-                        append(&lines_to_remove, i)
-                    } else {
-                        line^.characters = line.characters[:clamped]
-                    }
-                }
-            } else {
-                if len(line.characters) == 0 {
-                    append(&lines_to_remove, i)
-                } else {
-                    clamped := clamp(start_char, 0, len(line.characters))
-
-                    if clamped == len(line.characters) {
-                        append(&lines_to_remove, i)
-                    } else {
-                        line^.characters = line.characters[:clamped]
-                    }
-                }
-            }
-        } else {
-            append(&lines_to_remove, i)
-        }
-    }
-
-    set_buffer_cursor_pos(
-        start_line,
-        start_char,
-    )
-}
-*/
-
 @(private="package")
 remove_selection :: proc(
     start_line: int, end_line: int,
@@ -1241,6 +1133,10 @@ remove_selection :: proc(
         ordered_remove(active_buffer.lines, lines_to_remove[j])
     }
 
+    if len(active_buffer.lines) == 0 {
+        append(active_buffer.lines, BufferLine{})
+    }
+
     set_buffer_cursor_pos(a_line, a_char)
 }
 
@@ -1265,16 +1161,15 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_W) {
-        fmt.println(key_store[glfw.KEY_W].modifiers)
+        if key_store[glfw.KEY_W].modifiers == CTRL_SHIFT {
+            close_buffer(active_buffer)
+        }
     }
-
-
 
     if is_key_pressed(glfw.KEY_C) {
         key := key_store[glfw.KEY_C]
 
-
-        if key.modifiers == 1 {
+        if key.modifiers == SHIFT {
             delete_line(buffer_cursor_line)
         }
     }
@@ -1284,7 +1179,7 @@ handle_buffer_input :: proc() -> bool {
         key := key_store[glfw.KEY_Z]
 
         set_buffer_cursor_pos(
-            key.modifiers == 1 ? 0 : buffer_cursor_line,
+            key.modifiers == SHIFT ? 0 : buffer_cursor_line,
             0,
         )
     }
@@ -1443,6 +1338,10 @@ handle_buffer_input :: proc() -> bool {
 }
 
 @(private="package")
+close_buffer :: proc(buf: ^Buffer) {
+}
+
+@(private="package")
 paste_string :: proc(str: string, line: int, char: int) {
     split := strings.split(str, "\n")
 
@@ -1505,7 +1404,7 @@ handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_J) {
         key := key_store[glfw.KEY_J]
 
-        if key.modifiers == 1 {
+        if key.modifiers == SHIFT {
             scroll_down()
 
             return false
@@ -1521,7 +1420,7 @@ handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_K) {
         key := key_store[glfw.KEY_K]
 
-        if key.modifiers == 1 {
+        if key.modifiers == SHIFT {
             scroll_up()
 
             return false
@@ -1537,7 +1436,7 @@ handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_D) {
         key := key_store[glfw.KEY_D]
 
-        if key.modifiers == 1 {
+        if key.modifiers == SHIFT {
             scroll_left()
 
             return false
@@ -1553,7 +1452,7 @@ handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_F) {
         key := key_store[glfw.KEY_F]
 
-        if key.modifiers == 1 {
+        if key.modifiers == SHIFT {
             scroll_right()
 
             return false

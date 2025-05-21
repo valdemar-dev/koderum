@@ -21,7 +21,7 @@ draw_debug :: proc() {
     add_text(&rect_cache,
         vec2{0,0},
         TEXT_MAIN,
-        20,
+        ui_general_font_size,
         str,
         1000,
         false,

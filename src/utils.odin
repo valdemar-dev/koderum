@@ -29,6 +29,11 @@ rect :: struct {
     height:f32,
 }
 
+SHIFT : i32 : 1
+CTRL : i32 : 2
+CTRL_SHIFT : i32 : 3
+ALT : i32 : 4
+
 RectCache :: struct {
     vertices: [dynamic]f32,
     indices: [dynamic]u32,
