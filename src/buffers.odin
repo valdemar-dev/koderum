@@ -1264,6 +1264,12 @@ handle_buffer_input :: proc() -> bool {
         // add reload logic
     }
 
+    if is_key_pressed(glfw.KEY_W) {
+        fmt.println(key_store[glfw.KEY_W].modifiers)
+    }
+
+
+
     if is_key_pressed(glfw.KEY_C) {
         key := key_store[glfw.KEY_C]
 
