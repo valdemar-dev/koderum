@@ -61,7 +61,7 @@ IndentRule :: struct {
 }
 
 @(private="package")
-buffers : map[string]^Buffer
+buffers : [dynamic]^Buffer
 
 @(private="package")
 active_buffer : ^Buffer
@@ -87,6 +87,46 @@ selected_hit : ^SearchHit = nil
 
 @(private="package")
 buffer_search_term : string
+
+next_buffer :: proc() {
+    set_next_as_current := false
+
+    for buffer, index in buffers {
+        if set_next_as_current == true {
+            open_file(buffer.file_name)
+
+            break
+        } else if buffer.file_name == active_buffer.file_name {
+            set_next_as_current = true
+
+        }
+    }
+}
+
+set_buffer :: proc(number: int) {
+    idx := number - 1
+
+    if idx > len(buffers) - 1 {
+        return
+    }
+
+    buf := buffers[idx]
+    open_file(buf.file_name)
+}
+
+prev_buffer :: proc() {
+    set_next_as_current := false
+
+    #reverse for buffer, index in buffers {
+        if set_next_as_current == true {
+            open_file(buffer.file_name)
+
+            break
+        } else if buffer.file_name == active_buffer.file_name {
+            set_next_as_current = true
+        }
+    }
+}
 
 find_hits :: proc() {
     clear(&search_hits)
@@ -404,17 +444,25 @@ open_file :: proc(file_name: string) {
         active_buffer^.horizontal_scroll_position = buffer_horizontal_scroll_position
     }
 
-    if file_name in buffers {
-        new_buf := buffers[file_name]
-        active_buffer = new_buf
+    existing_file : ^Buffer
+
+    for buffer in buffers {
+        if buffer.file_name == file_name {
+            existing_file = buffer
+            break
+        }
+    }
+
+    if existing_file != nil {
+        active_buffer = existing_file
 
         set_buffer_cursor_pos(
-            new_buf.cursor_line,
-            new_buf.cursor_char_index,
+            existing_file.cursor_line,
+            existing_file.cursor_char_index,
         )
 
-        buffer_scroll_position = new_buf.scroll_position
-        buffer_horizontal_scroll_position = new_buf.horizontal_scroll_position
+        buffer_scroll_position = existing_file.scroll_position
+        buffer_horizontal_scroll_position = existing_file.horizontal_scroll_position
 
         return
     }
@@ -456,7 +504,6 @@ open_file :: proc(file_name: string) {
 
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
-        fmt.println(new_buffer^)
     }
 
     for line in lines { 
@@ -475,7 +522,7 @@ open_file :: proc(file_name: string) {
         append_elem(buffer_lines, buffer_line)
     }
 
-    buffers[file_name] = new_buffer
+    append(&buffers, new_buffer)
 
     when ODIN_DEBUG {
         fmt.println("Updating fonts for buffer")
@@ -529,12 +576,6 @@ insert_chars_at_index :: proc(runes: []rune, index: int, chars: []rune) -> []run
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
-    if file_name in buffers == false {
-        return false
-    }
-
-    file := buffers[file_name]
-
     return true
 }
 
@@ -1316,6 +1357,18 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
+    if is_key_pressed(glfw.KEY_M) {
+        prev_buffer()
+
+        return false
+    }
+
+    if is_key_pressed(glfw.KEY_COMMA) {
+        next_buffer()
+
+        return false
+    }
+
     handle_movement_input()
 
     if is_key_pressed(glfw.KEY_Q) {
@@ -1324,6 +1377,46 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
+    if is_key_pressed(glfw.KEY_1) {
+        set_buffer(1)
+    }
+
+    if is_key_pressed(glfw.KEY_2) {
+        set_buffer(2)
+    }
+
+    if is_key_pressed(glfw.KEY_3) {
+        set_buffer(3)
+    }
+ 
+    if is_key_pressed(glfw.KEY_4) {
+        set_buffer(4)
+    }
+  
+    if is_key_pressed(glfw.KEY_5) {
+        set_buffer(5)
+    }
+  
+    if is_key_pressed(glfw.KEY_6) {
+        set_buffer(6)
+    }
+  
+    if is_key_pressed(glfw.KEY_7) {
+        set_buffer(7)
+    }
+  
+    if is_key_pressed(glfw.KEY_8) {
+        set_buffer(8)
+    }
+  
+    if is_key_pressed(glfw.KEY_9) {
+        set_buffer(9)
+    }
+  
+    if is_key_pressed(glfw.KEY_0) {
+        set_buffer(10)
+    }
+ 
     return false
 }
 
@@ -1568,4 +1661,21 @@ handle_search_input :: proc() {
 
         return
     }
+
+    if is_key_pressed(glfw.KEY_V) && selected_hit != nil {
+        input_mode = .HIGHLIGHT
+
+        highlight_start_line = selected_hit.line
+        highlight_start_char = selected_hit.start_char
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            selected_hit.end_char
+        )
+
+        selected_hit = nil
+
+        return
+    }
+
 }

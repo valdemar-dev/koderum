@@ -80,10 +80,10 @@ init_window :: proc() {
     glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
     glfw.WindowHint(glfw.MAXIMIZED, glfw.TRUE)
 
-    glfw.WindowHintString(glfw.WAYLAND_APP_ID, "Visual Studio Goon")
+    glfw.WindowHintString(glfw.WAYLAND_APP_ID, "Koderum")
 
-    glfw.WindowHintString(glfw.X11_CLASS_NAME,    "Visual Studio Goon")
-    glfw.WindowHintString(glfw.X11_INSTANCE_NAME, "Visual Studio Goon")
+    glfw.WindowHintString(glfw.X11_CLASS_NAME,    "Koderum")
+    glfw.WindowHintString(glfw.X11_INSTANCE_NAME, "Koderum")
 
     primary_monitor := glfw.GetPrimaryMonitor()
     mode := glfw.GetVideoMode(primary_monitor)
@@ -101,6 +101,8 @@ init_window :: proc() {
         nil,
     )
 
+    glfw.SetWindowSizeLimits(window, 600, 800, glfw.DONT_CARE, glfw.DONT_CARE)
+
     if window == nil {
         panic("Could not create window.")
     }
@@ -117,8 +119,6 @@ init_window :: proc() {
     glfw.MakeContextCurrent(window)
 
     glfw.SwapInterval(1)
-
-    glfw.SetWindowSizeLimits(window, 900, 500, glfw.DONT_CARE, glfw.DONT_CARE)
 
     gl.load_up_to(3, 3, glfw.gl_set_proc_address)
 }

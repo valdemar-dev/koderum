@@ -15,12 +15,9 @@ todo:
     - add always loaded characters configurable in .conf
     - add lerp anim to text hl
     - should retain clipboard history
-    - start of line keybind
     - v to highlight search term
     - add ctrl + r reload
     
-    - Ctrl + DF buffer scrolling
-
 requirements:
     must be practically infinite
     

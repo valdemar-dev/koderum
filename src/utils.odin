@@ -84,6 +84,16 @@ push :: proc(sb: ^SlidingBuffer($TB), value: $T) {
     }
 }
 
+array_find :: proc(arr: []$T, match_proc: proc(value: T) -> bool) -> ^T {
+    for value in array {
+        if match_proc(value) {
+            return &value
+        }
+    }
+
+    return nil
+}
+
 hex_string_to_vec4 :: proc(hex_str: string) -> vec4 {
     if len(hex_str) != 8 {
         return vec4{0, 0, 0, 1}
@@ -142,4 +152,3 @@ contains_runes :: proc(main: []rune, subset: []rune) -> (found: bool, start: int
     }
     return false, -1
 }
-
