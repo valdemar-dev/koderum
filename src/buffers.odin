@@ -24,7 +24,6 @@ BufferLine :: struct {
     characters: []rune,
     words: []WordDef,
 }
-
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
     x_offset: f32,
@@ -1155,6 +1154,21 @@ remove_selection :: proc(
 
 delete_line :: proc(line: int) {
     ordered_remove(active_buffer.lines, line)
+    
+    if len(active_buffer.lines) == 0 {
+        append(active_buffer.lines, BufferLine{})
+    }
+    
+    new_line := active_buffer.lines[buffer_cursor_line]
+    
+    new_line_size := len(new_line.characters)
+    
+    if buffer_cursor_char_index > new_line_size {
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            new_line_size,
+        )
+    }
 }
 
 inject_line :: proc() {
@@ -1167,7 +1181,7 @@ inject_line :: proc() {
     for i in 0..<indent_spaces {
         buffer_line.characters = insert_char_at_index(
             buffer_line.characters, 0, ' ',
-        )        
+        )  
     }
     
     inject_at(active_buffer.lines, buffer_cursor_line + 1, buffer_line)
@@ -1176,6 +1190,8 @@ inject_line :: proc() {
         buffer_cursor_line + 1,
         indent_spaces, 
     )
+    
+    input_mode = .BUFFER_INPUT
 }
 
 @(private="package")

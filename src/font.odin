@@ -142,6 +142,8 @@ max_h : rp.Coord
 
 @(private="package")
 add_missing_characters :: proc() {
+    clear(&atlas)
+
     if len(missing_characters) < 1 {
         return
     }
