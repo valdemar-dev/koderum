@@ -12,6 +12,8 @@ todo:
     - add ctrl + r reload
     - store where you were pre search, go back with b
     - dedent indent selection
+    - mkdir to fb
+    - reopening filebrowser should uncache all files
 
 bugs:    
     - hl only works for 1 item per line

@@ -341,22 +341,28 @@ encountered_string_chars : map[rune]int
 
 is_char_in_string :: proc(
     lang_string_chars: ^map[rune]vec4,
-) -> (bool, vec4) {
+) -> (bool, vec4, rune) {
     for char,count in encountered_string_chars {
         if count % 2 != 0 {
             assert(lang_string_chars != nil)
 
-            return true,lang_string_chars[char]
+            return true,lang_string_chars[char],char
         }
     }
 
-    return false, vec4{},
+    return false, vec4{}, '0'
 }
 
 try_add_string_encounter :: proc(
     r: rune,
     lang_string_chars: ^map[rune]vec4,
+    is_in_string: bool,
+    string_char: rune,
 ) {
+    if is_in_string && r != string_char {
+        return
+    }
+    
     if lang_string_chars == nil {
         return
     }
@@ -624,8 +630,6 @@ add_code_text :: proc(
             continue
         }
 
-        try_add_string_encounter(r, lang_string_chars)
-
         index := char_uv_maps[font_height]
         char_uv_map := char_uv_maps_array[index]
         uvs_index := char_uv_map[u64(r)]
@@ -642,7 +646,9 @@ add_code_text :: proc(
             &highlight_width,&highlight_offset,
         )
 
-        is_in_string, variant := is_char_in_string(lang_string_chars)
+        is_in_string, variant, string_char := is_char_in_string(lang_string_chars)
+        
+        try_add_string_encounter(r, lang_string_chars, is_in_string, string_char)
 
         if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
             color = RED

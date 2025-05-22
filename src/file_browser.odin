@@ -41,7 +41,7 @@ change_dir :: proc(dir: string) {
     })
 
     when ODIN_DEBUG {
-        fmt.println("CD'd to", cwd)
+        fmt.println("CD'd", cwd)
     }
 
     set_found_files()
@@ -290,6 +290,72 @@ set_found_files :: proc() {
     dirs_searched := 0
     file_index := 0
 
+    glob := fp.base(search_term)
+
+    queue: [dynamic]string
+    append_elem(&queue, initial_dir())
+
+    for len(queue) > 0 && dirs_searched < 20 && file_index < 50 {
+        dir := queue[0]
+        ordered_remove(&queue, 0)
+        dirs_searched += 1
+
+        fd, err := os.open(dir)
+        defer os.close(fd)
+
+        hits: []os.File_Info
+        if cached, ok := cached_dirs[dir]; ok {
+            hits = cached
+        } else {
+            hits, err = os.read_dir(fd, -1)
+            cached_dirs[dir] = hits
+        }
+
+        for hit in hits {
+            if strings.contains(hit.name, glob) {
+                if hit.name == glob {
+                    inject_at(&found_files, 0, hit.fullpath)
+                } else {
+                    append_elem(&found_files, hit.fullpath)
+                }
+            }
+
+            file_index += 1
+            if file_index >= 50 {
+                break
+            }
+
+            if hit.is_dir {
+                skip := false
+                for ign in search_ignored_dirs {
+                    if hit.name == ign {
+                        skip = true
+                        break
+                    }
+                }
+                if !skip {
+                    append_elem(&queue, hit.fullpath)
+                }
+            }
+        }
+    }
+}
+
+initial_dir :: proc() -> string {
+    if os.is_dir(search_term) {
+        return strings.clone(search_term)
+    }
+    return fp.dir(search_term)
+}
+
+
+/*
+set_found_files :: proc() {
+    clear(&found_files)
+
+    dirs_searched := 0
+    file_index := 0
+
     get_dir_files :: proc(
         dir: string,
         glob: string, 
@@ -315,7 +381,7 @@ set_found_files :: proc() {
             cached_dirs[dir] = hits
         }
 
-        for hit in hits {
+        hit_loop: for hit in hits {
             if strings.contains(hit.name, glob) {
                 if hit.name == glob {
                     inject_at(&found_files, 0, hit.fullpath)
@@ -333,10 +399,12 @@ set_found_files :: proc() {
             if file_index^ >= 50 {
                 break
             }
-
-            // TODO: add more of these
-            if hit.name == ".git" {
-                continue
+            
+            for dir in search_ignored_dirs {
+                fmt.println(dir)
+                if hit.name == dir {
+                    continue hit_loop
+                }
             }
 
             get_dir_files(hit.fullpath, glob, dirs_searched, file_index) 
@@ -359,6 +427,7 @@ set_found_files :: proc() {
 
     get_dir_files(dir, base, &dirs_searched, &file_index)
 }
+*/
 
 @(private="package")
 browser_append_to_search_term :: proc(key: rune) {

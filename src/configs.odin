@@ -35,6 +35,8 @@ text_highlight_bg : vec4 = BG_MAIN_40
 general_line_thickness_px : f32
 line_count_padding_px : f32
 
+search_ignored_dirs : [dynamic]string
+
 ui_scale : f32
 
 load_configs :: proc() {
@@ -189,6 +191,8 @@ set_option :: proc(options: []string) {
         }
 
         delete(chars)
+    case "search_ignored_dir":
+        append(&search_ignored_dirs, strings.clone(value))
     case:
         fmt.eprintln("Unknown option,", option_name)
     }
