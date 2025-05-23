@@ -16,7 +16,7 @@ highlight_start_char : int
 
 @(private="package")
 handle_highlight_input :: proc() {
-    if is_key_pressed(glfw.KEY_ESCAPE) {
+    if is_key_pressed(glfw.KEY_ESCAPE) || is_key_pressed(glfw.KEY_V) {
         input_mode = .COMMAND
 
         return
@@ -64,7 +64,7 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_D) {
+    if is_key_pressed(glfw.KEY_X) {
         remove_selection(
             highlight_start_line,
             buffer_cursor_line,
