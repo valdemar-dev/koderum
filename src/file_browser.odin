@@ -289,13 +289,25 @@ set_found_files :: proc() {
 
     dirs_searched := 0
     file_index := 0
+    
+    search_dir : string
 
     glob := fp.base(search_term)
 
-    queue: [dynamic]string
-    append_elem(&queue, initial_dir())
+    if os.is_dir(search_term) {
+        glob = "."
 
-    for len(queue) > 0 && dirs_searched < 20 && file_index < 50 {
+        search_dir = strings.clone(search_term)
+    } else {
+        search_dir = fp.dir(search_term)
+    }
+
+    defer delete(search_dir)
+    
+    queue: [dynamic]string
+    append_elem(&queue, search_dir)
+
+    for len(queue) > 0 && dirs_searched < 20 && file_index < 100 {
         dir := queue[0]
         ordered_remove(&queue, 0)
         dirs_searched += 1
@@ -310,9 +322,9 @@ set_found_files :: proc() {
             hits, err = os.read_dir(fd, -1)
             cached_dirs[dir] = hits
         }
-
+        
         for hit in hits {
-            if strings.contains(hit.name, glob) {
+            if strings.contains(hit.name, glob) || glob == "" {
                 if hit.name == glob {
                     inject_at(&found_files, 0, hit.fullpath)
                 } else {

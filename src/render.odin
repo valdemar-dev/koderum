@@ -24,8 +24,8 @@ prev_time : f64
 @(private="package")
 render :: proc() {
     gl.ClearColor(1,0,0,1)
-    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
-
+    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+                   
     gl.UseProgram(shader_id)
     gl.ActiveTexture(gl.TEXTURE0)
     gl.Uniform1i(first_texture_loc, 0)
@@ -35,7 +35,7 @@ render :: proc() {
 
     gl.Enable(gl.DEPTH_TEST)
     gl.DepthFunc(gl.LESS)
-
+            
     time := glfw.GetTime()
     frame_time = f32(time - prev_time)
     prev_time = time
@@ -313,16 +313,16 @@ add_text :: proc(
        
         add_rect(rect_cache,
             rect{
-                math.round_f32(pen.x + character.offset.x),
-                math.round_f32((pen.y - character.offset.y + f32(ascend))),
-                math.round_f32(width),
-                math.round_f32(height),
+                (pen.x + character.offset.x),
+                ((pen.y - character.offset.y + f32(ascend))),
+                (width),
+                (height),
             },
             rect{
-                math.round_f32(f32(uvs.x)),
-                math.round_f32(f32(uvs.y)),
-                math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
-                math.round_f32(f32(uvs.h) - rect_pack_glyp_padding),
+                (f32(uvs.x)),
+                (f32(uvs.y)),
+                (f32(uvs.w) - rect_pack_glyp_padding),
+                (f32(uvs.h) - rect_pack_glyp_padding),
             },
             tint,
             char_uv_map_size,
@@ -649,7 +649,7 @@ add_code_text :: proc(
         is_in_string, variant, string_char := is_char_in_string(lang_string_chars)
         
         try_add_string_encounter(r, lang_string_chars, is_in_string, string_char)
-
+        
         if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
@@ -666,7 +666,7 @@ add_code_text :: proc(
 
         add_rect(&text_rect_cache,
             rect{
-                pen.x + character.offset.x,
+                pen.x + character.offset.x + 0.1,
                 pen.y - character.offset.y + ascender,
                 f32(character.width),
                 f32(character.rows),

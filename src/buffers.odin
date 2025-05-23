@@ -592,6 +592,7 @@ close_file :: proc(file_name: string) -> (ok: bool) {
     return true
 }
 
+/*
 save_buffer :: proc() {
     buffer_to_save := make([dynamic]u8)
     defer delete(buffer_to_save)
@@ -618,6 +619,36 @@ save_buffer :: proc() {
 
     active_buffer^.is_saved = true
 }
+*/
+
+save_buffer :: proc() {
+    buffer_to_save := make([dynamic]u8)
+    defer delete(buffer_to_save)
+
+    for line, index in active_buffer.lines {
+        if index != 0 {
+            append(&buffer_to_save, '\n');
+        }
+
+        for character in line.characters {
+            encoded, size := utf8.encode_rune(character);
+            append_elems(&buffer_to_save, ..encoded[0:size]);
+        }
+    }
+
+    ok := os.write_entire_file(
+        active_buffer.file_name,
+        buffer_to_save[:],
+        true,
+    );
+
+    if !ok {
+        panic("FAILED TO SAVE");
+    }
+
+    active_buffer^.is_saved = true;
+}
+
 
 insert_tab_as_spaces:: proc() {
     line := &active_buffer.lines[buffer_cursor_line]

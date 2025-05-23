@@ -14,6 +14,7 @@ todo:
     - dedent indent selection
     - mkdir to fb
     - reopening filebrowser should uncache all files
+    - put correct advance in glyph alredy
 
 bugs:    
     - hl only works for 1 item per line
