@@ -63,6 +63,32 @@ handle_highlight_input :: proc() {
 
         return
     }
+    
+    if is_key_pressed(glfw.KEY_D) {
+        remove_selection(
+            highlight_start_line,
+            buffer_cursor_line,
+            highlight_start_char,
+            buffer_cursor_char_index,
+        )
+
+        input_mode = .COMMAND
+
+        return
+    }
+    
+    if is_key_pressed(glfw.KEY_P) {
+        remove_selection(
+            highlight_start_line,
+            buffer_cursor_line,
+            highlight_start_char,
+            buffer_cursor_char_index,
+        )
+            
+        paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+        
+        input_mode = .COMMAND
+    }
 
     if is_key_pressed(glfw.KEY_G) {
         buffer_search_term = generate_highlight_string(
