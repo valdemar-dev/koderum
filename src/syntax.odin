@@ -8,6 +8,21 @@ WordType :: struct {
     color: vec4,
 }
 
+Token :: struct {
+    start: int,
+    end: int,
+    
+    color: vec4,
+    
+    token_type: union{^JSToken},
+}
+
+new_token :: proc($T: typeid) -> ^T {
+	e := new(T)
+	e.variant = e
+	return e
+}
+
 indent_rule_language_list : map[string]^map[string]IndentRule = {
     ".txt"=&generic_indent_rule_list,
     ".odin"=&generic_indent_rule_list,

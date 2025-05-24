@@ -83,7 +83,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
                 continue
             }
 
-            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
+            advance_amount := (character.advance.x) * f32(tab_spaces)
 
             new_x += advance_amount
             last_width = advance_amount
@@ -100,8 +100,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
             }
         }
 
-        new_x += (char.advance.x / 64) 
-        last_width = (char.advance.x / 64)
+        new_x += (char.advance.x) 
+        last_width = (char.advance.x)
     }
 
     cursor_width = last_width

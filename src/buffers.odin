@@ -24,6 +24,8 @@ BufferLine :: struct {
     characters: []rune,
     words: []WordDef,
 }
+
+@(private="package")
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
     x_offset: f32,
@@ -525,9 +527,12 @@ open_file :: proc(file_name: string) {
             get_char(buffer_font_size, u64(r))
         }
 
-        set_line_word_defs(&buffer_line)
-
         append_elem(buffer_lines, buffer_line)
+    }
+    
+    switch new_buffer.ext {
+    case ".js":
+        set_buffer_tokens_js(new_buffer)
     }
 
     append(&buffers, new_buffer)

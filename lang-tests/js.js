@@ -15,6 +15,8 @@ function Example(value) {
   this.obj = { a: 1, b: 2 };
 }
 
+const regex = /${h}/g;
+
 Example.prototype.method = function(x) {
   try {
     if (x < 0) throw new Error("Negative");

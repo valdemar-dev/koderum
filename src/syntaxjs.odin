@@ -108,6 +108,26 @@ js_keywords_map : map[string]WordType = {
     }
 }
 
+JSDataType :: enum {
+    string=1,
+    number=2,
+    float=3,
+    boolean=4,
+    object=5,
+    array=6,
+}
+
+JSToken :: struct {
+    data_type: JSDataType,
+}
+
+@(private="package")
+set_buffer_tokens_js :: proc(buffer: ^Buffer) {
+    for line in buffer.lines {
+        
+    }
+}
+
 js_string_chars : map[rune]vec4 = {
     '"'=GREEN,
     '\''=RED,

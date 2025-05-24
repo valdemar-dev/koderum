@@ -185,7 +185,7 @@ measure_text :: proc (
             continue
         }
 
-        pen.x = pen.x + (character.advance.x / 64)
+        pen.x = pen.x + (character.advance.x)
         pen.y = pen.y + character.advance.y
 
         if pen.x > highest.x {
@@ -264,7 +264,7 @@ add_text :: proc(
                 continue
             }
 
-            advance_amount := (character.advance.x / 64) * f32(tab_spaces)
+            advance_amount := (character.advance.x) * f32(tab_spaces)
             pen.x += advance_amount
 
             continue
@@ -329,7 +329,7 @@ add_text :: proc(
             z_index,
         )
 
-        pen.x = pen.x + (character.advance.x / 64)
+        pen.x = pen.x + (character.advance.x)
         pen.y = pen.y + character.advance.y
     }
 
@@ -512,8 +512,8 @@ add_code_text :: proc(
     line_number: int,
 ) -> (offset: f32, width: f32) {
     pen := vec2{
-        x=math.round_f32(pos.x),
-        y=math.round_f32(pos.y),
+        x=(pos.x),
+        y=(pos.y),
     }
 
     highlight_height := ascender - descender
@@ -576,9 +576,9 @@ add_code_text :: proc(
             advance_amount : f32
 
             if is_space {
-                advance_amount = (character.advance.x / 64)
+                advance_amount = (character.advance.x)
             } else if is_tab {
-                advance_amount = (character.advance.x / 64) * f32(tab_spaces)
+                advance_amount = (character.advance.x) * f32(tab_spaces)
             }
 
             was_highlighted := process_highlights(
@@ -637,7 +637,7 @@ add_code_text :: proc(
 
         color := TEXT_MAIN
 
-        advance_amount := (character.advance.x / 64)
+        advance_amount := character.advance.x
 
         was_highlighted := process_highlights(
             i,is_hl_start,positive_dir,
@@ -648,7 +648,7 @@ add_code_text :: proc(
 
         is_in_string, variant, string_char := is_char_in_string(lang_string_chars)
         
-        try_add_string_encounter(r, lang_string_chars, is_in_string, string_char)
+        // try_add_string_encounter(r, lang_string_chars, is_in_string, string_char)
         
         if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
             color = RED

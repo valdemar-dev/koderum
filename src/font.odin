@@ -395,8 +395,8 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
         pitch=orig_bmp.pitch,
         pixel_mode=orig_bmp.pixel_mode,
         advance=vec2{
-            f32(face.glyph.advance.x),
-            f32(face.glyph.advance.y),
+            math.round_f32(f32(face.glyph.advance.x / 64)),
+            math.round_f32(f32(face.glyph.advance.y)),
         },
         offset=vec2{
             f32(face.glyph.bitmap_left),
