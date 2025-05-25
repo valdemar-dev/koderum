@@ -336,91 +336,6 @@ add_text :: proc(
     return pen
 }
 
-@(private="package")
-encountered_string_chars : map[rune]int 
-
-is_char_in_string :: proc(
-    lang_string_chars: ^map[rune]vec4,
-) -> (bool, vec4, rune) {
-    for char,count in encountered_string_chars {
-        if count % 2 != 0 {
-            assert(lang_string_chars != nil)
-
-            return true,lang_string_chars[char],char
-        }
-    }
-
-    return false, vec4{}, '0'
-}
-
-try_add_string_encounter :: proc(
-    r: rune,
-    lang_string_chars: ^map[rune]vec4,
-    is_in_string: bool,
-    string_char: rune,
-) {
-    if is_in_string && r != string_char {
-        return
-    }
-    
-    if lang_string_chars == nil {
-        return
-    }
-    
-    if r not_in lang_string_chars {
-        return
-    }
-
-    existing_encounter := &encountered_string_chars[r]
-
-    if existing_encounter != nil {
-        encountered_string_chars[r] = existing_encounter^ + 1
-
-        return
-    }
-
-    encountered_string_chars[r] = 1
-}
-
-set_word :: proc(
-    word: ^^WordDef,
-    word_idx: ^int,
-    buffer_line: ^BufferLine,
-    i: int,
-) {
-    pos := i32(i)
-    ws  := buffer_line.words
-
-    if word^ != nil {
-        cur := word^
-        if pos >= cur.start && pos < cur.end {
-            return
-        }
-    }
-
-    startIdx := 0
-
-    if word^ != nil {
-        startIdx = word_idx^ + 1
-    }
-
-    for idx := startIdx; idx < len(ws); idx += 1 {
-        w := &ws[idx]
-
-        if pos < w.start {
-            break
-        }
-
-        if pos < w.end {
-            word^     = w
-            word_idx^ = idx
-            return
-        }
-    }
-
-    word^ = nil
-}
-
 process_highlights :: proc(i: int, is_hl_start,positive_dir,negative_dir,is_hl_end: bool, advance_amount: f32, highlight_width,highlight_offset: ^f32) -> (was_highlighted: bool) {
     if input_mode != .HIGHLIGHT {
         return false
@@ -527,8 +442,6 @@ add_code_text :: proc(
 
     word : ^WordDef
 
-    lang_string_chars := string_char_language_list[active_buffer.ext]
-
     highlight_width : f32 = 0
     highlight_offset : f32 = 0
 
@@ -557,8 +470,6 @@ add_code_text :: proc(
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
 
     for r,i in text {
-        set_word(&word, &word_idx, buffer_line, i) 
-
         if r != ' ' && is_start_of_line == true {
             is_start_of_line = false
         } 
@@ -645,23 +556,11 @@ add_code_text :: proc(
             advance_amount,
             &highlight_width,&highlight_offset,
         )
-
-        is_in_string, variant, string_char := is_char_in_string(lang_string_chars)
-        
-        // try_add_string_encounter(r, lang_string_chars, is_in_string, string_char)
         
         if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
-        } else if is_in_string {
-            color = variant
-        } else if lang_string_chars != nil && r in lang_string_chars {
-            color = lang_string_chars[r]
-        } else if word != nil {
-            color = word.color
-        } else if r in special_chars {
-            color = special_chars[r]
         }
 
         add_rect(&text_rect_cache,

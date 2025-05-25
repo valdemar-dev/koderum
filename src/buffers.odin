@@ -22,8 +22,17 @@ WordDef :: struct {
 @(private="package")
 BufferLine :: struct {
     characters: []rune,
-    words: []WordDef,
+    words: []WordDef,   
 }
+
+@(private="package")
+BufferError :: struct {
+    line: int,
+    error_string: string,
+}
+
+@(private="package")
+buffer_errors : [dynamic]BufferError = {}
 
 @(private="package")
 Buffer :: struct {
@@ -400,8 +409,6 @@ draw_text_buffer :: proc() {
     
     pen := vec2{0,0}
 
-    clear(&encountered_string_chars)
-   
     error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
     assert(error == .Ok)
 
@@ -528,11 +535,6 @@ open_file :: proc(file_name: string) {
         }
 
         append_elem(buffer_lines, buffer_line)
-    }
-    
-    switch new_buffer.ext {
-    case ".js":
-        set_buffer_tokens_js(new_buffer)
     }
 
     append(&buffers, new_buffer)
@@ -695,8 +697,6 @@ remove_char :: proc() {
 
         prev_line^.characters = new_runes[:]
 
-        set_line_word_defs(prev_line)
-
         ordered_remove(active_buffer.lines, buffer_cursor_line)
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
 
@@ -710,8 +710,6 @@ remove_char :: proc() {
             line^.characters = remove_char_at_index(line.characters, target-i)
         }
 
-        set_line_word_defs(line)
-
         set_buffer_cursor_pos(
             buffer_cursor_line,
             char_index-tab_spaces,
@@ -721,8 +719,6 @@ remove_char :: proc() {
     }
 
     line^.characters = remove_char_at_index(line.characters, target)
-
-    set_line_word_defs(line)
 
     set_buffer_cursor_pos(buffer_cursor_line, target)
 }
@@ -801,8 +797,6 @@ handle_text_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_TAB) {
         insert_tab_as_spaces()
 
-        set_line_word_defs(line)
-
         return false
     }
 
@@ -838,9 +832,6 @@ handle_text_input :: proc() -> bool {
             )
         }
 
-        set_line_word_defs(line)
-        set_line_word_defs(&buffer_line)
-
         inject_at(active_buffer.lines, new_line_num, buffer_line)
 
         set_buffer_cursor_pos(
@@ -856,82 +847,6 @@ handle_text_input :: proc() -> bool {
     return false
 }
 
-@(private="package") 
-set_line_word_defs :: proc(line: ^BufferLine) {
-    words := make([dynamic]WordDef)
-
-    start_idx : int = -1
-
-    for char,index in line.characters {
-        if rune_in_arr(char, word_break_chars) == false {
-            if start_idx < 0 {
-                start_idx = index
-            }
-
-            continue
-        }
-
-        if start_idx < 0 {
-            continue
-        }
-
-        word_def := new(WordDef)
-        word_def^ = WordDef{
-            start=i32(start_idx),
-            end=i32(index),
-        }
-
-        set_word_color(word_def, line)
-
-        append(&words, word_def^)
-
-        start_idx = -1
-    }
-
-    if start_idx > -1 {
-        word_def := new(WordDef)
-        word_def^ = WordDef{
-            start=i32(start_idx),
-            end=i32(len(line.characters)),
-        }
-
-        set_word_color(word_def, line)
-
-        append(&words, word_def^)
-    }
-
-    line.words = words[:]
-}
-
-set_word_color :: proc(word_def: ^WordDef, buffer_line: ^BufferLine) {
-    word_runes := buffer_line.characters[word_def.start:word_def.end]
-    word_string := utf8.runes_to_string(word_runes)
-
-    keyword_list := keyword_language_list[active_buffer.ext]
-
-    if keyword_list == nil {
-        word_def^.color = TEXT_MAIN    
-
-        return
-    }
-
-    for keyword,word_type in keyword_list {
-        assert(word_type.match_proc != nil)
-
-        does_match := word_type.match_proc(keyword, word_string, buffer_line)
-
-        if does_match == false {
-            continue
-        }
-
-        word_def^.color = word_type.color
-
-        return
-    }
-
-    word_def^.color = TEXT_MAIN    
-}
-
 @(private="package")
 insert_into_buffer :: proc (key: rune) {
     line := &active_buffer.lines[buffer_cursor_line] 
@@ -944,8 +859,6 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
     constrain_scroll_to_cursor()
-
-    set_line_word_defs(line)
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -1460,7 +1373,6 @@ paste_string :: proc(str: string, line: int, char: int) {
             inserted.characters = insert_chars_at_index(runes, len(runes), after)
         }
 
-        set_line_word_defs(&inserted)
         inject_at(active_buffer.lines, line_index, inserted)
         constrain_scroll_to_cursor()
 

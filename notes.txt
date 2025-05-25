@@ -15,7 +15,7 @@ todo:
     - mkdir to fb
     - reopening filebrowser should uncache all files
     - put correct advance in glyph alredy
-
+    - store arbitrary line number and ctrl+b to return
 bugs:    
     - hl only works for 1 item per line
     

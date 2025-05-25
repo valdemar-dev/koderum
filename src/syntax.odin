@@ -8,21 +8,6 @@ WordType :: struct {
     color: vec4,
 }
 
-Token :: struct {
-    start: int,
-    end: int,
-    
-    color: vec4,
-    
-    token_type: union{^JSToken},
-}
-
-new_token :: proc($T: typeid) -> ^T {
-	e := new(T)
-	e.variant = e
-	return e
-}
-
 indent_rule_language_list : map[string]^map[string]IndentRule = {
     ".txt"=&generic_indent_rule_list,
     ".odin"=&generic_indent_rule_list,
@@ -70,70 +55,6 @@ line_starts_match :: proc(comp: string, target: string, buffer_line: ^BufferLine
     return false
 }
 
-@(private="package")
-keyword_language_list : map[string]^map[string]WordType = {
-    ".js"=&js_keywords_map,
-    ".ts"=&js_keywords_map,
-    ".c"=&c_keywords_map,
-    ".odin"=&odin_keywords_map,
-}
-
-@(private="package")
-string_char_language_list : map[string]^map[rune]vec4 = {
-    ".js"=&js_string_chars,
-    ".ts"=&js_string_chars,
-    ".c"=&c_string_chars,
-    ".odin"=&odin_string_chars,
-}
-
-special_chars : map[rune]vec4 = {
-    '('=GRAY,
-    ')'=GRAY,
-    '['=GRAY,
-    ']'=GRAY,
-    '{'=GRAY,
-    '}'=GRAY,
-    '-'=GRAY,
-    '/'=GRAY,
-    '.'=GRAY,
-    ':'=GRAY,
-    ';'=GRAY,
-    '+'=GRAY,
-    '='=GRAY,
-    '>'=GRAY,
-    '<'=GRAY,
-    '|'=GRAY,
-    '1'=CYAN,
-    '2'=CYAN,
-    '3'=CYAN,
-    '4'=CYAN,
-    '5'=CYAN,
-    '6'=CYAN,
-    '7'=CYAN,
-    '8'=CYAN,
-    '9'=CYAN,
-    '0'=CYAN,
-}
-
 word_break_chars : []rune = {
-    '\'',
-    '.',
     ' ',
-    '{',
-    '}',
-    '[',
-    ']',
-    '(',
-    ')',
-    '"',
-    ':',
-    ';',
-    '/',
-    '<',
-    '>',
-    '|',
-    '=',
-    ',',
-    '-',
-    '+',
 }

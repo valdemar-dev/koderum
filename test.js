@@ -1,0 +1,2 @@
+const thing =
+let thing
