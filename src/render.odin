@@ -437,10 +437,13 @@ add_code_text :: proc(
 
     is_start_of_line := true
 
-    word_idx := 0
-    words_len := len(buffer_line.words)
-
-    word : ^WordDef
+    tokens := buffer_line.tokens    
+    token : ^Token
+    
+    token_idx := 0
+    if len(tokens) > 0 {
+        token = &buffer_line.tokens[token_idx]
+    }
 
     highlight_width : f32 = 0
     highlight_offset : f32 = 0
@@ -470,6 +473,19 @@ add_code_text :: proc(
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
 
     for r,i in text {
+        if token != nil {
+            if i32(i) >= token.char + token.length {
+                next_idx := token_idx + 1
+                
+                if next_idx > len(buffer_line.tokens) -1 {
+                    token = nil
+                } else {
+                    token = &buffer_line.tokens[next_idx]
+                    token_idx = next_idx
+                }
+            }
+        }
+        
         if r != ' ' && is_start_of_line == true {
             is_start_of_line = false
         } 
@@ -561,6 +577,10 @@ add_code_text :: proc(
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
+        } else if token != nil && token.char <= i32(i) {
+            if token.type in color_map {
+                color = color_map[token.type]
+            }
         }
 
         add_rect(&text_rect_cache,

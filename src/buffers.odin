@@ -22,7 +22,7 @@ WordDef :: struct {
 @(private="package")
 BufferLine :: struct {
     characters: []rune,
-    words: []WordDef,   
+    tokens: [dynamic]Token,
 }
 
 @(private="package")

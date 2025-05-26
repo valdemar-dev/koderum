@@ -9,6 +9,7 @@ import "core:strconv"
 import "core:fmt"
 import "core:io"
 import "core:encoding/json"
+import "core:sort"
 
 LanguageServer :: struct {
     lsp_stdin_w : ^os2.File,
@@ -17,6 +18,20 @@ LanguageServer :: struct {
     
     token_types : []string,
     token_modifiers : []string,
+}
+
+Token :: struct {
+    line:        i32,
+    char:        i32,
+    length:      i32,
+    type:        string,
+    modifiers:   []string,
+}
+
+color_map : map[string]vec4 = {
+    "variable"=ORANGE,
+    "function"=RED,
+    "keyword"=CYAN,
 }
 
 lsp_request_id := 10
@@ -75,15 +90,6 @@ lsp_handle_file_open :: proc() {
     }
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-}
-
-
-Token :: struct {
-    line:        i32,
-    char:        i32,
-    length:      i32,
-    type:        string,
-    modifiers:   []string,
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -193,6 +199,61 @@ set_buffer_tokens :: proc() {
         active_language_server.token_types,
         active_language_server.token_modifiers,
     )
+    
+    for token,index in decoded_tokens {        
+        if int(token.line) > len(active_buffer.lines) - 1 {
+            fmt.println("Illegal semantic token. Greater than buffer line length.")
+            
+            break
+        }
+        
+        if token.type == "member" {
+            lsp_request_id += 1
+            
+            msg := text_document_hover_message(
+                strings.concatenate({
+                    "file://",
+                    active_buffer.file_name,
+                }), 
+                int(token.line), 
+                int(token.char), 
+                lsp_request_id,
+            )
+            
+            _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+            bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
+            
+            when ODIN_DEBUG {
+                fmt.println(string(bytes))
+            }
+        }
+        
+        line := &active_buffer.lines[token.line]
+        
+        append(&line.tokens, token)
+    }
+    
+    delete(decoded_tokens)
+    
+    set_buffer_keywords()
+    
+    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+        return int(token_a.char - token_b.char)
+    }
+    
+    for &line in active_buffer.lines {
+        sort.quick_sort_proc(line.tokens[:], sort_proc)
+    }
+}
+
+lsp_query_hover :: proc(token_string: string) {
+}
+
+set_buffer_keywords :: proc() {
+    switch active_buffer.ext {
+    case ".js",".ts":
+        set_buffer_keywords_ts()
+    }
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
@@ -259,6 +320,45 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
     return body_buf[:], os2.ERROR_NONE
 }
 
+text_document_hover_message :: proc(doc_uri: string, line: int, character: int, id: int) -> string {
+    buf := make([dynamic]u8, 32)
+    
+    id_str := strconv.itoa(buf[:], id)
+    
+    line_str := strconv.itoa(buf[:], line)
+    char_str := strconv.itoa(buf[:], character)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": ", id_str, ",\n",
+        "  \"method\": \"textDocument/hover\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", doc_uri, "\"\n",
+        "    },\n",
+        "    \"position\": {\n",
+        "      \"line\": ", line_str, ",\n",
+        "      \"character\": ", char_str, "\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    })
+
+    buf = make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+
+    header := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+
+    delete(buf)
+    return header
+}
+
+
 did_change_workspace_folders_message :: proc(folder_uri: string, folder_name: string) -> string {
     json := strings.concatenate({
         "{\n",
@@ -291,6 +391,37 @@ did_change_workspace_folders_message :: proc(folder_uri: string, folder_name: st
     return header
 }
 
+text_document_document_symbol_message :: proc(doc_uri: string, id: int) -> string {
+    buf := make([dynamic]u8, 32)
+    id_str := strconv.itoa(buf[:], id)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": ", id_str, ",\n",
+        "  \"method\": \"textDocument/documentSymbol\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", doc_uri, "\"\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    })
+
+    delete(buf)
+    
+    buf = make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+
+    header := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+
+    delete(buf)
+    return header
+}
 
 initialize_message :: proc(pid: int, project_dir: string) -> string {
     buf := make([dynamic]u8, 32)

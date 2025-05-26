@@ -8,6 +8,8 @@ import "core:os"
 import "core:strings"
 import fp "core:path/filepath"
 import "core:encoding/json"
+import "core:text/regex"
+import "core:unicode/utf8"
 
 @(private="package")
 spawn_ts_server :: proc(allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
@@ -122,6 +124,9 @@ spawn_ts_server :: proc(allocator := context.allocator) -> (server: ^LanguageSer
     modifiers := value_to_str_array(modifiers_arr)
     types := value_to_str_array(types_arr)
     
+    fmt.println(types)
+    fmt.println(modifiers)
+    
     server = new(LanguageServer)
     server^ = LanguageServer{
         lsp_stdin_w = stdin_w,
@@ -137,3 +142,143 @@ spawn_ts_server :: proc(allocator := context.allocator) -> (server: ^LanguageSer
     
     return server,os2.ERROR_NONE
 }
+
+keywords : []string = {
+    "for",
+    "in",
+    "of",
+    "const",
+    "let",
+    "return",
+    "function",
+    "if",
+    "else",
+    "var",
+    "with",
+    "import",
+    "export",
+}
+
+check_for_keyword :: proc(
+    token_string: string,
+    line_index: int,
+    char: i32,
+    length: i32,
+    line: ^BufferLine,
+) -> bool {
+    for keyword in keywords {
+        if token_string != keyword {
+            continue
+        }
+                
+        token := Token{
+            line = i32(line_index),
+            char = char,
+            length = length,
+            type = "keyword",
+        }
+        
+        append(&line.tokens, token)
+        
+        return false
+    }
+    
+    return true
+}
+
+
+set_token :: proc(
+    token_string: string,
+    line_index: int,
+    char: i32,
+    length: i32,
+    line: ^BufferLine,
+) -> bool {
+    check_for_keyword(
+        token_string,
+        line_index,
+        char,
+        length,
+        line,
+    ) or_return
+    
+    return true
+}
+
+@(private="package")
+set_buffer_keywords_ts :: proc() {
+    delimiters := []string{
+        " ", "\t", "\n", "\r",
+        "(", ")", "[", "]", "{", "}", ".", ",", ";", ":", "?", "!", "~",
+        "+", "-", "*", "/", "%", "^", "&", "|", "=", "<", ">", "\"", "'", "`",
+        "@", "#", "\\",
+    }
+    
+    rune_str_buf := make([dynamic]rune)
+    
+    for &line, line_index in active_buffer.lines {
+        str := utf8.runes_to_string(line.characters[:])
+        start := -1
+
+        for i in 0..<len(str) {
+            r := str[i]
+            
+            clear(&rune_str_buf)
+            append(&rune_str_buf, rune(r))
+            
+            ch := utf8.runes_to_string(rune_str_buf[:])
+            
+            is_delim := false
+            for d in delimiters {
+                if d == ch {
+                    is_delim = true
+                }
+            }
+
+            if is_delim {
+                if start != -1 {
+                    char := i32(start)
+                    length := i32(i - start)
+                    
+                    end_idx := char + length
+                    
+                    token_string := str[char:end_idx]
+                    
+                    check_for_keyword(
+                        token_string,
+                        line_index,
+                        char,
+                        length,
+                        &line
+                    )
+                    
+                    start = -1
+                }
+                continue
+            }
+
+            if start == -1 {
+                start = i
+            }
+        }
+
+        if start != -1 {
+            char := i32(start)
+            length := i32(len(line.characters)) - i32(start)
+            
+            end_idx := char + length
+            
+            token_string := str[char:end_idx]
+            
+            set_token(
+                token_string,
+                line_index,
+                char,
+                length,
+                &line
+            )
+        }
+    }
+}
+
+
