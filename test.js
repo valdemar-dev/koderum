@@ -1,2 +1,0 @@
-const thing =
-let thing

@@ -57,6 +57,8 @@ Buffer :: struct {
 
     scroll_position: f32,
     horizontal_scroll_position: f32,
+    
+    revision: int,
 }
 
 @(private="package")
@@ -469,7 +471,7 @@ open_file :: proc(file_name: string) {
             break
         }
     }
-
+    
     if existing_file != nil {
         active_buffer = existing_file
 
@@ -481,6 +483,10 @@ open_file :: proc(file_name: string) {
         buffer_scroll_position = existing_file.scroll_position
         buffer_horizontal_scroll_position = existing_file.horizontal_scroll_position
 
+        lsp_handle_file_open()
+
+        set_buffer_tokens()
+            
         return
     }
 
@@ -518,7 +524,7 @@ open_file :: proc(file_name: string) {
     new_buffer^.ext = filepath.ext(new_buffer^.file_name)
 
     active_buffer = new_buffer
-
+    
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
     }
@@ -545,6 +551,9 @@ open_file :: proc(file_name: string) {
 
     set_buffer_cursor_pos(0,0)
     constrain_scroll_to_cursor()
+    
+    lsp_handle_file_open()
+    set_buffer_tokens()
 }
 
 remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
@@ -1618,4 +1627,51 @@ handle_search_input :: proc() {
         return
     }
 
+}
+
+@(private="package")
+serialize_buffer :: proc(buffer: ^Buffer) -> string {
+    buffer_to_save := make([dynamic]u8)
+    defer delete(buffer_to_save)
+
+    for line, index in active_buffer.lines {
+        if index != 0 {
+            append(&buffer_to_save, '\n');
+        }
+
+        for character in line.characters {
+            encoded, size := utf8.encode_rune(character);
+            append_elems(&buffer_to_save, ..encoded[0:size]);
+        }
+    }
+    
+    return strings.clone(string(buffer_to_save[:]))
+}
+
+@(private="package")
+escape_json :: proc(text: string) -> string {
+    builder := strings.builder_make()
+    
+    for c in text {
+        switch c {
+        case '"':
+            strings.write_string(&builder, "\\\"")
+        case '\\':
+            strings.write_string(&builder, "\\\\")
+        case '\b':
+            strings.write_string(&builder, "\\b")
+        case '\f':
+            strings.write_string(&builder, "\\f")
+        case '\n':
+            strings.write_string(&builder, "\\n")
+        case '\r':
+            strings.write_string(&builder, "\\r")
+        case '\t':
+            strings.write_string(&builder, "\\t")
+        case:
+            strings.write_rune(&builder, c)
+        }
+    }
+
+    return strings.clone(strings.to_string(builder))
 }

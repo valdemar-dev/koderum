@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import ft "../../alt-odin-freetype"
 import "core:math"
+import "core:encoding/json"
 
 vec2 :: struct {
     x: f32,
@@ -156,4 +157,20 @@ contains_runes :: proc(main: []rune, subset: []rune) -> (found: bool, start: int
         }
     }
     return false, -1
+}
+
+value_to_str_array :: proc(arr: json.Array) -> []string {
+    values := make([dynamic]string)
+    
+    for value in arr {
+        str_value, str_ok := value.(string)
+        
+        if !str_ok {
+            panic("Value in str array is not a str.")
+        }
+        
+        append(&values, str_value)
+    }
+    
+    return values[:]
 }
