@@ -1,8 +1,12 @@
-const thing = 2;
+const someFn = () => 4;
 
-const numberValue = Math.random();
+const stringValue=`Some text ${someFn} some text.`
+const stringValueTwo ="hii"
 
-function skibidi() {
-}
+const multiLineString = `
+hello i am stirng on a line
+hello i am also string on a line
+someFn
 
-skibidi()
+GRR I AM A VARIABLE GRRG ${someFn} apsdlkjasdpklj
+`;

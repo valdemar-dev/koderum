@@ -482,10 +482,6 @@ open_file :: proc(file_name: string) {
 
         buffer_scroll_position = existing_file.scroll_position
         buffer_horizontal_scroll_position = existing_file.horizontal_scroll_position
-
-        lsp_handle_file_open()
-
-        set_buffer_tokens()
             
         return
     }

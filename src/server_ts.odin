@@ -157,6 +157,7 @@ keywords : []string = {
     "with",
     "import",
     "export",
+    "from",
 }
 
 check_for_keyword :: proc(
@@ -177,6 +178,7 @@ check_for_keyword :: proc(
             length = length,
             type = "keyword",
         }
+        fmt.println("KEYWORD")
         
         append(&line.tokens, token)
         
@@ -205,6 +207,17 @@ set_token :: proc(
     return true
 }
 
+TokenTypeOverride :: enum {
+    NONE,
+    
+    STRING,
+    
+    SINGE_LINE_COMMENT,
+    MULTI_LINE_COMMENT,
+    
+    REGEXP,
+}
+
 @(private="package")
 set_buffer_keywords_ts :: proc() {
     delimiters := []string{
@@ -216,17 +229,63 @@ set_buffer_keywords_ts :: proc() {
     
     rune_str_buf := make([dynamic]rune)
     
+    token_type_override : TokenTypeOverride = .NONE
+    
+    string_runes := []rune{
+        '`', '\'', '"',
+    }
+    
+    string_width := 0
+    string_char : rune
+    
     for &line, line_index in active_buffer.lines {
         str := utf8.runes_to_string(line.characters[:])
         start := -1
-
-        for i in 0..<len(str) {
+        
+        str_loop: for i in 0..<len(str) {
             r := str[i]
             
             clear(&rune_str_buf)
             append(&rune_str_buf, rune(r))
             
             ch := utf8.runes_to_string(rune_str_buf[:])
+            
+            #partial switch token_type_override {
+            case .NONE:
+                for string_rune in string_runes {
+                    if rune(r) == string_rune {
+                        token_type_override = .STRING
+                        string_char = rune(r)
+                        
+                        start = i
+                    
+                        continue str_loop
+                    }
+                }
+                
+                break
+            case .STRING:
+                string_width += 1
+                
+                if rune(r) == string_char {
+                    token_type_override = .NONE
+                    string_char = ' '
+                    
+                    token := Token{
+                        line = i32(line_index),
+                        char = i32(start),
+                        length = i32(string_width+1),
+                        type = "string"
+                    }
+            
+                    append(&line.tokens, token)
+            
+                    string_width = 0
+
+                }
+                
+                continue
+            }
             
             is_delim := false
             for d in delimiters {
@@ -244,7 +303,7 @@ set_buffer_keywords_ts :: proc() {
                     
                     token_string := str[char:end_idx]
                     
-                    check_for_keyword(
+                    set_token(
                         token_string,
                         line_index,
                         char,
@@ -260,6 +319,24 @@ set_buffer_keywords_ts :: proc() {
             if start == -1 {
                 start = i
             }
+        }
+        
+        #partial switch token_type_override {
+        case .STRING:
+            token := Token{
+                line = i32(line_index),
+                char = i32(start),
+                length = i32(string_width+1),
+                type = "string"
+            }
+            
+            append(&line.tokens, token)
+            
+            string_width = 0
+            
+            fmt.println("palsdkfjpaskld")
+            
+            continue
         }
 
         if start != -1 {
@@ -280,5 +357,7 @@ set_buffer_keywords_ts :: proc() {
         }
     }
 }
+
+
 
 
