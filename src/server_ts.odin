@@ -124,9 +124,6 @@ spawn_ts_server :: proc(allocator := context.allocator) -> (server: ^LanguageSer
     modifiers := value_to_str_array(modifiers_arr)
     types := value_to_str_array(types_arr)
     
-    fmt.println(types)
-    fmt.println(modifiers)
-    
     server = new(LanguageServer)
     server^ = LanguageServer{
         lsp_stdin_w = stdin_w,
@@ -178,7 +175,6 @@ check_for_keyword :: proc(
             length = length,
             type = "keyword",
         }
-        fmt.println("KEYWORD")
         
         append(&line.tokens, token)
         
@@ -333,8 +329,6 @@ set_buffer_keywords_ts :: proc() {
             append(&line.tokens, token)
             
             string_width = 0
-            
-            fmt.println("palsdkfjpaskld")
             
             continue
         }

@@ -1,12 +1,20 @@
 const someFn = () => 4;
 
-const stringValue=`Some text ${someFn} some text.`
+const stringValue=`Some 
+fffffftext ${someFn} some text.`
+
 const stringValueTwo ="hii"
+let otherTHing = () => {}
+
+otherTHing = "some value";
+const array = [1,2,3,4];
+
+const split = array.reverse()
 
 const multiLineString = `
-hello i am stirng on a line
+hello i am stirasdflpkajsdfplkjng on a line
 hello i am also string on a line
-someFn
-
-GRR I AM A VARIABLE GRRG ${someFn} apsdlkjasdpklj
+dsomeFnf
+${someFn.call.bind().cum()}
+fGRR I AM A VARIABLE GRRG ${someFn} apsdlkjasdpklj
 `;

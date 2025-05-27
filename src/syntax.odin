@@ -199,7 +199,7 @@ set_buffer_tokens :: proc() {
     if active_language_server == nil {
         return
     }
-    
+        
     lsp_request_id += 1
     
     msg := semantic_tokens_request_message(
@@ -208,18 +208,10 @@ set_buffer_tokens :: proc() {
         0, len(active_buffer.lines)
     )
     
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
     bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP RESPONSE", string(bytes))
-    }
-    
+        
     if read_err != os2.ERROR_NONE {
         return
     }
@@ -272,36 +264,45 @@ set_buffer_tokens :: proc() {
     
     set_buffer_keywords()
     
-    lsp_request_id += 1
-    msg = get_project_info_message(lsp_request_id)
-    
-    fmt.println(msg)
-    
-    _, write_err = os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-    bytes, read_err = read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP RESPONSE", string(bytes))
-    }
-    
     sort_proc :: proc(token_a: Token, token_b: Token) -> int {
         return int(token_a.char - token_b.char)
     }
     
     for &line, index in active_buffer.lines {
-        sort.quick_sort_proc(line.tokens[:], sort_proc)
-        
-        fmt.println(index, line.tokens)
-        
+        sort.quick_sort_proc(line.tokens[:], sort_proc)       
         line.tokens = separate_tokens(line.tokens[:])
-        
         sort.quick_sort_proc(line.tokens[:], sort_proc)
-        
-        fmt.println(index, line.tokens)
+    }
+}
+
+notify_server_of_change :: proc(
+    buffer: ^Buffer,
+    start_line: int,
+    start_char: int,
+    end_line: int,
+    end_char: int,
+    new_text: string,
+) {
+    if active_language_server == nil {
+        return
     }
     
-    // consolidate tokens
+    buffer^.version += 1
     
+    escaped := escape_json(new_text)
+
+    msg := text_document_did_change_message(
+        strings.concatenate({
+            "file://",
+            buffer.file_name,
+        }),
+        buffer.version,
+        start_line, start_char, end_line, end_char, escaped,
+    )
+    
+    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+    
+    do_refresh_buffer_tokens = true
 }
 
 Interval :: struct {
@@ -312,17 +313,14 @@ Interval :: struct {
 separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
     result := make([dynamic]Token)
 
-    // tokens must be sorted by (line, char)
     for i in 0..<len(tokens) {
         base       := tokens[i]
         base_start := base.char
         base_end   := base.char + base.length
 
-        // One interval covering the full base-token span
         intervals := make([dynamic]Interval)
         append(&intervals, Interval{ start = base_start, end = base_end })
 
-        // Carve out every later token on the same line
         for j := i + 1; j < len(tokens); j += 1 {
             next := tokens[j]
             if next.line != base.line {
@@ -337,20 +335,18 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
             for k in 0..<len(intervals) {
                 iv := intervals[k]
 
-                // No overlap: keep it intact
                 if next_end <= iv.start || next_start >= iv.end {
                     append(&new_intervals, iv)
                     continue
                 }
 
-                // Left fragment: [iv.start, next_start)
                 if next_start > iv.start {
                     append(&new_intervals, Interval{
                         start = iv.start,
                         end   = next_start,
                     })
                 }
-                // Right fragment: [next_end, iv.end)
+                
                 if next_end < iv.end {
                     append(&new_intervals, Interval{
                         start = next_end,
@@ -362,7 +358,6 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
             intervals = new_intervals
         }
 
-        // Emit all remaining fragments of base
         for k in 0..<len(intervals) {
             iv      := intervals[k]
             seg_len := iv.end - iv.start
@@ -492,6 +487,51 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
     delete(buf)
     return header
 }
+
+text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
+    buf := [32]u8{}
+
+    version_str := strings.clone(strconv.itoa(buf[:], version), context.temp_allocator)
+    
+    start_line_str := strings.clone(strconv.itoa(buf[:], start_line), context.temp_allocator)
+    start_char_str := strings.clone(strconv.itoa(buf[:], start_char), context.temp_allocator)
+    end_line_str := strings.clone(strconv.itoa(buf[:], end_line), context.temp_allocator)
+    end_char_str := strings.clone(strconv.itoa(buf[:], end_char), context.temp_allocator)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"method\": \"textDocument/didChange\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", doc_uri, "\",\n",
+        "      \"version\": ", version_str, "\n",
+        "    },\n",
+        "    \"contentChanges\": [\n",
+        "      {\n",
+        "        \"range\": {\n",
+        "          \"start\": { \"line\": ", start_line_str, ", \"character\": ", start_char_str, " },\n",
+        "          \"end\": { \"line\": ", end_line_str, ", \"character\": ", end_char_str, " }\n",
+        "        },\n",
+        "        \"text\": \"", new_text, "\"\n",
+        "      }\n",
+        "    ]\n",
+        "  }\n",
+        "}\n"
+    })
+
+    buf = [32]u8{}
+    length := strconv.itoa(buf[:], len(json))
+
+    header := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+
+    return header
+}
+
 
 get_project_info_message :: proc(id: int) -> string {
     buf := make([dynamic]u8, 32)

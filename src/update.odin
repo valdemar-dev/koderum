@@ -9,7 +9,9 @@ import gl "vendor:OpenGL"
 
 @(private="package")
 update_state :: proc(current_time: f64) {
-    //add_missing_characters()
+    if do_refresh_buffer_tokens {
+        set_buffer_tokens()
+    }
 }
 
 @(private="package")
