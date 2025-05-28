@@ -95,15 +95,21 @@ init_window :: proc() {
     window = glfw.CreateWindow(
         640,
         480,
-        "Test Test",
+        "Koderum",
         nil,
         nil,
     )
 
+    if window == nil {
+        panic("Could not create window.") 
+    }
+
     glfw.SetWindowSizeLimits(window, 600, 800, glfw.DONT_CARE, glfw.DONT_CARE)
 
-    if window == nil {
-        panic("Could not create window.")
+    width, height := glfw.GetWindowSize(window)
+
+    fb_size = vec2{
+        f32(width), f32(height),
     }
 
     glfw.SetFramebufferSizeCallback(window, size_callback)
