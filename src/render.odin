@@ -425,6 +425,9 @@ add_code_text :: proc(
     ascender: f32,
     descender: f32,
     line_number: int,
+
+    buffer: ^Buffer,
+    token_idx: ^int,
 ) -> (offset: f32, width: f32) {
     pen := vec2{
         x=(pos.x),
@@ -437,12 +440,22 @@ add_code_text :: proc(
 
     is_start_of_line := true
 
-    tokens := buffer_line.tokens    
+    tokens := buffer.tokens    
     token : ^Token
-    
-    token_idx := 0
+
     if len(tokens) > 0 {
-        token = &buffer_line.tokens[token_idx]
+        for &buffer_token, index in tokens {
+            if buffer_token.line < i32(line_number) {
+                continue
+            } else if buffer_token.line > i32(line_number) {
+                break
+            }
+
+            token_idx^ = index
+            token = &buffer_token 
+
+            break
+        }
     }
 
     highlight_width : f32 = 0
@@ -473,15 +486,22 @@ add_code_text :: proc(
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
 
     for r,i in text {
-        if token != nil {
-            if i32(i) >= token.char + token.length {
-                next_idx := token_idx + 1
+        defer if token != nil {
+            if i32(i) >= token.char + (token.length-1) {
+                next_idx := token_idx^ + 1
                 
-                if next_idx > len(buffer_line.tokens) -1 {
+                if next_idx > len(buffer.tokens) -1 {
                     token = nil
                 } else {
-                    token = &buffer_line.tokens[next_idx]
-                    token_idx = next_idx
+                    token_idx^ = token_idx^ + 1
+
+                    token_to_use := &buffer.tokens[next_idx]
+
+                    if token_to_use.line == i32(line_number) {
+                        token = token_to_use
+                    } else {
+                        token = nil
+                    }
                 }
             }
         }

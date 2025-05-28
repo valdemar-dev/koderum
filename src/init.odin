@@ -125,9 +125,11 @@ init_window :: proc() {
 
     glfw.SwapInterval(1)
 
+    glfw.SetWindowSize(window, width, height)
+
     gl.load_up_to(3, 3, glfw.gl_set_proc_address)
 
-    glfw.SetWindowSize(window, width, height)
+
 }
 
 vbo : u32

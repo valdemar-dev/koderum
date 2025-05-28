@@ -11,7 +11,6 @@ BG_MAIN_30 := hex_string_to_vec4("313A4DFF")
 BG_MAIN_40 := hex_string_to_vec4("3A455CFF")
 BG_MAIN_50 := hex_string_to_vec4("43506BFF")
 
-
 // TEXT_MAIN := hex_string_to_vec4("F6F8F6FF")
 TEXT_MAIN := hex_string_to_vec4("FFFFFFFF")
 
@@ -26,3 +25,4 @@ YELLOW := hex_string_to_vec4("EDF060ff")
 ORANGE := hex_string_to_vec4("FF9442ff")
 CYAN := hex_string_to_vec4("50F7D5ff")
 PURPLE := hex_string_to_vec4("BC88FFFF")
+BLUE := hex_string_to_vec4("f2de7aff")

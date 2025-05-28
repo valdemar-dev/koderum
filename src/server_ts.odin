@@ -163,6 +163,7 @@ check_for_keyword :: proc(
     char: i32,
     length: i32,
     line: ^BufferLine,
+    tokens: ^[dynamic]Token
 ) -> bool {
     for keyword in keywords {
         if token_string != keyword {
@@ -176,7 +177,7 @@ check_for_keyword :: proc(
             type = "keyword",
         }
         
-        append(&line.tokens, token)
+        append(tokens, token)
         
         return false
     }
@@ -191,6 +192,7 @@ set_token :: proc(
     char: i32,
     length: i32,
     line: ^BufferLine,
+    tokens: ^[dynamic]Token,
 ) -> bool {
     check_for_keyword(
         token_string,
@@ -198,6 +200,7 @@ set_token :: proc(
         char,
         length,
         line,
+        tokens,
     ) or_return
     
     return true
@@ -215,7 +218,7 @@ TokenTypeOverride :: enum {
 }
 
 @(private="package")
-set_buffer_keywords_ts :: proc() {
+set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     delimiters := []string{
         " ", "\t", "\n", "\r",
         "(", ")", "[", "]", "{", "}", ".", ",", ";", ":", "?", "!", "~",
@@ -254,6 +257,7 @@ set_buffer_keywords_ts :: proc() {
                         string_char = rune(r)
                         
                         start = i
+                        string_width = 1
                     
                         continue str_loop
                     }
@@ -269,15 +273,14 @@ set_buffer_keywords_ts :: proc() {
                     
                     token := Token{
                         line = i32(line_index),
-                        char = i32(start),
-                        length = i32(string_width+1),
+                        char = max(i32(start), 0),
+                        length = i32(string_width),
                         type = "string"
                     }
-            
-                    append(&line.tokens, token)
-            
+                    
+                    append(tokens, token)
+                    
                     string_width = 0
-
                 }
                 
                 continue
@@ -304,7 +307,8 @@ set_buffer_keywords_ts :: proc() {
                         line_index,
                         char,
                         length,
-                        &line
+                        &line,
+                        tokens,
                     )
                     
                     start = -1
@@ -321,12 +325,12 @@ set_buffer_keywords_ts :: proc() {
         case .STRING:
             token := Token{
                 line = i32(line_index),
-                char = i32(start),
-                length = i32(string_width+1),
+                char = max(i32(start), 0),
+                length = i32(string_width),
                 type = "string"
             }
             
-            append(&line.tokens, token)
+            append(tokens, token)
             
             string_width = 0
             
@@ -346,7 +350,8 @@ set_buffer_keywords_ts :: proc() {
                 line_index,
                 char,
                 length,
-                &line
+                &line,
+                tokens,
             )
         }
     }

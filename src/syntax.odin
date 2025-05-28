@@ -29,7 +29,7 @@ Token :: struct {
 }
 
 color_map : map[string]vec4 = {
-    "variable"=TEXT_MAIN,
+    "variable"=BLUE,
     "type"=CYAN,
     "function"=RED,
     "keyword"=ORANGE,
@@ -249,33 +249,36 @@ set_buffer_tokens :: proc() {
         active_language_server.token_types,
         active_language_server.token_modifiers,
     )
+
+    new_tokens := make([dynamic]Token)
     
     for token,index in decoded_tokens {        
         if int(token.line) > len(active_buffer.lines) - 1 {
             fmt.println("Illegal semantic token. Greater than buffer line length.")
             
             break
-        }
+        } 
         
-        line := &active_buffer.lines[token.line]
-        
-        append(&line.tokens, token)
+        append(&new_tokens, token)
     }
-    
+ 
     delete(decoded_tokens)
-    
-    set_buffer_keywords()
-    
+     
     sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+        if token_a.line != token_b.line {
+            return int(token_a.line - token_b.line)
+        }
         return int(token_a.char - token_b.char)
     }
-    
-    for &line, index in active_buffer.lines {
-        sort.quick_sort_proc(line.tokens[:], sort_proc)       
-        line.tokens = separate_tokens(line.tokens[:])
-        sort.quick_sort_proc(line.tokens[:], sort_proc)
-    }
 
+    set_buffer_keywords(&new_tokens)
+
+    sort.quick_sort_proc(new_tokens[:], sort_proc)       
+    new_tokens = separate_tokens(new_tokens[:])
+    sort.quick_sort_proc(new_tokens[:], sort_proc)
+
+    active_buffer.tokens = new_tokens
+ 
     do_refresh_buffer_tokens = false
     
     when ODIN_DEBUG {
@@ -387,10 +390,10 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
 lsp_query_hover :: proc(token_string: string) {
 }
 
-set_buffer_keywords :: proc() {
+set_buffer_keywords :: proc(tokens: ^[dynamic]Token) {
     switch active_buffer.ext {
     case ".js",".ts":
-        set_buffer_keywords_ts()
+        set_buffer_keywords_ts(tokens)
     }
 }
 

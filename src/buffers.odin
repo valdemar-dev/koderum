@@ -13,16 +13,8 @@ import "core:path/filepath"
 import ft "../../alt-odin-freetype"
     
 @(private="package")
-WordDef :: struct {
-    start: i32,
-    end: i32,
-    color: vec4,
-}
-
-@(private="package")
 BufferLine :: struct {
     characters: []rune,
-    tokens: [dynamic]Token,
 }
 
 @(private="package")
@@ -59,6 +51,8 @@ Buffer :: struct {
     horizontal_scroll_position: f32,
     
     version: int,
+
+    tokens: [dynamic]Token
 }
 
 @(private="package")
@@ -203,6 +197,7 @@ draw_buffers :: proc() {
 }
 
 draw_buffer_line :: proc(
+    buffer: ^Buffer,
     buffer_line: ^BufferLine,
     index: int,
     input_pen: vec2,
@@ -212,6 +207,8 @@ draw_buffer_line :: proc(
     descender: f32,
     char_map: ^CharacterMap,
     font_size: f32,
+
+    token_idx: ^int,
 ) -> vec2 {
     pen := input_pen
 
@@ -239,6 +236,8 @@ draw_buffer_line :: proc(
         ascender,
         descender, 
         index,
+        buffer,
+        token_idx,
     )
 
     if (
@@ -422,6 +421,8 @@ draw_text_buffer :: proc() {
 
     char_map := get_char_map(buffer_font_size)
 
+    token_idx := 0
+
     for &buffer_line, index in buffer_lines {
         line_pos := vec2{
             pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
@@ -433,6 +434,7 @@ draw_text_buffer :: proc() {
         }
 
         pen = draw_buffer_line(
+            active_buffer,
             &buffer_line,
             index,
             pen,
@@ -442,7 +444,9 @@ draw_text_buffer :: proc() {
             descender,
             char_map,
             buffer_font_size,
+            &token_idx,
         )
+
     }
 
     draw_rects(&rect_cache)
@@ -884,6 +888,8 @@ handle_text_input :: proc() -> bool {
             new_text,
         )
 
+        delete(new_text)
+
         return false
     }
 
@@ -1161,6 +1167,23 @@ delete_line :: proc(line: int) {
     if len(active_buffer.lines) == 0 {
         append(active_buffer.lines, BufferLine{})
     }
+
+    notify_server_of_change(
+        active_buffer,
+        buffer_cursor_line,
+        0,
+        buffer_cursor_line+1,
+        0,
+        "",
+    )
+
+    // edge case for deleting the last line
+    if buffer_cursor_line > len(active_buffer.lines) - 1 {
+        set_buffer_cursor_pos(
+            buffer_cursor_line - (buffer_cursor_line - (len(active_buffer.lines)-1)),
+            buffer_cursor_char_index,
+        )
+    }
     
     new_line := active_buffer.lines[buffer_cursor_line]
     
@@ -1174,9 +1197,7 @@ delete_line :: proc(line: int) {
     }
 }
 
-inject_line :: proc() {
-    indent := determine_line_indent(buffer_cursor_line + 1)
-    
+inject_line :: proc() {   
     buffer_line := BufferLine{}
         
     indent_spaces := determine_line_indent(buffer_cursor_line + 1)
@@ -1186,13 +1207,39 @@ inject_line :: proc() {
             buffer_line.characters, 0, ' ',
         )  
     }
-    
+
+    old_line := active_buffer.lines[buffer_cursor_line]
+    old_line_length := len(old_line.characters)
+
+    new_text := strings.concatenate({
+        "\n", strings.repeat(" ", indent_spaces),
+    })
+
+    notify_server_of_change(
+        active_buffer,
+        buffer_cursor_line,
+        old_line_length,
+        buffer_cursor_line,
+        old_line_length,
+        new_text,
+    )
+
+    fmt.println(new_text)
+     
     inject_at(active_buffer.lines, buffer_cursor_line + 1, buffer_line)
-    
+
     set_buffer_cursor_pos(
         buffer_cursor_line + 1,
         indent_spaces, 
     )
+
+    de := os.get_env("XDG_CURRENT_DESKTOP") 
+
+    if de == "GNOME" {
+        glfw.WaitEvents()
+    }
+
+    delete(de)
     
     input_mode = .BUFFER_INPUT
 }
