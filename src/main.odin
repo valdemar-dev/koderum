@@ -81,13 +81,20 @@ main :: proc() {
 
         free_all(context.temp_allocator)
 
-        if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
-           glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1
-        {
+        when ODIN_OS == .Windows {
             glfw.SwapBuffers(window)
-
-            continue
         }
+
+        when ODIN_OS == .Linux {
+            if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
+               glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1
+            {
+                glfw.SwapBuffers(window)
+
+                continue
+            }
+        }
+
     }
 
     clear_fonts()
