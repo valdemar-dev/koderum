@@ -112,8 +112,6 @@ init_window :: proc() {
         f32(width), f32(height),
     }
 
-    gl.Viewport(0,0,width,height)
-
     glfw.SetFramebufferSizeCallback(window, size_callback)
 
     glfw.SetKeyCallback(window, key_callback)
@@ -128,6 +126,8 @@ init_window :: proc() {
     glfw.SwapInterval(1)
 
     gl.load_up_to(3, 3, glfw.gl_set_proc_address)
+
+    glfw.SetWindowSize(window, width, height)
 }
 
 vbo : u32
