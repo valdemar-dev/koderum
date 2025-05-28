@@ -146,6 +146,8 @@ lsp_handle_file_open :: proc() {
     }
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+    
+    do_refresh_buffer_tokens = true
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -272,6 +274,12 @@ set_buffer_tokens :: proc() {
         sort.quick_sort_proc(line.tokens[:], sort_proc)       
         line.tokens = separate_tokens(line.tokens[:])
         sort.quick_sort_proc(line.tokens[:], sort_proc)
+    }
+
+    do_refresh_buffer_tokens = false
+    
+    when ODIN_DEBUG {
+        fmt.println("Set buffer tokens")
     }
 }
 

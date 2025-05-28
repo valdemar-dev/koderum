@@ -3,3 +3,5 @@
 *.png
 *.args
 *.conf
+
+node_modules
