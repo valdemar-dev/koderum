@@ -12,11 +12,30 @@ import "core:math"
 import "core:strings"
 import "core:time"
 import "core:thread"
+import "core:os"
 
 target_fps :: 60.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
+
+parse_args :: proc() {
+    for arg in os.args {
+        if arg == "-save_logs" {
+            fmt.println("NOTE: All output will be directed to stdout.txt")
+            
+            file_handle, err := os.open("stdout.txt", os.O_WRONLY | os.O_CREATE, 0o644)
+            if err != os.ERROR_NONE {
+                fmt.println("Failed to open file:", os.error_string(err))
+                return
+            }
+
+            os.stdout = file_handle
+
+            fmt.println("-- START OF LOG --")
+        }
+    }
+}
 
 main :: proc() {
     fmt.println("Loading..")
@@ -43,6 +62,8 @@ main :: proc() {
 		}
 	}
 	
+    parse_args()
+    
     init()
 
     last_time := glfw.GetTime()

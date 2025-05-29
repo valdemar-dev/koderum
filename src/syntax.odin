@@ -218,6 +218,10 @@ set_buffer_tokens :: proc() {
     
     bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
         
+    when ODIN_DEBUG {
+        fmt.println(string(bytes))
+    }
+        
     if read_err != os2.ERROR_NONE {
         return
     }
@@ -340,10 +344,6 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
 
         intervals := make([dynamic]Interval)
         append(&intervals, Interval{ start = base_start, end = base_end })
-        
-        if base.line == 24 {
-            fmt.println(base)
-        }
     
         if (prev.char == base.char) && (prev.line == base.line) && prev.priority > base.priority {
             prev = base

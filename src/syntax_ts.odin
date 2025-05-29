@@ -24,9 +24,12 @@ ts_colors : map[string]vec4 = {
     "continue"=PINK,
     "break"=PINK,
 
-    "string"=GREEN,
+    "predefined_type"=PURPLE,
+    
     "string_fragment"=GREEN,
     "`"=GREEN,
+    "\""=GREEN,
+    "'"=GREEN,
     "template_string"=GREEN,
 
     "import"=RED,
@@ -35,18 +38,24 @@ ts_colors : map[string]vec4 = {
     "from"=RED,
     "typeof"=RED, 
     "throw"=RED,
-
-    "number"=BLUE,
-
-    "await"=PURPLE,
-    "async"=PURPLE,
-
-    "switch"=CYAN,
-    "case"=CYAN,
-
+    
+    "number"=BLUE,  
+    "true"=BLUE,    
+    "false"=BLUE,
+    
+    "await"=CYAN,
+    "async"=CYAN,
+    
     "as"=RED,
     "any"=RED,
     
+    "delete"=RED,
+    "undefined"=RED,
+    
+    "--"=GRAY,
+    "++"=GRAY,
+    ":"=GRAY,
+    "+="=GRAY,
     "}"=GRAY,
     "{"=GRAY,
     "."=GRAY,
@@ -65,15 +74,22 @@ ts_colors : map[string]vec4 = {
     "..."=GRAY,
     "!"=GRAY,
     "||"=GRAY,
+    ">"=GRAY,
+    "<"=GRAY,
     "?."=GRAY,
-    "comment"=GRAY,
+    "comment"=DARK_GRAY,
 
-    "if"=CYAN,
-    "else"=CYAN,
-    "for_in_statement"=CYAN,
-    "for"=CYAN,
-
-
+    "if"=PINK,
+    "else"=PINK,
+    "for_in_statement"=PINK,
+    "for"=PINK,
+    "while"=PINK,
+    "with"=CYAN,
+        
+    "true"=BLUE,    
+    "false"=BLUE,
+    
+    
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
 }
@@ -247,10 +263,13 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
-        nil,
+        active_buffer.previous_tree,
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
+    
+    active_buffer.previous_tree = tree
+    
     
     if tree == nil {
         fmt.println("Failed to parse source code")
@@ -302,7 +321,9 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
         
     } else {
         when ODIN_DEBUG {
-            fmt.println("UNHANDLED:", node_type)
+            start := ts.node_start_byte(node)
+            end := ts.node_end_byte(node)
+            fmt.println("UNHANDLED:", node_type, "Value:", string(source[start:end]))
         }
     }
     

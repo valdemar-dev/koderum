@@ -12,6 +12,8 @@ import "core:strconv"
 import "core:path/filepath"
 import ft "../../alt-odin-freetype"
     
+import ts "../../odin-tree-sitter"
+    
 @(private="package")
 BufferLine :: struct {
     characters: []rune,
@@ -52,7 +54,8 @@ Buffer :: struct {
     
     version: int,
 
-    tokens: [dynamic]Token
+    tokens: [dynamic]Token,
+    previous_tree: ts.Tree,
 }
 
 @(private="package")
