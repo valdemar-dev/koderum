@@ -97,7 +97,7 @@ set_active_language_server :: proc(ext: string) {
     switch ext {
     case ".js",".ts":
         if ext not_in language_servers {
-            server,err := init_syntax_typescript()
+            server,err := init_syntax_typescript(ext)
             
             if err != os2.ERROR_NONE {
                 return

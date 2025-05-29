@@ -14,7 +14,7 @@ import "core:unicode/utf8"
 import ts "../../odin-tree-sitter"
 
 import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
-
+import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 ts_colors : map[string]vec4 = {
     "const"=RED,
@@ -39,13 +39,10 @@ ts_colors : map[string]vec4 = {
     "+"=GRAY,
     ","=GRAY,
     "${"=GRAY,
-    
     "`"=GREEN,
     "template_string"=GREEN,
-    
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
-
 }
 
 ts_lsp_colors := map[string]vec4{
@@ -58,12 +55,19 @@ ts_lsp_colors := map[string]vec4{
 }
 
 @(private="package")
-init_syntax_typescript :: proc(allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
+init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
     parser := ts.parser_new()
     
-    if !ts.parser_set_language(parser, ts_js_bindings.tree_sitter_javascript()) {
-        fmt.println("Failed to set parser language")
-        return
+    if ext == ".js" {
+        if !ts.parser_set_language(parser, ts_js_bindings.tree_sitter_javascript()) {
+            fmt.println("Failed to set parser language")
+            return
+        }
+    } else {
+        if !ts.parser_set_language(parser, ts_ts_bindings.tree_sitter_typescript()) {
+            fmt.println("Failed to set parser language")
+            return
+        }
     }
     
     stdin_r, stdin_w := os2.pipe() or_return
