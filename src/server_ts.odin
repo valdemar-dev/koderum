@@ -252,6 +252,8 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
             #partial switch token_type_override {
             case .NONE:
                 for string_rune in string_runes {
+                    lsp_request_id += 1
+                    
                     if rune(r) == string_rune {
                         token_type_override = .STRING
                         string_char = rune(r)

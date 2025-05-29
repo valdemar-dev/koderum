@@ -249,6 +249,8 @@ set_buffer_tokens :: proc() {
         active_language_server.token_types,
         active_language_server.token_modifiers,
     )
+    
+    fmt.println(decoded_tokens)
 
     new_tokens := make([dynamic]Token)
     

@@ -21,3 +21,5 @@ dsomeFnf
 ${someFn.call.call.call}
 fGRR I AM A VARIABLE GRRG ${someFn} apsdlkjasdpklj
 `;
+
+const extra = /cum/g
