@@ -21,9 +21,31 @@ ts_colors : map[string]vec4 = {
     "let"=RED,
     
     "return"=PINK,
+    "continue"=PINK,
+    "break"=PINK,
+
     "string"=GREEN,
     "string_fragment"=GREEN,
+    "`"=GREEN,
+    "template_string"=GREEN,
+
+    "import"=RED,
+    "export"=RED,
+
+    "from"=RED,
+    "typeof"=RED, 
+    "throw"=RED,
+
     "number"=BLUE,
+
+    "await"=PURPLE,
+    "async"=PURPLE,
+
+    "switch"=CYAN,
+    "case"=CYAN,
+
+    "as"=RED,
+    "any"=RED,
     
     "}"=GRAY,
     "{"=GRAY,
@@ -39,19 +61,38 @@ ts_colors : map[string]vec4 = {
     "+"=GRAY,
     ","=GRAY,
     "${"=GRAY,
-    "`"=GREEN,
-    "template_string"=GREEN,
+    "==="=GRAY,
+    "..."=GRAY,
+    "!"=GRAY,
+    "||"=GRAY,
+    "?."=GRAY,
+    "comment"=GRAY,
+
+    "if"=CYAN,
+    "else"=CYAN,
+    "for_in_statement"=CYAN,
+    "for"=CYAN,
+
+
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
 }
 
 ts_lsp_colors := map[string]vec4{
-    "variable"=ORANGE,
     "type"=CYAN,
     "property"=PURPLE,
     
     "function"=YELLOW,
     "member"=YELLOW,
+
+    "parameter"=ORANGE,
+    "namespace"=ORANGE,
+    "variable"=ORANGE,
+    "interface"=ORANGE,
+    "class"=RED,
+
+    "enum"=ORANGE,
+    "enumMember"=YELLOW,
 }
 
 @(private="package")
@@ -248,17 +289,21 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
                 priority += 1
             }
 
+            color := ts_colors[node_type]
+
             append(tokens, Token{
                 char = i32(start_col),
                 line = i32(row),
                 length = i32(length),
-                color = ts_colors[node_type],
+                color = color,
                 priority = priority,
             })
         }
         
     } else {
-        fmt.println("UNHANDLED:", node_type)
+        when ODIN_DEBUG {
+            fmt.println("UNHANDLED:", node_type)
+        }
     }
     
     child_count := ts.node_child_count(node)

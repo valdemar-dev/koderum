@@ -28,3 +28,5 @@ PURPLE := hex_string_to_vec4("BC88FFFF")
 BLUE := hex_string_to_vec4("6978ffff")
 PINK := hex_string_to_vec4("f263ffff")
 LIGHT_GREEN := hex_string_to_vec4("bceb65ff")
+
+TEST := hex_string_to_vec4("ff008cff")

@@ -178,11 +178,19 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             char = delta_char
         }
 
+        type := active_language_server.token_types[token_type_index]
+
+        if type not_in active_language_server.colors {
+            fmt.println("Could not find a color for type", type, "whilst attempting to decode semantic tokens.")
+        }
+
+        color := active_language_server.colors[type]
+
         t := Token{
             line = line,
             char = char,
             length = length,
-            color = active_language_server.colors[active_language_server.token_types[token_type_index]],
+            color = color,
             modifiers = decode_modifiers(token_mod_bitset, token_modifiers),
             priority = 2,
         }
@@ -333,16 +341,13 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
         intervals := make([dynamic]Interval)
         append(&intervals, Interval{ start = base_start, end = base_end })
         
-            if base.line == 24 {
-                fmt.println(base)
-            }
-        
+        if base.line == 24 {
+            fmt.println(base)
+        }
+    
         if (prev.char == base.char) && (prev.line == base.line) && prev.priority > base.priority {
             prev = base
-            
-            
-            fmt.println("skibbidy")
-            
+           
             continue outer
         }
 
