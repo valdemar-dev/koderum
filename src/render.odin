@@ -598,9 +598,7 @@ add_code_text :: proc(
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
         } else if token != nil && token.char <= i32(i) {
-            if token.type in color_map {
-                color = color_map[token.type]
-            }
+            color = token.color
         }
 
         add_rect(&text_rect_cache,

@@ -8,6 +8,10 @@ fffffftext ${someFn} some text.`
 const stringValueTwo ="hii";
 let otherTHing = () => {}
 
+const megaFunction = () => {
+    return 5 + 20
+}
+
 let thirdThing = "some value";
 const array = [1,2,3,4];
 
@@ -22,4 +26,4 @@ ${someFn.call.call.call}
 fGRR I AM A VARIABLE GRRG ${someFn} apsdlkjasdpklj
 `;
 
-const extra = /cum/g
+const extra = /regex/g

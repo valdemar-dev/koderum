@@ -10,6 +10,7 @@ import "core:fmt"
 import "core:io"
 import "core:encoding/json"
 import "core:sort"
+import ts "../../odin-tree-sitter"
 
 LanguageServer :: struct {
     lsp_stdin_w : ^os2.File,
@@ -18,25 +19,19 @@ LanguageServer :: struct {
     
     token_types : []string,
     token_modifiers : []string,
+    
+    ts_parser: ts.Parser,
+    
+    colors : map[string]vec4,
 }
 
 Token :: struct {
     line:        i32,
     char:        i32,
     length:      i32,
-    type:        string,
+    color: vec4,
     modifiers:   []string,
-}
-
-color_map : map[string]vec4 = {
-    "variable"=BLUE,
-    "type"=CYAN,
-    "function"=RED,
-    "keyword"=ORANGE,
-    "property"=PURPLE,
-    "comment"=RED,
-    "member"=RED,
-    "string"=GREEN,
+    priority: u8,
 }
 
 /*
@@ -102,7 +97,7 @@ set_active_language_server :: proc(ext: string) {
     switch ext {
     case ".js",".ts":
         if ext not_in language_servers {
-            server,err := spawn_ts_server()
+            server,err := init_syntax_typescript()
             
             if err != os2.ERROR_NONE {
                 return
@@ -187,8 +182,9 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             line = line,
             char = char,
             length = length,
-            type = token_types[token_type_index],
+            color = active_language_server.colors[active_language_server.token_types[token_type_index]],
             modifiers = decode_modifiers(token_mod_bitset, token_modifiers),
+            priority = 2,
         }
         
         append(&tokens, t)
@@ -250,8 +246,6 @@ set_buffer_tokens :: proc() {
         active_language_server.token_modifiers,
     )
     
-    fmt.println(decoded_tokens)
-
     new_tokens := make([dynamic]Token)
     
     for token,index in decoded_tokens {        
@@ -269,13 +263,16 @@ set_buffer_tokens :: proc() {
     sort_proc :: proc(token_a: Token, token_b: Token) -> int {
         if token_a.line != token_b.line {
             return int(token_a.line - token_b.line)
+        } else if token_a.char != token_b.char {    
+            return int(token_a.char - token_b.char)
         }
-        return int(token_a.char - token_b.char)
+        
+        return int(int(token_a.priority) - int(token_b.priority))
     }
 
     set_buffer_keywords(&new_tokens)
 
-    sort.quick_sort_proc(new_tokens[:], sort_proc)       
+    sort.quick_sort_proc(new_tokens[:], sort_proc)           
     new_tokens = separate_tokens(new_tokens[:])
     sort.quick_sort_proc(new_tokens[:], sort_proc)
 
@@ -323,16 +320,31 @@ Interval :: struct {
     end:   i32,
 }
 
+
 separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
     result := make([dynamic]Token)
 
-    for i in 0..<len(tokens) {
+    prev : Token
+    outer: for i in 0..<len(tokens) {
         base       := tokens[i]
         base_start := base.char
         base_end   := base.char + base.length
 
         intervals := make([dynamic]Interval)
         append(&intervals, Interval{ start = base_start, end = base_end })
+        
+            if base.line == 24 {
+                fmt.println(base)
+            }
+        
+        if (prev.char == base.char) && (prev.line == base.line) && prev.priority > base.priority {
+            prev = base
+            
+            
+            fmt.println("skibbidy")
+            
+            continue outer
+        }
 
         for j := i + 1; j < len(tokens); j += 1 {
             next := tokens[j]
@@ -342,6 +354,7 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
 
             next_start := next.char
             next_end   := next.char + next.length
+            
 
             new_intervals := make([dynamic]Interval)
 
@@ -367,6 +380,85 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
                     })
                 }
             }
+            
+            prev = base
+
+            intervals = new_intervals
+        }
+
+        for k in 0..<len(intervals) {
+            iv      := intervals[k]
+            seg_len := iv.end - iv.start
+            
+            if seg_len > 0 {
+                append(&result, Token{
+                    char   = iv.start,
+                    length = seg_len,
+                    line   = base.line,
+                    color   = base.color,
+                    priority = base.priority,
+                })
+            }
+        }
+    }
+
+    return result
+}
+
+
+/*
+separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
+    result := make([dynamic]Token)
+
+    for i in 0..<len(tokens) {
+        base       := tokens[i]
+        base_start := base.char
+        base_end   := base.char + base.length
+
+        intervals := make([dynamic]Interval)
+        append(&intervals, Interval{ start = base_start, end = base_end })
+
+        for j := 0; j < len(tokens); j += 1 {
+            if i == j {
+                continue
+            }
+
+            next := tokens[j]
+            if next.line != base.line {
+                continue
+            }
+
+            if next.priority <= base.priority {
+                continue // Only cut if next has higher priority
+            }
+
+            next_start := next.char
+            next_end   := next.char + next.length
+
+            new_intervals := make([dynamic]Interval)
+
+            for k in 0..<len(intervals) {
+                iv := intervals[k]
+
+                if next_end <= iv.start || next_start >= iv.end {
+                    append(&new_intervals, iv)
+                    continue
+                }
+
+                if next_start > iv.start {
+                    append(&new_intervals, Interval{
+                        start = iv.start,
+                        end   = next_start,
+                    })
+                }
+
+                if next_end < iv.end {
+                    append(&new_intervals, Interval{
+                        start = next_end,
+                        end   = iv.end,
+                    })
+                }
+            }
 
             intervals = new_intervals
         }
@@ -376,10 +468,11 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
             seg_len := iv.end - iv.start
             if seg_len > 0 {
                 append(&result, Token{
-                    char   = iv.start,
-                    length = seg_len,
-                    line   = base.line,
-                    type   = base.type,
+                    char     = iv.start,
+                    length   = seg_len,
+                    line     = base.line,
+                    color    = base.color,
+                    priority = base.priority,
                 })
             }
         }
@@ -387,7 +480,7 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
 
     return result
 }
-
+*/
 
 lsp_query_hover :: proc(token_string: string) {
 }
