@@ -95,6 +95,7 @@ ts_colors : map[string]vec4 = {
     
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
+    "function"=YELLOW,
 }
 
 ts_lsp_colors := map[string]vec4{
@@ -322,12 +323,6 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
                 color    = color,
                 priority = priority,
             })
-        }
-    } else {
-        when ODIN_DEBUG {
-            start := ts.node_start_byte(node)
-            end := ts.node_end_byte(node)
-            fmt.println("UNHANDLED:", node_type, "Value:", string(source[start:end]))
         }
     }
     

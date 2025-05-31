@@ -31,8 +31,11 @@ buffer_errors : [dynamic]BufferError = {}
 @(private="package")
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
+    
+    // Unused(?)
     x_offset: f32,
 
+    // Unused
     x_pos: f32,
     y_pos: f32,
 
@@ -52,11 +55,19 @@ Buffer :: struct {
     scroll_position: f32,
     horizontal_scroll_position: f32,
     
+    // Used for LSP stuff
     version: int,
 
+    // Syntax highlighting
     tokens: [dynamic]Token,
+    
+    // Raw LSP syntax highlihgting tokens
+    raw_token_data: [dynamic]i32,
+    
+    // Tree-sitter tree
     previous_tree: ts.Tree,
     
+    // Raw data that we read from file and modify for tree-sitter so it doesnt die
     content: []u8,
 }
 

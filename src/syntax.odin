@@ -11,6 +11,7 @@ import "core:io"
 import "core:encoding/json"
 import "core:sort"
 import ts "../../odin-tree-sitter"
+import "core:time"
 
 LanguageServer :: struct {
     lsp_stdin_w : ^os2.File,
@@ -208,22 +209,34 @@ set_buffer_tokens :: proc() {
         
     lsp_request_id += 1
     
+    when ODIN_DEBUG {
+        start := time.now()
+        prev := start
+    }
+    
+    ///* 
     msg := semantic_tokens_request_message(
         lsp_request_id,
         strings.concatenate({"file://",active_buffer.file_name}),
         0, len(active_buffer.lines)
     )
-    
+        
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
     bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
         
-    when ODIN_DEBUG {
-        fmt.println(string(bytes))
-    }
-        
     if read_err != os2.ERROR_NONE {
         return
+    }
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "for lsp to process.")
+            
+            prev = now
+        }
     }
     
     parsed,_ := json.parse(bytes)
@@ -246,7 +259,7 @@ set_buffer_tokens :: proc() {
         panic("Malformed json in set_buffer_tokens")
     }
     
-    tokens : [dynamic]i32
+    tokens : make([dynamic]i32)
     
     for value in data {
         append(&tokens, i32(value.(f64)))
@@ -281,19 +294,37 @@ set_buffer_tokens :: proc() {
         
         return int(int(token_a.priority) - int(token_b.priority))
     }
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to process LSP tokens.")
+        }
+    }
 
     set_buffer_keywords(&new_tokens)
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to set buffer keywords.")
+        }
+    }
 
-    sort.quick_sort_proc(new_tokens[:], sort_proc)           
-    new_tokens = separate_tokens(new_tokens[:])
-    sort.quick_sort_proc(new_tokens[:], sort_proc)
+    // used to be needed, not anymore!    
+    // new_tokens = separate_tokens(new_tokens[:])
+    // sort.quick_sort_proc(new_tokens[:], sort_proc)
 
     active_buffer.tokens = new_tokens
  
     do_refresh_buffer_tokens = false
     
     when ODIN_DEBUG {
-        fmt.println("Set buffer tokens")
+        end := time.now()
+        
+        fmt.println("Took", time.diff(start, end), "to update buffer tokens.")
     }
 }
 
@@ -503,83 +534,6 @@ separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
 
     return result
 }
-
-
-/*
-separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
-    result := make([dynamic]Token)
-
-    for i in 0..<len(tokens) {
-        base       := tokens[i]
-        base_start := base.char
-        base_end   := base.char + base.length
-
-        intervals := make([dynamic]Interval)
-        append(&intervals, Interval{ start = base_start, end = base_end })
-
-        for j := 0; j < len(tokens); j += 1 {
-            if i == j {
-                continue
-            }
-
-            next := tokens[j]
-            if next.line != base.line {
-                continue
-            }
-
-            if next.priority <= base.priority {
-                continue // Only cut if next has higher priority
-            }
-
-            next_start := next.char
-            next_end   := next.char + next.length
-
-            new_intervals := make([dynamic]Interval)
-
-            for k in 0..<len(intervals) {
-                iv := intervals[k]
-
-                if next_end <= iv.start || next_start >= iv.end {
-                    append(&new_intervals, iv)
-                    continue
-                }
-
-                if next_start > iv.start {
-                    append(&new_intervals, Interval{
-                        start = iv.start,
-                        end   = next_start,
-                    })
-                }
-
-                if next_end < iv.end {
-                    append(&new_intervals, Interval{
-                        start = next_end,
-                        end   = iv.end,
-                    })
-                }
-            }
-
-            intervals = new_intervals
-        }
-
-        for k in 0..<len(intervals) {
-            iv      := intervals[k]
-            seg_len := iv.end - iv.start
-            if seg_len > 0 {
-                append(&result, Token{
-                    char     = iv.start,
-                    length   = seg_len,
-                    line     = base.line,
-                    color    = base.color,
-                    priority = base.priority,
-                })
-            }
-        }
-    }
-
-    return result
-}
-*/
 
 lsp_query_hover :: proc(token_string: string) {
 }
