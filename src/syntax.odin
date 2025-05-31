@@ -303,6 +303,8 @@ notify_server_of_change :: proc(
     start_char: int,
     end_line: int,
     end_char: int,
+    old_byte_length: int,
+    new_end_char: int,
     new_text: string,
 ) {
     if active_language_server == nil {
@@ -324,8 +326,100 @@ notify_server_of_change :: proc(
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
+    if buffer.previous_tree != nil {        
+        start_byte,old_end_byte,end_byte := apply_diff(
+            buffer,
+            start_line, start_char,
+            end_line, end_char,
+            new_text,
+        )
+        
+        edit := ts.Input_Edit{
+            u32(start_byte),
+            u32(old_end_byte),
+            u32(end_byte),
+            ts.Point{},
+            ts.Point{},
+            ts.Point{},
+        }
+        
+        ts.tree_edit(buffer.previous_tree, &edit)
+    }
+    
     do_refresh_buffer_tokens = true
 }
+
+compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -> int {
+    line_count := 0
+    byte_off := 0
+    total_len := len(content)
+
+    for line_count < target_line {
+        if byte_off >= total_len {
+            fmt.println("compute_byte_offset: requested line ", target_line, " out of range")
+            panic("")
+        }
+        if content[byte_off] == '\n' {
+            line_count += 1
+        }
+        byte_off += 1
+    }
+
+    rune_count := 0
+    for rune_count < target_rune {
+        if byte_off >= total_len {
+            fmt.println("compute_byte_offset: requested rune ", target_rune, " on line ", target_line, " out of range")
+            panic("")
+        }
+        _, width := utf8.decode_rune(content[byte_off:])
+        byte_off += width
+        rune_count += 1
+    }
+    return byte_off
+}
+
+apply_diff :: proc(
+    buffer: ^Buffer,
+    start_line, start_char: int,
+    end_line, end_char: int,
+    new_text: string,
+) -> (start_byte: int, old_end_byte: int, new_end_byte: int) {
+    start_off := compute_byte_offset(buffer.content, start_line, start_char)
+    end_off := compute_byte_offset(buffer.content, end_line, end_char)
+
+    content_len := len(buffer.content)
+    if start_off < 0 || start_off > content_len {
+        fmt.println("apply_diff: start_off out of range ", start_off, " ", content_len)
+        panic("")
+    }
+    if end_off < 0 || end_off > content_len {
+        fmt.println("apply_diff: end_off out of range ", end_off, " ", content_len)
+        panic("")
+    }
+    if start_off > end_off {
+        fmt.println("apply_diff: start_off after end_off")
+        panic("")
+    }
+
+    new_bytes := transmute([]u8)new_text
+
+    dyn := make([dynamic]u8)
+
+    for b in buffer.content[0:start_off] {
+        append(&dyn, b)
+    }
+    for b in new_bytes {
+        append(&dyn, b)
+    }
+    for b in buffer.content[end_off:content_len] {
+        append(&dyn, b)
+    }
+
+    buffer.content = dyn[:]
+
+    return start_off, end_off, start_off + len(new_bytes)
+}
+
 
 Interval :: struct {
     start: i32,

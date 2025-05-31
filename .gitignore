@@ -5,3 +5,4 @@
 *.conf
 
 node_modules
+stdout.txt

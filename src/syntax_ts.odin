@@ -18,7 +18,7 @@ import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 ts_colors : map[string]vec4 = {
     "const"=RED,
-    "let"=RED,
+    "let"=LIGHT_RED,
     
     "return"=PINK,
     "continue"=PINK,
@@ -39,9 +39,9 @@ ts_colors : map[string]vec4 = {
     "typeof"=RED, 
     "throw"=RED,
     
-    "number"=BLUE,  
-    "true"=BLUE,    
-    "false"=BLUE,
+    "number"=LIGHT_GREEN,  
+    "true"=RED,   
+    "false"=RED,
     
     "await"=CYAN,
     "async"=CYAN,
@@ -85,6 +85,9 @@ ts_colors : map[string]vec4 = {
     "for"=PINK,
     "while"=PINK,
     "with"=CYAN,
+    
+    "import_specifier"=ORANGE,
+    "identifier"=ORANGE,
         
     "true"=BLUE,    
     "false"=BLUE,
@@ -258,8 +261,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
 
 @(private="package")
 set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
-    active_buffer_string := serialize_buffer(active_buffer)
-    active_buffer_cstring := strings.clone_to_cstring(active_buffer_string)
+    active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
     
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
@@ -269,7 +271,6 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     )
     
     active_buffer.previous_tree = tree
-    
     
     if tree == nil {
         fmt.println("Failed to parse source code")
@@ -281,9 +282,7 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     root_node := ts.tree_root_node(tree)
     node_type := ts.node_type(root_node)
     
-    walk_tree(root_node, transmute([]u8)active_buffer_string, tokens, active_buffer)
-    
-    delete(active_buffer_string)
+    walk_tree(root_node, active_buffer.content, tokens, active_buffer)
 }
 
 walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
@@ -292,18 +291,24 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
     start_point := ts.node_start_point(node)
     end_point   := ts.node_end_point(node)
     
-    if node_type in ts_colors {        
+    if node_type in ts_colors {
         for row in start_point.row..=end_point.row {
             line := buffer.lines[row]
-            start_col := row == start_point.row ? start_point.col : 0
-            end_col   := row == end_point.row ? end_point.col : u32(len(line.characters))
+            line_string := utf8.runes_to_string(line.characters)
 
-            length := end_col - start_col
+            start_col := row == start_point.row ? start_point.col : 0
+            end_col   := row == end_point.row   ? end_point.col   : u32(len(line_string))
+
+            start_char := byte_offset_to_rune_index(line_string, int(start_col))
+            end_char   := byte_offset_to_rune_index(line_string, int(end_col))
+
+            length := end_char - start_char
             if length <= 0 {
                 continue
             }
-            
+
             priority : u8 = 0
+        
             if node_type == "${" {
                 priority += 1
             }
@@ -311,14 +316,13 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
             color := ts_colors[node_type]
 
             append(tokens, Token{
-                char = i32(start_col),
-                line = i32(row),
-                length = i32(length),
-                color = color,
+                char     = i32(start_char),
+                line     = i32(row),
+                length   = i32(length),
+                color    = color,
                 priority = priority,
             })
         }
-        
     } else {
         when ODIN_DEBUG {
             start := ts.node_start_byte(node)

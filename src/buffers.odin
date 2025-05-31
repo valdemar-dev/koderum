@@ -56,6 +56,8 @@ Buffer :: struct {
 
     tokens: [dynamic]Token,
     previous_tree: ts.Tree,
+    
+    content: []u8,
 }
 
 @(private="package")
@@ -505,7 +507,7 @@ open_file :: proc(file_name: string) {
     }
 
     data_string := string(data)
-
+    
     lines := strings.split(data_string, "\n")
 
     buffer_lines := new([dynamic]BufferLine)
@@ -513,6 +515,11 @@ open_file :: proc(file_name: string) {
     new_buffer := new(Buffer)
     new_buffer^.lines = buffer_lines
     new_buffer^.file_name = file_name
+    
+    content := make([dynamic]u8, len(data))
+    copy(content[:], data)
+    
+    new_buffer^.content = content[:]
 
     new_buffer^.width = fb_size.x
     new_buffer^.height = fb_size.y
@@ -534,6 +541,10 @@ open_file :: proc(file_name: string) {
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
     }
+    
+    when ODIN_DEBUG {
+        fmt.println("Finished creating a buffer.", new_buffer)
+    }
 
     for line in lines { 
         runes := utf8.string_to_runes(line)
@@ -550,11 +561,7 @@ open_file :: proc(file_name: string) {
     }
 
     append(&buffers, new_buffer)
-
-    when ODIN_DEBUG {
-        fmt.println("Updating fonts for buffer")
-    }
-
+    
     set_buffer_cursor_pos(0,0)
     constrain_scroll_to_cursor()
     
@@ -572,7 +579,7 @@ remove_char_at_index :: proc(runes: []rune, index: int) -> []rune {
     append_elems(&new_runes, ..runes[index+1:])
 
     active_buffer^.is_saved = false
-
+    
     return new_runes[:]
 }
 
@@ -676,7 +683,20 @@ insert_tab_as_spaces:: proc() {
 
     tab_chars : []rune = {' ',' ',' ',' '}
 
+    old_length := len(line.characters)
+    old_byte_length := len(utf8.runes_to_string(line.characters))
     line^.characters = insert_chars_at_index(line.characters, buffer_cursor_char_index, tab_chars)
+    
+    notify_server_of_change(
+        active_buffer,
+        buffer_cursor_line,
+        0,
+        buffer_cursor_line,
+        old_length,
+        old_byte_length,
+        len(line.characters),
+        utf8.runes_to_string(line.characters[:])
+    )
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
@@ -702,6 +722,7 @@ remove_char :: proc() {
 
         prev_line := &active_buffer.lines[buffer_cursor_line-1]
         prev_line_len := len(prev_line.characters)
+        old_byte_length := len(utf8.runes_to_string(prev_line.characters))
 
         new_runes := make([dynamic]rune)
         
@@ -710,17 +731,19 @@ remove_char :: proc() {
 
         prev_line^.characters = new_runes[:]
 
-        new_text := strings.clone(utf8.runes_to_string(line.characters[:]))
+        new_text := strings.clone(utf8.runes_to_string(prev_line.characters[:]))
         
         ordered_remove(active_buffer.lines, buffer_cursor_line)
-        
+     
         notify_server_of_change(
             active_buffer,
-            buffer_cursor_line-1,
+            buffer_cursor_line - 1,
             prev_line_len,
             buffer_cursor_line,
             0,
-            new_text,
+            1,
+            prev_line_len,
+            "",
         )
         
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
@@ -744,6 +767,8 @@ remove_char :: proc() {
     }
 
     old_line_length := len(line.characters)
+    old_byte_length := len(utf8.runes_to_string(line.characters))
+    
     line^.characters = remove_char_at_index(line.characters, target)
     
     notify_server_of_change(
@@ -752,6 +777,8 @@ remove_char :: proc() {
         0,
         buffer_cursor_line,
         old_line_length,
+        old_byte_length,
+        len(line.characters),
         utf8.runes_to_string(line.characters[:]),
     )
 
@@ -852,6 +879,8 @@ handle_text_input :: proc() -> bool {
         before_cursor := line.characters[:index] 
 
         old_line_length := len(line.characters)
+        old_byte_length := len(utf8.runes_to_string(line.characters))
+        
         line^.characters = before_cursor
 
         buffer_line := BufferLine{
@@ -888,6 +917,8 @@ handle_text_input :: proc() -> bool {
             index,
             new_line_num-1,
             old_line_length,
+            old_byte_length,
+            old_line_length,
             new_text,
         )
 
@@ -904,7 +935,8 @@ insert_into_buffer :: proc (key: rune) {
     line := &active_buffer.lines[buffer_cursor_line] 
     
     old_length := len(line.characters)
-    
+    old_byte_length := len(utf8.runes_to_string(line.characters[:]))
+
     line^.characters = insert_char_at_index(line.characters, buffer_cursor_char_index, key)
 
     get_char(buffer_font_size, u64(key))
@@ -920,8 +952,10 @@ insert_into_buffer :: proc (key: rune) {
         0,
         buffer_cursor_line,
         old_length,
+        old_byte_length,
+        len(line.characters),
         utf8.runes_to_string(line.characters[:]),
-    )    
+    )
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -1177,6 +1211,8 @@ delete_line :: proc(line: int) {
         0,
         buffer_cursor_line+1,
         0,
+        0,
+        0,
         "",
     )
 
@@ -1213,6 +1249,7 @@ inject_line :: proc() {
 
     old_line := active_buffer.lines[buffer_cursor_line]
     old_line_length := len(old_line.characters)
+    old_byte_length := len(utf8.runes_to_string(old_line.characters))
 
     new_text := strings.concatenate({
         "\n", strings.repeat(" ", indent_spaces),
@@ -1224,6 +1261,8 @@ inject_line :: proc() {
         old_line_length,
         buffer_cursor_line,
         old_line_length,
+        old_byte_length,
+        len(old_line.characters),
         new_text,
     )
 

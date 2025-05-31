@@ -20,13 +20,15 @@ TEXT_ERROR := RED
 
 //RED := hex_string_to_vec4("F06449ff")
 RED := hex_string_to_vec4("F04E48ff")
+LIGHT_RED := hex_string_to_vec4("F16763ff")
+
 GREEN := hex_string_to_vec4("ADFF88ff")
 
 // GRAY := hex_string_to_vec4("AAAAAAff")
 GRAY := hex_string_to_vec4("747B8Bff")
 
 //YELLOW := hex_string_to_vec4("e6e66cff")
-YELLOW := hex_string_to_vec4("EACD65ff")
+YELLOW := hex_string_to_vec4("E0D382ff")
 
 // ORANGE := hex_string_to_vec4("FF9442ff")
 ORANGE := hex_string_to_vec4("FDA35Eff")
@@ -39,8 +41,10 @@ PURPLE := hex_string_to_vec4("BC88FFFF")
 // BLUE := hex_string_to_vec4("6978ffff")
 BLUE := hex_string_to_vec4("707EFFff")
 
-PINK := hex_string_to_vec4("ff8feaff")
-LIGHT_GREEN := hex_string_to_vec4("bceb65ff")
+// PINK := hex_string_to_vec4("ff8feaff")
+PINK := hex_string_to_vec4("CB8CBFff")
+
+LIGHT_GREEN := hex_string_to_vec4("D9FF87ff")
 
 DARK_GRAY := hex_string_to_vec4("394357ff")
 

@@ -4,6 +4,7 @@ import "core:fmt"
 import ft "../../alt-odin-freetype"
 import "core:math"
 import "core:encoding/json"
+import "core:unicode/utf8"
 
 vec2 :: struct {
     x: f32,
@@ -173,4 +174,15 @@ value_to_str_array :: proc(arr: json.Array) -> []string {
     }
     
     return values[:]
+}
+
+byte_offset_to_rune_index :: proc(line: string, byte_offset: int) -> int {
+    rune_index := 0
+    i := 0
+    for i < byte_offset && i < len(line) {
+        _, size := utf8.decode_rune(line[i:])
+        i += size
+        rune_index += 1
+    }
+    return rune_index
 }
