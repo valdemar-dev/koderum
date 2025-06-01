@@ -30,13 +30,15 @@ ts_colors : map[string]vec4 = {
     "`"=GREEN,
     "\""=GREEN,
     "'"=GREEN,
-    "template_string"=GREEN,
+    //"template_string"=GREEN,
+    
+    "string_literal"=TEST,
 
     "import"=RED,
     "export"=RED,
-
+    
     "from"=RED,
-    "typeof"=RED, 
+    "typeof"=RED,
     "throw"=RED,
     
     "number"=LIGHT_GREEN,  
@@ -81,17 +83,19 @@ ts_colors : map[string]vec4 = {
 
     "if"=PINK,
     "else"=PINK,
-    "for_in_statement"=PINK,
+    "in"=PINK,
     "for"=PINK,
+    "of"=PINK,
     "while"=PINK,
-    "with"=CYAN,
+    "with"=PINK,
+    "switch"=PINK,
+    "case"=PINK,
     
     "import_specifier"=ORANGE,
     "identifier"=ORANGE,
         
     "true"=BLUE,    
     "false"=BLUE,
-    
     
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
@@ -151,9 +155,10 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
 
     process, start_err := os2.process_start(desc)
     if start_err != os2.ERROR_NONE {
+        fmt.println(start_err)
         panic("Failed to start TypeScript language server: ")
     }
-
+    
     msg := initialize_message(process.pid, dir)
     
     when ODIN_DEBUG {
@@ -175,6 +180,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     when ODIN_DEBUG {
         fmt.println("LSP RESPONSE", string(bytes))
     }
+    
     
     delete(bytes)
     
@@ -304,16 +310,11 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
             end_char   := byte_offset_to_rune_index(line_string, int(end_col))
 
             length := end_char - start_char
+            
             if length <= 0 {
                 continue
             }
-
-            priority : u8 = 0
-        
-            if node_type == "${" {
-                priority += 1
-            }
-
+            
             color := ts_colors[node_type]
 
             append(tokens, Token{
@@ -321,7 +322,7 @@ walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: 
                 line     = i32(row),
                 length   = i32(length),
                 color    = color,
-                priority = priority,
+                priority = 0,
             })
         }
     }

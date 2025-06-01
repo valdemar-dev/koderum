@@ -206,7 +206,39 @@ set_buffer_tokens :: proc() {
     if active_language_server == nil {
         return
     }
+    
+    start_version := active_buffer.version
+    
+    new_tokens := make([dynamic]Token)
+    
+    set_buffer_keywords(&new_tokens)
+
+    active_buffer.tokens = new_tokens
+
+    if active_buffer.token_set_id == "" {
+        request_full_tokens(active_buffer, &active_buffer.tokens)
+    }
+ 
+    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+        if token_a.line != token_b.line {
+            return int(token_a.line - token_b.line)
+        } else if token_a.char != token_b.char {    
+            return int(token_a.char - token_b.char)
+        }
         
+        return int(int(token_a.priority) - int(token_b.priority))
+    }
+    
+    sort.quick_sort_proc(new_tokens[:], sort_proc)
+    
+    // cool lag-behind system
+    // forces set buffer tokens to catch up to the real buffer
+    if start_version == active_buffer.version {
+        do_refresh_buffer_tokens = false
+    }
+}
+
+request_full_tokens :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
     lsp_request_id += 1
     
     when ODIN_DEBUG {
@@ -214,7 +246,6 @@ set_buffer_tokens :: proc() {
         prev := start
     }
     
-    ///* 
     msg := semantic_tokens_request_message(
         lsp_request_id,
         strings.concatenate({"file://",active_buffer.file_name}),
@@ -224,7 +255,11 @@ set_buffer_tokens :: proc() {
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
     bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
-        
+    
+    when ODIN_DEBUG {
+        fmt.println(string(bytes))
+    }
+    
     if read_err != os2.ERROR_NONE {
         return
     }
@@ -259,19 +294,17 @@ set_buffer_tokens :: proc() {
         panic("Malformed json in set_buffer_tokens")
     }
     
-    tokens : make([dynamic]i32)
+    lsp_tokens := make([dynamic]i32)
     
     for value in data {
-        append(&tokens, i32(value.(f64)))
+        append(&lsp_tokens, i32(value.(f64)))
     }
     
     decoded_tokens := decode_semantic_tokens(
-        tokens[:],
+        lsp_tokens[:],
         active_language_server.token_types,
         active_language_server.token_modifiers,
     )
-    
-    new_tokens := make([dynamic]Token)
     
     for token,index in decoded_tokens {        
         if int(token.line) > len(active_buffer.lines) - 1 {
@@ -280,52 +313,25 @@ set_buffer_tokens :: proc() {
             break
         } 
         
-        append(&new_tokens, token)
+        append(tokens, token)
     }
  
     delete(decoded_tokens)
-     
-    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
-        if token_a.line != token_b.line {
-            return int(token_a.line - token_b.line)
-        } else if token_a.char != token_b.char {    
-            return int(token_a.char - token_b.char)
-        }
-        
-        return int(int(token_a.priority) - int(token_b.priority))
-    }
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "to process LSP tokens.")
-        }
-    }
+}
 
-    set_buffer_keywords(&new_tokens)
+request_token_delta :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
+    lsp_request_id += 1
     
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "to set buffer keywords.")
-        }
-    }
+    msg := semantic_tokens_delta_message(
+        lsp_request_id, 
+        strings.concatenate({
+            "file://",
+            buffer.file_name,
+        }),
+        buffer.token_set_id,
+    )
 
-    // used to be needed, not anymore!    
-    // new_tokens = separate_tokens(new_tokens[:])
-    // sort.quick_sort_proc(new_tokens[:], sort_proc)
-
-    active_buffer.tokens = new_tokens
- 
-    do_refresh_buffer_tokens = false
-    
-    when ODIN_DEBUG {
-        end := time.now()
-        
-        fmt.println("Took", time.diff(start, end), "to update buffer tokens.")
-    }
+    fmt.println()
 }
 
 notify_server_of_change :: proc(
@@ -447,6 +453,10 @@ apply_diff :: proc(
     }
 
     buffer.content = dyn[:]
+    
+    when ODIN_DEBUG {
+        fmt.println("TS BUFFER CONTENT:", string(buffer.content))
+    }
 
     return start_off, end_off, start_off + len(new_bytes)
 }
@@ -896,6 +906,35 @@ semantic_tokens_request_message :: proc(id: int, uri: string, line_start: int, l
         json,
     })
 }
+
+semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string) -> string {
+    id_buf := make([dynamic]u8, 16)
+    str_id := strconv.itoa(id_buf[:], id)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": \"", str_id, "\",\n",
+        "  \"method\": \"textDocument/semanticTokens/delta\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", uri, "\"\n",
+        "    },\n",
+        "    \"previousResultId\": \"", token_set_id, "\"\n",
+        "  }\n",
+        "}\n",
+    })
+
+    buf := make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+
+    return strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+}
+
 
 indent_rule_language_list : map[string]^map[string]IndentRule = {
     ".txt"=&generic_indent_rule_list,

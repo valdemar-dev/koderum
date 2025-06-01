@@ -61,6 +61,8 @@ Buffer :: struct {
     // Syntax highlighting
     tokens: [dynamic]Token,
     
+    token_set_id: string,
+    
     // Raw LSP syntax highlihgting tokens
     raw_token_data: [dynamic]i32,
     
@@ -882,62 +884,62 @@ handle_text_input :: proc() -> bool {
 
         return false
     } 
-
+    
     if is_key_pressed(glfw.KEY_ENTER) {
         index := clamp(buffer_cursor_char_index, 0, len(line.characters))
-
+        
         after_cursor := line.characters[index:]
         before_cursor := line.characters[:index] 
-
+        
         old_line_length := len(line.characters)
         old_byte_length := len(utf8.runes_to_string(line.characters))
         
         line^.characters = before_cursor
-
+        
         buffer_line := BufferLine{
             characters=after_cursor,
         }
         
         new_line_num := buffer_cursor_line+1
-
+        
         indent_spaces := determine_line_indent(new_line_num)
-
+        
         for i in 0..<indent_spaces {
             buffer_line.characters = insert_char_at_index(
                 buffer_line.characters, 0, ' ',
             )
         }
-
+        
         inject_at(active_buffer.lines, new_line_num, buffer_line)
-
+        
+        new_text := strings.concatenate({
+            utf8.runes_to_string(before_cursor),
+            "\n",
+            utf8.runes_to_string(buffer_line.characters),
+        })
+        
+        notify_server_of_change(
+            active_buffer,
+            buffer_cursor_line,
+            0,
+            buffer_cursor_line,
+            old_line_length,
+            old_byte_length,
+            len(before_cursor),
+            new_text,
+        )
+        
+        delete(new_text)
+        
         set_buffer_cursor_pos(
             new_line_num,
             indent_spaces,
         )
-
-        constrain_scroll_to_cursor()
         
-        new_text := strings.concatenate({
-            "\n",
-            utf8.runes_to_string(after_cursor),
-        })
-            
-        notify_server_of_change(
-            active_buffer,
-            new_line_num-1,
-            index,
-            new_line_num-1,
-            old_line_length,
-            old_byte_length,
-            old_line_length,
-            new_text,
-        )
-
-        delete(new_text)
-
+        constrain_scroll_to_cursor()    
         return false
     }
-
+    
     return false
 }
 
@@ -1142,6 +1144,125 @@ append_to_line :: proc() {
     )
 
     input_mode = .BUFFER_INPUT
+}
+
+@(private="package")
+indent_selection :: proc(start_line: int, end_line: int) {
+    start_line : int = start_line
+    end_line : int = end_line
+    
+    if end_line < start_line {
+        temp := end_line
+        end_line = start_line
+        start_line = temp
+    }
+    
+    chars := []rune{' ', ' ', ' ', ' '}
+    text := ""
+    old_bytes := 0
+
+    for i in start_line..=end_line {
+        line := &active_buffer.lines[i]
+        old_line_str := utf8.runes_to_string(line.characters)
+        old_bytes += len(old_line_str)
+
+        line^.characters = insert_chars_at_index(line.characters, 0, chars)
+
+        new_line_str := utf8.runes_to_string(line.characters)
+        
+        text = strings.concatenate({text, new_line_str})
+        if i < end_line {
+            text = strings.concatenate({text, "\n"})
+            old_bytes += 1
+        }
+    }
+
+    notify_server_of_change(
+        active_buffer,
+        start_line, 0,
+        end_line, len(utf8.runes_to_string(active_buffer.lines[end_line].characters)) - len(chars),
+        old_bytes,
+        len(utf8.runes_to_string(active_buffer.lines[end_line].characters)),
+        text,
+    )
+}
+
+array_is_equal :: proc(a, b: []rune) -> bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i in 0..<len(a) {
+        if a[i] != b[i] {
+            return false
+        }
+    }
+    return true
+}
+
+@(private="package")
+unindent_selection :: proc(start_line: int, end_line: int) {
+    start_line : int = start_line
+    end_line : int = end_line
+    
+    if end_line < start_line {
+        temp := end_line
+        end_line = start_line
+        start_line = temp
+    }
+    
+    chars := []rune{' ', ' ', ' ', ' '}
+    lines := active_buffer.lines
+
+    old_lines := make([dynamic][]rune)
+    old_bytes := 0
+    for i in start_line..=end_line {
+        old := lines[i].characters[:]
+        append(&old_lines, old)
+        old_str := utf8.runes_to_string(old)
+        old_bytes += len(old_str)
+        if i < end_line {
+            old_bytes += 1
+        }
+    }
+
+    text := ""
+    for idx in 0..<len(old_lines) {
+        old := old_lines[idx]
+        count := 0
+        for count < len(chars) && count < len(old) && old[count] == ' ' {
+            count += 1
+        }
+        lines[start_line + idx].characters = old[count:]
+
+        new_str := utf8.runes_to_string(lines[start_line + idx].characters)
+        if text == "" {
+            text = new_str
+        } else {
+            text = strings.concatenate({text, "\n", new_str})
+        }
+    }
+
+    old_last_len := len(old_lines[end_line - start_line])
+    new_last_len := len(lines[end_line].characters)
+
+    notify_server_of_change(
+        active_buffer,
+        start_line,
+        0,
+        end_line,
+        old_last_len,
+        old_bytes,
+        new_last_len,
+        text,
+    )
+    
+    cursor_line := lines[buffer_cursor_line]
+    if buffer_cursor_char_index > len(cursor_line.characters) {
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            len(cursor_line.characters),
+        )
+    }
 }
 
 @(private="package")

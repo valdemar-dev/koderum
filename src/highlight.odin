@@ -102,6 +102,24 @@ handle_highlight_input :: proc() {
 
         find_search_hits()
     }
+    
+    if is_key_pressed(glfw.KEY_E) {
+        indent_selection(
+            highlight_start_line,
+            buffer_cursor_line,
+        )
+        
+        return
+    }
+    
+    if is_key_pressed(glfw.KEY_W) {
+        unindent_selection(
+            highlight_start_line,
+            buffer_cursor_line,
+        )
+        
+        return
+    }
 
     handle_movement_input()
 }
