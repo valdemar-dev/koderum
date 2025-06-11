@@ -16,6 +16,8 @@ draw_debug :: proc() {
         strings.clone(strconv.itoa(buf[:], buffer_cursor_char_index), context.temp_allocator),
         ",",
         strings.clone(strconv.itoa(buf[:], highlight_start_char), context.temp_allocator),
+        "\nFPS:",
+        strings.clone(strconv.ftoa(buf[:], f64(1 / frame_time), 'f', 10, 64), context.temp_allocator),
     }, context.temp_allocator)
 
     add_text(&rect_cache,

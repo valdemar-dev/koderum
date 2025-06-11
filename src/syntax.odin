@@ -185,11 +185,10 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
 
         type := active_language_server.token_types[token_type_index]
 
-        if type not_in active_language_server.colors {
-            fmt.println("Could not find a color for type", type, "whilst attempting to decode semantic tokens.")
-        }
-
         color := active_language_server.colors[type]
+        if type not_in active_language_server.colors {
+            continue
+        }
 
         t := Token{
             line = line,
@@ -197,7 +196,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             length = length,
             color = color,
             modifiers = decode_modifiers(token_mod_bitset, token_modifiers),
-            priority = 3,
+            priority = 0,
         }
         
         append(&tokens, t)
@@ -246,7 +245,7 @@ set_buffer_tokens :: proc() {
 }
 
 set_buffer_tokens_threaded :: proc() {
-    if active_language_server != nil {
+    if active_language_server == nil {
         return
     }
     
@@ -261,7 +260,7 @@ set_buffer_tokens_threaded :: proc() {
     
     start_version := active_buffer.version
     
-    //request_full_tokens(active_buffer, &new_tokens)
+    request_full_tokens(active_buffer, &new_tokens)
     
     {
         when ODIN_DEBUG {
@@ -447,6 +446,21 @@ notify_server_of_change :: proc(
         ts.tree_edit(buffer.previous_tree, &edit)
     }
     
+    /*
+    for token,i in active_buffer.tokens {
+        if int(token.line) < start_line {
+            continue
+        }
+        
+        if int(token.line) > end_line {
+            continue
+        }
+        
+        unordered_remove(&active_buffer.tokens, i)
+        fmt.println("removed")
+    }
+    */
+    
     set_buffer_tokens()
     do_refresh_buffer_tokens = true
 }
@@ -520,93 +534,6 @@ apply_diff :: proc(
     buffer.content = dyn[:]
     
     return start_off, end_off, start_off + len(new_bytes)
-}
-
-
-Interval :: struct {
-    start: i32,
-    end:   i32,
-}
-
-
-separate_tokens :: proc(tokens: []Token) -> [dynamic]Token {
-    result := make([dynamic]Token)
-
-    prev : Token
-    outer: for i in 0..<len(tokens) {
-        base       := tokens[i]
-        base_start := base.char
-        base_end   := base.char + base.length
-
-        intervals := make([dynamic]Interval)
-        append(&intervals, Interval{ start = base_start, end = base_end })
-    
-        if (prev.char == base.char) && (prev.line == base.line) && prev.priority > base.priority {
-            prev = base
-           
-            continue outer
-        }
-
-        for j := i + 1; j < len(tokens); j += 1 {
-            next := tokens[j]
-            if next.line != base.line {
-                continue
-            }
-
-            next_start := next.char
-            next_end   := next.char + next.length
-            
-
-            new_intervals := make([dynamic]Interval)
-
-            for k in 0..<len(intervals) {
-                iv := intervals[k]
-
-                if next_end <= iv.start || next_start >= iv.end {
-                    append(&new_intervals, iv)
-                    continue
-                }
-
-                if next_start > iv.start {
-                    append(&new_intervals, Interval{
-                        start = iv.start,
-                        end   = next_start,
-                    })
-                }
-                
-                if next_end < iv.end {
-                    append(&new_intervals, Interval{
-                        start = next_end,
-                        end   = iv.end,
-                    })
-                }
-            }
-            
-            prev = base
-
-            intervals = new_intervals
-        }
-
-        for k in 0..<len(intervals) {
-            iv      := intervals[k]
-            seg_len := iv.end - iv.start
-            
-            if seg_len > 0 {
-                append(&result, Token{
-                    char   = iv.start,
-                    length = seg_len,
-                    line   = base.line,
-                    color   = base.color,
-                    priority = base.priority,
-                })
-            }
-        }
-    }
-
-    return result
-}
-
-lsp_query_hover :: proc(token_string: string) {
 }
 
 set_buffer_keywords :: proc(tokens: ^[dynamic]Token) {
@@ -1008,7 +935,6 @@ override_node_type :: proc(
         override_node_type_ts(node_type, node, source, start_point, end_point)
     }
 }
-
 
 walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
     node_type := string(ts.node_type(node))

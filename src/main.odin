@@ -14,7 +14,7 @@ import "core:time"
 import "core:thread"
 import "core:os"
 
-target_fps :: 60.0
+target_fps :: 240.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
@@ -85,6 +85,13 @@ main :: proc() {
             time.sleep(time.Duration(sleep_duration))
 
             continue
+        }
+        
+        when ODIN_DEBUG {
+            fps := 1 / frame_time
+            if int(fps) < 60 {
+                fmt.println(fps)
+            }
         }
 
         last_time = current_time

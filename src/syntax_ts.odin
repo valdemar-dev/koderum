@@ -136,7 +136,7 @@ ts_lsp_colors := map[string]vec4{
     "parameter"=LIGHT_ORANGE,
     "namespace"=PURPLE,
     
-    "variable"=ORANGE,
+    // "variable"=ORANGE,
     
     "interface"=CYAN,
     "class"=RED,
@@ -303,6 +303,14 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
+    
+    if active_buffer.previous_tree != nil {    
+        changes := new(u32)
+    
+        changes_array := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes)
+        
+        fmt.println(changes_array)
+    }
     
     active_buffer.previous_tree = tree
     
