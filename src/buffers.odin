@@ -60,6 +60,8 @@ Buffer :: struct {
 
     // Syntax highlighting
     tokens: [dynamic]Token,
+    new_tokens : [dynamic]Token,
+    did_tokens_update : bool,
     
     token_set_id: string,
     
@@ -387,6 +389,10 @@ draw_image_buffer :: proc(ext: string) {
 }
 
 draw_text_buffer :: proc() {
+    if active_buffer.did_tokens_update == true {
+        active_buffer.tokens = active_buffer.new_tokens
+    }
+    
     buffer_lines := active_buffer.lines
 
     line_height := buffer_font_size * 1.2
@@ -439,7 +445,7 @@ draw_text_buffer :: proc() {
 
     char_map := get_char_map(buffer_font_size)
 
-    token_idx := 0
+    token_idx := new(int)
 
     for &buffer_line, index in buffer_lines {
         line_pos := vec2{
@@ -462,10 +468,11 @@ draw_text_buffer :: proc() {
             descender,
             char_map,
             buffer_font_size,
-            &token_idx,
+            token_idx,
         )
-
     }
+    
+    free(token_idx)
 
     draw_rects(&rect_cache)
     reset_rect_cache(&rect_cache)

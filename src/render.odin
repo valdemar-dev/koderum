@@ -313,7 +313,7 @@ add_text :: proc(
        
         add_rect(rect_cache,
             rect{
-                (pen.x + character.offset.x),
+                pen.x + character.offset.x + 0.1,
                 ((pen.y - character.offset.y + f32(ascend))),
                 (width),
                 (height),

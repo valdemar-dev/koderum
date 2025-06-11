@@ -32,6 +32,7 @@ YELLOW := hex_string_to_vec4("E0D382ff")
 
 // ORANGE := hex_string_to_vec4("FF9442ff")
 ORANGE := hex_string_to_vec4("FDA35Eff")
+LIGHT_ORANGE := hex_string_to_vec4("ffbb87ff")
 
 // CYAN := hex_string_to_vec4("7affe9ff")
 CYAN := hex_string_to_vec4("8DE0D2ff")

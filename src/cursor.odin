@@ -51,12 +51,14 @@ draw_cursor :: proc() {
 }
 
 set_buffer_cursor_pos :: proc(line: int, char_index: int) {
+    line := min(line, len(active_buffer.lines)-1)
+    
     if active_buffer == nil {
         return
     }
 
     buffer_lines := active_buffer.lines
-
+    
     new_line := buffer_lines[line]
     characters := new_line.characters
 

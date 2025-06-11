@@ -19,6 +19,8 @@ target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
 
+// NOTE:
+// this is very silly, but it's fine - val 10th of June 2025.
 parse_args :: proc() {
     for arg in os.args {
         if arg == "-save_logs" {
@@ -33,6 +35,8 @@ parse_args :: proc() {
             os.stdout = file_handle
 
             fmt.println("-- START OF LOG --")
+        } else if arg == "-log_unhandled_ts" {
+            log_unhandled_treesitter_cases = true
         }
     }
 }

@@ -1,15 +1,21 @@
-const thing = "hello there";
-const someFunction = () => { return 5 + 10 };
+const thing = () => {};
+const otherThing = 5;
+const megaThing = "#000000";
 
-const object = {
-    thing: {
-    thing: 4,
-    },
-    otherThing: function() {},
-}
+function someFunction() {}
 
-const mega = (object).thing.thing
+someFunction()
+const cringeValue = "five";
 
+cringeValue = Math.random();
+cringeValue.test;
 
+const mega = {};
 
-k
+const thing: Array<string | number | boolean | object> = [];
+
+const test = true;
+const thing = Math.random()
+const someFunction = function(param: User<number>) {
+    test.test()
+};

@@ -10,7 +10,7 @@ import gl "vendor:OpenGL"
 @(private="package")
 update_state :: proc(current_time: f64) {
     if do_refresh_buffer_tokens {
-        set_buffer_tokens()
+        set_buffer_tokens_threaded()
     }
 }
 

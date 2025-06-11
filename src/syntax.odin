@@ -24,6 +24,7 @@ LanguageServer :: struct {
     ts_parser: ts.Parser,
     
     colors : map[string]vec4,
+    ts_colors : map[string]vec4,
 }
 
 Token :: struct {
@@ -34,6 +35,8 @@ Token :: struct {
     modifiers:   []string,
     priority: u8,
 }
+
+log_unhandled_treesitter_cases := false
 
 /*
 NOTE: these are here for reference, just in case we need them.
@@ -143,6 +146,7 @@ lsp_handle_file_open :: proc() {
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
+    set_buffer_tokens()
     do_refresh_buffer_tokens = true
 }
 
@@ -193,7 +197,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             length = length,
             color = color,
             modifiers = decode_modifiers(token_mod_bitset, token_modifiers),
-            priority = 2,
+            priority = 3,
         }
         
         append(&tokens, t)
@@ -206,17 +210,67 @@ set_buffer_tokens :: proc() {
     if active_language_server == nil {
         return
     }
+     
+    when ODIN_DEBUG {
+        start := time.now()
+        prev := start
+    }
     
     start_version := active_buffer.version
     
     new_tokens := make([dynamic]Token)
     
     set_buffer_keywords(&new_tokens)
-
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to Tree-Sitter the tokens.")
+            
+            prev = now
+        }
+    }
+    
     active_buffer.tokens = new_tokens
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to assign tokens.")
+            
+            prev = now
+        }
+    }    
+}
 
-    if active_buffer.token_set_id == "" {
-        request_full_tokens(active_buffer, &active_buffer.tokens)
+set_buffer_tokens_threaded :: proc() {
+    if active_language_server != nil {
+        return
+    }
+    
+    when ODIN_DEBUG {
+        start := time.now()
+        prev := start
+    }
+    
+    new_tokens := make([dynamic]Token)
+    
+    append_elems(&new_tokens, ..active_buffer.tokens[:])
+    
+    start_version := active_buffer.version
+    
+    //request_full_tokens(active_buffer, &new_tokens)
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to get LSP tokens.")
+            
+            prev = now
+        }
     }
  
     sort_proc :: proc(token_a: Token, token_b: Token) -> int {
@@ -226,15 +280,35 @@ set_buffer_tokens :: proc() {
             return int(token_a.char - token_b.char)
         }
         
-        return int(int(token_a.priority) - int(token_b.priority))
+        return int(int(token_b.priority) - int(token_a.priority))
     }
     
     sort.quick_sort_proc(new_tokens[:], sort_proc)
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            
+            fmt.println("Took", time.diff(prev, now), "to sort buffer tokens.")
+            
+            prev = now
+        }
+    }
     
     // cool lag-behind system
     // forces set buffer tokens to catch up to the real buffer
     if start_version == active_buffer.version {
         do_refresh_buffer_tokens = false
+        active_buffer.tokens = new_tokens
+    }
+    
+    {
+        when ODIN_DEBUG {
+            now := time.now()
+            prev = now
+            
+            fmt.println("Took", time.diff(start, now), "to update buffer tokens.")
+        }
     }
 }
 
@@ -257,21 +331,11 @@ request_full_tokens :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
     bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
     
     when ODIN_DEBUG {
-        fmt.println(string(bytes))
+        // fmt.println(string(bytes))
     }
     
     if read_err != os2.ERROR_NONE {
         return
-    }
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "for lsp to process.")
-            
-            prev = now
-        }
     }
     
     parsed,_ := json.parse(bytes)
@@ -383,6 +447,7 @@ notify_server_of_change :: proc(
         ts.tree_edit(buffer.previous_tree, &edit)
     }
     
+    set_buffer_tokens()
     do_refresh_buffer_tokens = true
 }
 
@@ -454,10 +519,6 @@ apply_diff :: proc(
 
     buffer.content = dyn[:]
     
-    when ODIN_DEBUG {
-        fmt.println("TS BUFFER CONTENT:", string(buffer.content))
-    }
-
     return start_off, end_off, start_off + len(new_bytes)
 }
 
@@ -933,6 +994,75 @@ semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string
         "\r\n",
         json,
     })
+}
+
+override_node_type :: proc(
+    node_type: ^string,
+    node: ts.Node, 
+    source: []u8,
+    start_point,
+    end_point: ^ts.Point,
+) {
+    switch active_buffer.ext {
+    case ".ts", ".js":
+        override_node_type_ts(node_type, node, source, start_point, end_point)
+    }
+}
+
+
+walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
+    node_type := string(ts.node_type(node))
+    
+    start_point := ts.node_start_point(node)
+    end_point   := ts.node_end_point(node)
+    
+    override_node_type(&node_type, node, source, &start_point, &end_point)
+    
+    if node_type in active_language_server.ts_colors {
+        for row in start_point.row..=end_point.row {
+            if int(row) > len(buffer.lines) -1 {
+                continue
+            }
+            
+            line := buffer.lines[row]
+            line_string := utf8.runes_to_string(line.characters)
+
+            start_col := row == start_point.row ? start_point.col : 0
+            end_col   := row == end_point.row   ? end_point.col   : u32(len(line_string))
+
+            start_char := byte_offset_to_rune_index(line_string, int(start_col))
+            end_char   := byte_offset_to_rune_index(line_string, int(end_col))
+
+            length := end_char - start_char
+            
+            if length <= 0 {
+                continue
+            }
+            
+            color := active_language_server.ts_colors[node_type]
+            append(tokens, Token{
+                char     = i32(start_char),
+                line     = i32(row),
+                length   = i32(length),
+                color    = color,
+                priority = 0,
+            })
+        }
+    } else if log_unhandled_treesitter_cases == true {
+        fmt.println(node_type)
+    }
+    
+    child_count := ts.node_child_count(node)
+    for i: u32 = 0; i < child_count; i += 1 {
+        child := ts.node_child(node, i)
+        walk_tree(child, source, tokens, buffer)
+    }
+}
+
+get_node_text :: proc(node: ts.Node, source: []u8) -> string {
+    start := ts.node_start_byte(node)
+    end := ts.node_end_byte(node)
+    return string(source[start:end])
 }
 
 

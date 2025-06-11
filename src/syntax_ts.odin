@@ -16,24 +16,40 @@ import ts "../../odin-tree-sitter"
 import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
 import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
-ts_colors : map[string]vec4 = {
+ts_ts_colors : map[string]vec4 = {
+    // FUNCTIONS
+    "arrow_function_name"=YELLOW,
+    "method_call" = YELLOW,
+    "function_call" = YELLOW,
+    "function_name" = YELLOW,
+        
     "const"=RED,
     "let"=LIGHT_RED,
+    "function"=LIGHT_RED,
     
+    // make code go somewhere else
     "return"=PINK,
     "continue"=PINK,
     "break"=PINK,
-
-    "predefined_type"=PURPLE,
     
+    // BUILT IN TYPES
+    "object_type"=PURPLE,
+    "string_type"=GREEN,
+    "boolean_type"=BLUE,
+    "common_type"=CYAN,
+    "number_type"=LIGHT_GREEN,
+    
+    // NUMBERS
+    "number"=LIGHT_GREEN,
+    
+    // STRINGS
     "string_fragment"=GREEN,
     "`"=GREEN,
     "\""=GREEN,
     "'"=GREEN,
     //"template_string"=GREEN,
-    
-    "string_literal"=TEST,
 
+    // import export
     "import"=RED,
     "export"=RED,
     
@@ -41,19 +57,19 @@ ts_colors : map[string]vec4 = {
     "typeof"=RED,
     "throw"=RED,
     
-    "number"=LIGHT_GREEN,  
-    "true"=RED,   
-    "false"=RED,
-    
+    // async
     "await"=CYAN,
     "async"=CYAN,
     
+    // casting
     "as"=RED,
     "any"=RED,
     
+    // spookies
     "delete"=RED,
     "undefined"=RED,
     
+    // make it gray
     "--"=GRAY,
     "++"=GRAY,
     ":"=GRAY,
@@ -79,8 +95,10 @@ ts_colors : map[string]vec4 = {
     ">"=GRAY,
     "<"=GRAY,
     "?."=GRAY,
+    "|"=GRAY,
     "comment"=DARK_GRAY,
 
+    // logical keywords
     "if"=PINK,
     "else"=PINK,
     "in"=PINK,
@@ -92,14 +110,20 @@ ts_colors : map[string]vec4 = {
     "case"=PINK,
     
     "import_specifier"=ORANGE,
-    "identifier"=ORANGE,
-        
+
+    "variable_name"=ORANGE,    
+    
     "true"=BLUE,    
     "false"=BLUE,
     
     "regex_flags"=RED,
     "regex_pattern"=YELLOW,
-    "function"=YELLOW,
+    
+    "property_identifier"=LIGHT_ORANGE,
+    
+    "parameter_name"=LIGHT_ORANGE,
+    
+    "identifier"=ORANGE,
 }
 
 ts_lsp_colors := map[string]vec4{
@@ -109,10 +133,12 @@ ts_lsp_colors := map[string]vec4{
     "function"=YELLOW,
     "member"=YELLOW,
 
-    "parameter"=ORANGE,
-    "namespace"=ORANGE,
+    "parameter"=LIGHT_ORANGE,
+    "namespace"=PURPLE,
+    
     "variable"=ORANGE,
-    "interface"=ORANGE,
+    
+    "interface"=CYAN,
     "class"=RED,
 
     "enum"=ORANGE,
@@ -257,6 +283,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         token_types = types,
         ts_parser = parser,
         colors=ts_lsp_colors,
+        ts_colors=ts_ts_colors,
     }
     
     when ODIN_DEBUG{
@@ -292,44 +319,90 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     walk_tree(root_node, active_buffer.content, tokens, active_buffer)
 }
 
-walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
-    node_type := string(ts.node_type(node))
+@(private="package")
+override_node_type_ts :: proc(
+    node_type: ^string,
+    node: ts.Node, 
+    source: []u8,
+    start_point,
+    end_point: ^ts.Point,
+) {
+    if node_type^ == "identifier" || node_type^ == "property_identifier" {
+        parent := ts.node_parent(node)
+        if ts.node_is_null(parent) do return
+
+        parent_type := string(ts.node_type(parent))
     
-    start_point := ts.node_start_point(node)
-    end_point   := ts.node_end_point(node)
-    
-    if node_type in ts_colors {
-        for row in start_point.row..=end_point.row {
-            line := buffer.lines[row]
-            line_string := utf8.runes_to_string(line.characters)
+        switch parent_type {
+        case "function_declaration":
+            node_type^ = "function_name"
 
-            start_col := row == start_point.row ? start_point.col : 0
-            end_col   := row == end_point.row   ? end_point.col   : u32(len(line_string))
-
-            start_char := byte_offset_to_rune_index(line_string, int(start_col))
-            end_char   := byte_offset_to_rune_index(line_string, int(end_col))
-
-            length := end_char - start_char
+        case "variable_declarator":       
+            if value_node, found := get_value_node(parent); found {
+                node_type^ = string(ts.node_type(value_node))
             
-            if length <= 0 {
-                continue
+                if node_type^ == "arrow_function" {
+                    node_type^ = "arrow_function_name"
+                } else {
+                    node_type^ = "variable_name"
+                }
             }
-            
-            color := ts_colors[node_type]
 
-            append(tokens, Token{
-                char     = i32(start_char),
-                line     = i32(row),
-                length   = i32(length),
-                color    = color,
-                priority = 0,
-            })
+        case "method_definition":
+            node_type^ = "method_name"
+
+        case "formal_parameters", "parameter", "required_parameter":
+            node_type^ = "parameter_name"
+
+        case "member_expression":
+            if field_name := ts.node_field_name_for_child(parent, 1); field_name != nil {
+                if field_name == "property" && ts.node_eq(node, ts.node_child(parent, 1)) {
+                    node_type^ = "method_name"
+                } else if field_name == "object" {
+                    node_type^ = "object_property"
+                }
+            }
+        }
+        return
+    }
+    
+    if node_type^ == "call_expression" || node_type^ == "function_expression" {
+        function_node := ts.node_child_by_field_name(node, "function")
+        if !ts.node_is_null(function_node) {
+            if string(ts.node_type(function_node)) == "member_expression" {
+                property_node := ts.node_child_by_field_name(function_node, "property")
+                if !ts.node_is_null(property_node) {
+                    start_point^ = ts.node_start_point(property_node)
+                    end_point^ = ts.node_end_point(property_node)
+                    node_type^ = "method_call"
+                }
+            } else {
+                start_point^ = ts.node_start_point(function_node)
+                end_point^ = ts.node_end_point(function_node)
+                node_type^ = "function_call"
+            }
+        }
+        return
+    }
+
+    switch node_type^ {
+    case "type_identifier":
+        node_type^ = "common_type"
+
+    case "predefined_type":
+        type_name := get_node_text(node, source)
+        node_type^ = strings.concatenate({type_name, "_type"})
+    }
+}
+
+get_value_node :: proc(parent: ts.Node) -> (ts.Node, bool) {
+    child_count := ts.node_child_count(parent)
+    for i: u32 = 0; i < child_count; i += 1 {
+        if field_name := ts.node_field_name_for_child(parent, i); field_name != nil {
+            if field_name == "value" {
+                return ts.node_child(parent, i), true
+            }
         }
     }
-    
-    child_count := ts.node_child_count(node)
-    for i in 0..<child_count {
-        child := ts.node_child(node, i)
-        walk_tree(child, source, tokens, buffer)
-    }
+    return {}, false
 }
