@@ -73,6 +73,8 @@ main :: proc() {
     last_time := glfw.GetTime()
 
     glfw.SwapBuffers(window)
+    
+    open_file("/home/v/prog/projects/elegance-js/src/build.ts")
 
     for !glfw.WindowShouldClose(window) {
         glfw.PollEvents()

@@ -466,18 +466,35 @@ add_code_text :: proc(
     }
 
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
-
-    token_ranges := make([dynamic]TokenRange)
-    defer delete(token_ranges)
-    for tok in tokens {
-        if tok.line == i32(line_number) {
-            append(&token_ranges, TokenRange{
-                start_char = tok.char,
-                end_char = tok.char + tok.length,
-                color = tok.color
-            })
+    
+    hit_start := -1
+    hit_end := -1
+    for i in 0..<len(tokens) {
+        tok := tokens[i]
+        
+        if tok.line > i32(line_number) {
+            token_idx^ = i
+            hit_end = i
+            break
         }
+        if tok.line < i32(line_number) {
+            continue
+        }
+        
+        if hit_start == -1 {
+            hit_start = i
+        }    
     }
+    
+    if hit_start == -1 {
+        hit_start = 0
+    }
+    
+    if hit_end == -1 {
+        hit_end = len(tokens)
+    }
+    
+    token_ranges : []Token = tokens[hit_start:hit_end]
 
     for r, i in text {
         if r != ' ' && is_start_of_line {
@@ -546,7 +563,7 @@ add_code_text :: proc(
             color = text_highlight_color
         } else {
             for range in token_ranges {
-                if i32(i) >= range.start_char && i32(i) < range.end_char {
+                if i32(i) >= range.char && i32(i) < range.char + range.length {
                     color = range.color
                     break
                 }

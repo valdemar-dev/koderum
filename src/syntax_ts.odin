@@ -10,6 +10,7 @@ import fp "core:path/filepath"
 import "core:encoding/json"
 import "core:text/regex"
 import "core:unicode/utf8"
+import "core:sort"
 
 import ts "../../odin-tree-sitter"
 
@@ -293,10 +294,12 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     return server,os2.ERROR_NONE
 }
 
+
 @(private="package")
-set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
+set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token, change_start_byte, change_end_byte: u32) {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
-    
+    defer delete(active_buffer_cstring)
+
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
         active_buffer.previous_tree,
@@ -304,28 +307,72 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
         u32(len(active_buffer_cstring))
     )
     
-    if active_buffer.previous_tree != nil {    
-        changes := new(u32)
-    
-        changes_array := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes)
+    if active_buffer.previous_tree == nil || true {
+        walk_tree(ts.tree_root_node(tree), active_buffer.content, tokens, active_buffer)
         
-        fmt.println(changes_array)
-    }
-    
-    active_buffer.previous_tree = tree
-    
-    if tree == nil {
-        fmt.println("Failed to parse source code")
+        active_buffer.previous_tree = tree
         return
     }
     
-    defer delete(active_buffer_cstring)
+    /*
+    changes_count := new(u32)
+    defer free(changes_count)
+    changes := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes_count)
     
-    root_node := ts.tree_root_node(tree)
-    node_type := ts.node_type(root_node)
+    fmt.println(changes)
+    fmt.println(string(active_buffer.content))
+    active_buffer.previous_tree = tree
+
+    if changes_count^ == 0 {
+        tokens^ = active_buffer.tokens
+        
+        return
+    }
+        
+    changed_tokens := make([dynamic]Token)
     
-    walk_tree(root_node, active_buffer.content, tokens, active_buffer)
+    change := changes[0]
+    root := ts.tree_root_node(tree)
+    
+    walk_changed_range(root, change.start_byte, change.end_byte, active_buffer.content, &changed_tokens, active_buffer)
+    
+    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+        if token_a.line != token_b.line {
+            return int(token_a.line - token_b.line)
+        } else if token_a.char != token_b.char {    
+            return int(token_a.char - token_b.char)
+        }
+        
+        return int(int(token_b.priority) - int(token_a.priority))
+    }
+    
+    sort.quick_sort_proc(changed_tokens[:], sort_proc)
+
+    if len(changed_tokens) == 0 {
+        tokens^ = active_buffer.tokens
+        
+        return
+    }
+    
+    first := changed_tokens[0]
+    last := changed_tokens[len(changed_tokens)-1]
+    
+    first_byte := first.start_byte
+    last_byte := last.end_byte
+    filtered := make([dynamic]Token)
+    
+    for token in active_buffer.tokens {
+        if token.end_byte <= first_byte || token.start_byte >= last_byte {
+            append(&filtered, token)
+        }
+    }
+    
+    append_elems(&filtered, ..changed_tokens[:])
+    sort.quick_sort_proc(filtered[:], sort_proc)
+    tokens^ = filtered
+    */
 }
+
 
 @(private="package")
 override_node_type_ts :: proc(

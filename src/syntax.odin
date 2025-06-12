@@ -34,6 +34,9 @@ Token :: struct {
     color: vec4,
     modifiers:   []string,
     priority: u8,
+    
+    start_byte: u32,
+    end_byte: u32,
 }
 
 log_unhandled_treesitter_cases := false
@@ -146,8 +149,7 @@ lsp_handle_file_open :: proc() {
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
-    set_buffer_tokens()
-    do_refresh_buffer_tokens = true
+    set_buffer_tokens(0, u32(len(active_buffer.content)))
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -205,7 +207,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
     return tokens
 }
 
-set_buffer_tokens :: proc() {
+set_buffer_tokens :: proc(change_start_byte, change_end_byte: u32) {
     if active_language_server == nil {
         return
     }
@@ -218,8 +220,19 @@ set_buffer_tokens :: proc() {
     start_version := active_buffer.version
     
     new_tokens := make([dynamic]Token)
+
+    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+        if token_a.line != token_b.line {
+            return int(token_a.line - token_b.line)
+        } else if token_a.char != token_b.char {    
+            return int(token_a.char - token_b.char)
+        }
+        
+        return int(int(token_b.priority) - int(token_a.priority))
+    }
     
-    set_buffer_keywords(&new_tokens)
+    set_buffer_keywords(&new_tokens, change_start_byte, change_end_byte)
+    sort.quick_sort_proc(new_tokens[:], sort_proc)
     
     {
         when ODIN_DEBUG {
@@ -444,25 +457,13 @@ notify_server_of_change :: proc(
         }
         
         ts.tree_edit(buffer.previous_tree, &edit)
+        
+        set_buffer_tokens(u32(start_byte), u32(end_byte))
+        
+        return
     }
     
-    /*
-    for token,i in active_buffer.tokens {
-        if int(token.line) < start_line {
-            continue
-        }
-        
-        if int(token.line) > end_line {
-            continue
-        }
-        
-        unordered_remove(&active_buffer.tokens, i)
-        fmt.println("removed")
-    }
-    */
-    
-    set_buffer_tokens()
-    do_refresh_buffer_tokens = true
+    set_buffer_tokens(0, u32(len(buffer.content)))
 }
 
 compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -> int {
@@ -536,10 +537,10 @@ apply_diff :: proc(
     return start_off, end_off, start_off + len(new_bytes)
 }
 
-set_buffer_keywords :: proc(tokens: ^[dynamic]Token) {
+set_buffer_keywords :: proc(tokens: ^[dynamic]Token, change_start_byte, change_end_byte: u32) {
     switch active_buffer.ext {
     case ".js",".ts":
-        set_buffer_keywords_ts(tokens)
+        set_buffer_keywords_ts(tokens, change_start_byte, change_end_byte)
     }
 }
 
@@ -936,54 +937,160 @@ override_node_type :: proc(
     }
 }
 
-walk_tree :: proc(node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
-    node_type := string(ts.node_type(node))
+
+walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
+    cursor := ts.tree_cursor_new(root_node)
+    defer ts.tree_cursor_delete(&cursor)
     
-    start_point := ts.node_start_point(node)
-    end_point   := ts.node_end_point(node)
+    for {
+        node := ts.tree_cursor_current_node(&cursor)
+        node_type := string(ts.node_type(node))
+
+        start_point := ts.node_start_point(node)
+        end_point := ts.node_end_point(node)
+
+        start_byte := ts.node_start_byte(node)
+        end_byte := ts.node_end_byte(node)
+
+        override_node_type(&node_type, node, source, &start_point, &end_point)
+        
+        color := &active_language_server.ts_colors[node_type]
+        
+        if color != nil && false {
+        /*
+            for row in start_point.row..=end_point.row {
+                if int(row) > len(buffer.lines) - 1 {
+                    continue
+                }
     
-    override_node_type(&node_type, node, source, &start_point, &end_point)
+                line := buffer.lines[row]
+                line_string := utf8.runes_to_string(line.characters)
     
-    if node_type in active_language_server.ts_colors {
-        for row in start_point.row..=end_point.row {
-            if int(row) > len(buffer.lines) -1 {
-                continue
+                start_col := row == start_point.row ? start_point.col : 0
+                end_col := row == end_point.row ? end_point.col : u32(len(line_string))
+                
+                byte_offset_to_rune_index :: proc(line: string, byte_offset: int) -> int {
+                    rune_index := 0
+                    i := 0
+                    for i < byte_offset && i < len(line) {
+                        _, size := utf8.decode_rune(line[i:])
+                        i += size
+                        rune_index += 1
+                    }
+                    return rune_index
+                }
+    
+                start_char := byte_offset_to_rune_index(line_string, int(start_col))
+                end_char := byte_offset_to_rune_index(line_string, int(end_col))
+    
+                length := end_char - start_char
+                if length <= 0 {
+                    continue
+                }
+                append(tokens, Token{
+                    char = i32(start_char),
+                    line = i32(row),
+                    length = i32(length),
+                    color = color^,
+                    priority = 0,
+                    start_byte = start_byte,
+                    end_byte = end_byte,
+                })
+            }
+        */
+            byte_offsets_for_range :: proc(line: string, start_rune: int, end_rune: int) -> (int, int) {
+                i := 0
+                rune_index := 0
+                start_byte := -1
+                end_byte := -1
+            
+                for i < len(line) {
+                    if rune_index == start_rune {
+                        start_byte = i
+                    }
+                    if rune_index == end_rune {
+                        end_byte = i
+                        break
+                    }
+                    _, size := utf8.decode_rune(line[i:])
+                    i += size
+                    rune_index += 1
+                }
+            
+                if end_byte == -1 {
+                    end_byte = len(line)
+                }
+            
+                return start_byte, end_byte
             }
             
-            line := buffer.lines[row]
-            line_string := utf8.runes_to_string(line.characters)
-
-            start_col := row == start_point.row ? start_point.col : 0
-            end_col   := row == end_point.row   ? end_point.col   : u32(len(line_string))
-
-            start_char := byte_offset_to_rune_index(line_string, int(start_col))
-            end_char   := byte_offset_to_rune_index(line_string, int(end_col))
-
-            length := end_char - start_char
+            for row in start_point.row ..= end_point.row {
+                if int(row) >= len(buffer.lines) {
+                    continue
+                }
             
-            if length <= 0 {
-                continue
+                line := buffer.lines[row]
+                runes := line.characters
+                line_string := utf8.runes_to_string(line.characters)
+                defer delete(line_string)
+            
+                start_rune := row == start_point.row ? int(start_point.col) : 0
+                end_rune := row == end_point.row ? int(end_point.col) : len(runes)
+            
+                length := end_rune - start_rune
+                if length <= 0 {
+                    continue
+                }
+            
+                start_byte, end_byte := byte_offsets_for_range(line_string, start_rune, end_rune)
+            
+                append(tokens, Token{
+                    char = i32(start_rune),
+                    line = i32(row),
+                    length = i32(length),
+                    color = color^,
+                    priority = 0,
+                    start_byte = u32(start_byte),
+                    end_byte = u32(end_byte),
+                })
             }
-            
-            color := active_language_server.ts_colors[node_type]
-            append(tokens, Token{
-                char     = i32(start_char),
-                line     = i32(row),
-                length   = i32(length),
-                color    = color,
-                priority = 0,
-            })
+        
         }
-    } else if log_unhandled_treesitter_cases == true {
-        fmt.println(node_type)
+        
+        if ts.tree_cursor_goto_first_child(&cursor) {
+            continue
+        }
+
+        for !ts.tree_cursor_goto_next_sibling(&cursor) {
+            if !ts.tree_cursor_goto_parent(&cursor) {
+                return
+            }
+        }
+    }
+}
+
+
+/*
+walk_changed_range :: proc(node: ts.Node, start_byte, end_byte: u32, content: []u8, out_tokens: ^[dynamic]Token, buffer: ^Buffer) {
+    node_start_byte := ts.node_start_byte(node)
+    node_end_byte := ts.node_end_byte(node)
+    
+    if node_end_byte <= start_byte || node_start_byte >= end_byte {
+        return
+    }
+
+    if node_start_byte >= start_byte && node_end_byte <= end_byte {
+        walk_tree(node, content, out_tokens, buffer)
+        return
     }
     
     child_count := ts.node_child_count(node)
-    for i: u32 = 0; i < child_count; i += 1 {
+    for i in 0..<child_count {
         child := ts.node_child(node, i)
-        walk_tree(child, source, tokens, buffer)
+        walk_changed_range(child, start_byte, end_byte, content, out_tokens, buffer)
     }
 }
+*/
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {
     start := ts.node_start_byte(node)
