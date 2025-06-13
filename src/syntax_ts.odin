@@ -233,8 +233,9 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         return server,read_err
     }
     
-    parsed,_ := json.parse(bytes)
-    
+    parsed,_ := json.parse(bytes, json.Specification.JSON, false, context.temp_allocator)
+    defer delete(parsed.(json.Object))
+        
     obj, obj_ok := parsed.(json.Object)
     
     if !obj_ok {
@@ -242,25 +243,29 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     }
     
     result_obj, result_ok := obj["result"].(json.Object)
-    
+    defer delete(result_obj)
+        
     if !result_ok {
         panic("Missing result from lsp packet.")
     }
     
     capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
+    defer delete(capabilities_obj)
     
     if !capabilities_ok {
         panic("Missing result from lsp packet.")
     }
     
     provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
+    defer delete(provider_obj)
     
     if !provider_ok {
         panic("Missing semanticTokensProvider from lsp response.")
     }
     
     legend_obj, legend_ok := provider_obj["legend"].(json.Object)
-    
+    defer delete(legend_obj)
+        
     if !provider_ok {
         panic("Missing legend from lsp response.")
     }
@@ -274,6 +279,9 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     
     modifiers := value_to_str_array(modifiers_arr)
     types := value_to_str_array(types_arr)
+    
+    defer delete(modifiers)
+    defer delete(types)
     
     server = new(LanguageServer)
     server^ = LanguageServer{
@@ -294,9 +302,403 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     return server,os2.ERROR_NONE
 }
 
+query_src : cstring = `
+    ; Types
+    ; Javascript
+    ; Variables
+    ;-----------
+    (identifier) @variable
+    
+    ; Properties
+    ;-----------
+    (property_identifier) @variable.member
+    
+    (shorthand_property_identifier) @variable.member
+    
+    (private_property_identifier) @variable.member
+    
+    (object_pattern
+      (shorthand_property_identifier_pattern) @variable)
+    
+    (object_pattern
+      (object_assignment_pattern
+        (shorthand_property_identifier_pattern) @variable))
+    
+    ; Special identifiers
+    ;--------------------
+    ((identifier) @type
+      (#lua-match? @type "^[A-Z]"))
+    
+    ((identifier) @constant
+      (#lua-match? @constant "^_*[A-Z][A-Z%d_]*$"))
+    
+    ((shorthand_property_identifier) @constant
+      (#lua-match? @constant "^_*[A-Z][A-Z%d_]*$"))
+    
+    ((identifier) @variable.builtin
+      (#any-of? @variable.builtin "arguments" "module" "console" "window" "document"))
+    
+    ((identifier) @type.builtin
+      (#any-of? @type.builtin
+        "Object" "Function" "Boolean" "Symbol" "Number" "Math" "Date" "String" "RegExp" "Map" "Set"
+        "WeakMap" "WeakSet" "Promise" "Array" "Int8Array" "Uint8Array" "Uint8ClampedArray" "Int16Array"
+        "Uint16Array" "Int32Array" "Uint32Array" "Float32Array" "Float64Array" "ArrayBuffer" "DataView"
+        "Error" "EvalError" "InternalError" "RangeError" "ReferenceError" "SyntaxError" "TypeError"
+        "URIError"))
+    
+    (statement_identifier) @label
+    
+    ; Function and method definitions
+    ;--------------------------------
+    (function_expression
+      name: (identifier) @function)
+    
+    (function_declaration
+      name: (identifier) @function)
+    
+    (generator_function
+      name: (identifier) @function)
+    
+    (generator_function_declaration
+      name: (identifier) @function)
+    
+    (method_definition
+      name: [
+        (property_identifier)
+        (private_property_identifier)
+      ] @function.method)
+    
+    (method_definition
+      name: (property_identifier) @constructor
+      (#eq? @constructor "constructor"))
+    
+    (pair
+      key: (property_identifier) @function.method
+      value: (function_expression))
+    
+    (pair
+      key: (property_identifier) @function.method
+      value: (arrow_function))
+    
+    (assignment_expression
+      left: (member_expression
+        property: (property_identifier) @function.method)
+      right: (arrow_function))
+    
+    (assignment_expression
+      left: (member_expression
+        property: (property_identifier) @function.method)
+      right: (function_expression))
+    
+    (variable_declarator
+      name: (identifier) @function
+      value: (arrow_function))
+    
+    (variable_declarator
+      name: (identifier) @function
+      value: (function_expression))
+    
+    (assignment_expression
+      left: (identifier) @function
+      right: (arrow_function))
+    
+    (assignment_expression
+      left: (identifier) @function
+      right: (function_expression))
+    
+    ; Function and method calls
+    ;--------------------------
+    (call_expression
+      function: (identifier) @function.call)
+    
+    (call_expression
+      function: (member_expression
+        property: [
+          (property_identifier)
+          (private_property_identifier)
+        ] @function.method.call))
+    
+    (call_expression
+      function: (await_expression
+        (identifier) @function.call))
+    
+    (call_expression
+      function: (await_expression
+        (member_expression
+          property: [
+            (property_identifier)
+            (private_property_identifier)
+          ] @function.method.call)))
+    
+    ; Builtins
+    ;---------
+    ((identifier) @module.builtin
+      (#eq? @module.builtin "Intl"))
+    
+    ((identifier) @function.builtin
+      (#any-of? @function.builtin
+        "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI" "decodeURIComponent" "encodeURI"
+        "encodeURIComponent" "require"))
+    
+    ; Constructor
+    ;------------
+    (new_expression
+      constructor: (identifier) @constructor)
+    
+    ; Decorators
+    ;----------
+    (decorator
+      "@" @attribute
+      (identifier) @attribute)
+    
+    (decorator
+      "@" @attribute
+      (call_expression
+        (identifier) @attribute))
+    
+    (decorator
+      "@" @attribute
+      (member_expression
+        (property_identifier) @attribute))
+    
+    (decorator
+      "@" @attribute
+      (call_expression
+        (member_expression
+          (property_identifier) @attribute)))
+    
+    ; Literals
+    ;---------
+    [
+      (this)
+      (super)
+    ] @variable.builtin
+    
+    ((identifier) @variable.builtin
+      (#eq? @variable.builtin "self"))
+    
+    [
+      (true)
+      (false)
+    ] @boolean
+    
+    [
+      (null)
+      (undefined)
+    ] @constant.builtin
+    
+    [
+      (comment)
+      (html_comment)
+    ] @comment @spell
+    
+    ((comment) @comment.documentation
+      (#lua-match? @comment.documentation "^/[*][*][^*].*[*]/$"))
+    
+    (hash_bang_line) @keyword.directive
+    
+    ((string_fragment) @keyword.directive
+      (#eq? @keyword.directive "use strict"))
+    
+    (string) @string
+    
+    (template_string) @string
+    
+    (escape_sequence) @string.escape
+    
+    (regex_pattern) @string.regexp
+    
+    (regex_flags) @character.special
+    
+    (regex
+      "/" @punctuation.bracket) ; Regex delimiters
+    
+    (number) @number
+    
+    ((identifier) @number
+      (#any-of? @number "NaN" "Infinity"))
+    
+    ; Punctuation
+    ;------------
+    [
+      ";"
+      "."
+      ","
+      ":"
+    ] @punctuation.delimiter
+    
+    [
+      "--"
+      "-"
+      "-="
+      "&&"
+      "+"
+      "++"
+      "+="
+      "&="
+      "/="
+      "**="
+      "<<="
+      "<"
+      "<="
+      "<<"
+      "="
+      "=="
+      "==="
+      "!="
+      "!=="
+      "=>"
+      ">"
+      ">="
+      ">>"
+      "||"
+      "%"
+      "%="
+      "*"
+      "**"
+      ">>>"
+      "&"
+      "|"
+      "^"
+      "??"
+      "*="
+      ">>="
+      ">>>="
+      "^="
+      "|="
+      "&&="
+      "||="
+      "??="
+      "..."
+    ] @operator
+    
+    (binary_expression
+      "/" @operator)
+    
+    (ternary_expression
+      [
+        "?"
+        ":"
+      ] @keyword.conditional.ternary)
+    
+    (unary_expression
+      [
+        "!"
+        "~"
+        "-"
+        "+"
+      ] @operator)
+    
+    (unary_expression
+      [
+        "delete"
+        "void"
+      ] @keyword.operator)
+    
+    [
+      "("
+      ")"
+      "["
+      "]"
+      "{"
+      "}"
+    ] @punctuation.bracket
+    
+    (template_substitution
+      [
+        "${"
+        "}"
+      ] @punctuation.special) @none
+    
+    ; Imports
+    ;----------
+    (namespace_import
+      "*" @character.special
+      (identifier) @module)
+    
+    (namespace_export
+      "*" @character.special
+      (identifier) @module)
+    
+    (export_statement
+      "*" @character.special)
+    
+    ; Keywords
+    ;----------
+    [
+      "if"
+      "else"
+      "switch"
+      "case"
+    ] @keyword.conditional
+    
+    [
+      "import"
+      "from"
+      "as"
+      "export"
+    ] @keyword.import
+    
+    [
+      "for"
+      "of"
+      "do"
+      "while"
+      "continue"
+    ] @keyword.repeat
+    
+    [
+      "break"
+      "const"
+      "debugger"
+      "extends"
+      "get"
+      "let"
+      "set"
+      "static"
+      "target"
+      "var"
+      "with"
+    ] @keyword
+    
+    "class" @keyword.type
+    
+    [
+      "async"
+      "await"
+    ] @keyword.coroutine
+    
+    [
+      "return"
+      "yield"
+    ] @keyword.return
+    
+    "function" @keyword.function
+    
+    [
+      "new"
+      "delete"
+      "in"
+      "instanceof"
+      "typeof"
+    ] @keyword.operator
+    
+    [
+      "throw"
+      "try"
+      "catch"
+      "finally"
+    ] @keyword.exception
+    
+    (export_statement
+      "default" @keyword)
+    
+    (switch_default
+      "default" @keyword.conditional)
+`
 
 @(private="package")
-set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token, change_start_byte, change_end_byte: u32) {
+set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
     defer delete(active_buffer_cstring)
 
@@ -307,69 +709,178 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token, change_start_byte, chang
         u32(len(active_buffer_cstring))
     )
     
+    if active_buffer.previous_tree == nil {
+        error_offset := new(u32)
+        error_type := new(ts.Query_Error)
+        
+        query := ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), error_offset, error_type)
+        
+        if query == nil {
+            fmt.println(string(query_src)[int(error_offset^):int(error_offset^+10)])
+            fmt.println(error_type)
+            
+            return
+        }
+        
+        active_buffer.query = query
+    }
+    
+    cursor := ts.query_cursor_new()
+    ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
+    
+    start_point := ts.Point{
+        row=u32(max(active_buffer.first_drawn_line, 0)),
+        col=0,
+    }
+    
+    end_point := ts.Point{
+        row=u32(max(active_buffer.last_drawn_line, 0)),
+        col=0,
+    }
+    
+    ts.query_cursor_set_point_range(cursor, start_point, end_point)
+    
+    match : ts.Query_Match
+    capture_count := new(u32)
+    
+    for ts._query_cursor_next_capture(cursor, &match, capture_count) && true {
+        capture := match.captures[capture_count^]
+        
+        node := capture.node
+        node_type := string(ts.node_type(node))
+
+        start_point := ts.node_start_point(node)
+        end_point := ts.node_end_point(node)
+        
+        start_byte := ts.node_start_byte(node)
+        end_byte := ts.node_end_byte(node)
+
+        override_node_type(&node_type, node, active_buffer.content, &start_point, &end_point)
+        
+        color := &active_language_server.ts_colors[node_type]
+        
+        if color == nil {
+            continue
+        }
+        
+        byte_offsets_for_range :: proc(line: string, start_rune: int, end_rune: int) -> (int, int) {
+            i := 0
+            rune_index := 0
+            start_byte := -1
+            end_byte := -1
+        
+            for i < len(line) {
+                if rune_index == start_rune {
+                    start_byte = i
+                }
+                if rune_index == end_rune {
+                    end_byte = i
+                    break
+                }
+                _, size := utf8.decode_rune(line[i:])
+                i += size
+                rune_index += 1
+            }
+        
+            if end_byte == -1 {
+                end_byte = len(line)
+            }
+        
+            return start_byte, end_byte
+        }
+        
+        for row in start_point.row ..= end_point.row {
+            if int(row) >= len(active_buffer.lines) {
+                continue
+            }
+        
+            line := active_buffer.lines[row]
+            
+            start_rune := row == start_point.row ? int(start_point.col) : 0
+            end_rune := row == end_point.row ? int(end_point.col) : len(line.characters)
+        
+            length := end_rune - start_rune
+            if length <= 0 {
+                continue
+            }
+        
+            append(tokens, Token{
+                char = i32(start_rune),
+                line = i32(row),
+                length = i32(length),
+                color = color^,
+                priority = 0,
+            })
+        }
+    }
+        
+    active_buffer.previous_tree = tree
+    
+    /*
     if active_buffer.previous_tree == nil || true {
         walk_tree(ts.tree_root_node(tree), active_buffer.content, tokens, active_buffer)
         
         active_buffer.previous_tree = tree
         return
     }
+    */
     
     /*
-    changes_count := new(u32)
-    defer free(changes_count)
-    changes := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes_count)
-    
-    fmt.println(changes)
-    fmt.println(string(active_buffer.content))
-    active_buffer.previous_tree = tree
-
-    if changes_count^ == 0 {
-        tokens^ = active_buffer.tokens
+        changes_count := new(u32)
+        defer free(changes_count)
+        changes := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes_count)
         
-        return
-    }
+        fmt.println(changes)
+        fmt.println(string(active_buffer.content))
+        active_buffer.previous_tree = tree
+    
+        if changes_count^ == 0 {
+            tokens^ = active_buffer.tokens
+            
+            return
+        }
+            
+        changed_tokens := make([dynamic]Token)
         
-    changed_tokens := make([dynamic]Token)
-    
-    change := changes[0]
-    root := ts.tree_root_node(tree)
-    
-    walk_changed_range(root, change.start_byte, change.end_byte, active_buffer.content, &changed_tokens, active_buffer)
-    
-    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
-        if token_a.line != token_b.line {
-            return int(token_a.line - token_b.line)
-        } else if token_a.char != token_b.char {    
-            return int(token_a.char - token_b.char)
+        change := changes[0]
+        root := ts.tree_root_node(tree)
+        
+        walk_changed_range(root, change.start_byte, change.end_byte, active_buffer.content, &changed_tokens, active_buffer)
+        
+        sort_proc :: proc(token_a: Token, token_b: Token) -> int {
+            if token_a.line != token_b.line {
+                return int(token_a.line - token_b.line)
+            } else if token_a.char != token_b.char {    
+                return int(token_a.char - token_b.char)
+            }
+            
+            return int(int(token_b.priority) - int(token_a.priority))
         }
         
-        return int(int(token_b.priority) - int(token_a.priority))
-    }
+        sort.quick_sort_proc(changed_tokens[:], sort_proc)
     
-    sort.quick_sort_proc(changed_tokens[:], sort_proc)
-
-    if len(changed_tokens) == 0 {
-        tokens^ = active_buffer.tokens
-        
-        return
-    }
-    
-    first := changed_tokens[0]
-    last := changed_tokens[len(changed_tokens)-1]
-    
-    first_byte := first.start_byte
-    last_byte := last.end_byte
-    filtered := make([dynamic]Token)
-    
-    for token in active_buffer.tokens {
-        if token.end_byte <= first_byte || token.start_byte >= last_byte {
-            append(&filtered, token)
+        if len(changed_tokens) == 0 {
+            tokens^ = active_buffer.tokens
+            
+            return
         }
-    }
-    
-    append_elems(&filtered, ..changed_tokens[:])
-    sort.quick_sort_proc(filtered[:], sort_proc)
-    tokens^ = filtered
+        
+        first := changed_tokens[0]
+        last := changed_tokens[len(changed_tokens)-1]
+        
+        first_byte := first.start_byte
+        last_byte := last.end_byte
+        filtered := make([dynamic]Token)
+        
+        for token in active_buffer.tokens {
+            if token.end_byte <= first_byte || token.start_byte >= last_byte {
+                append(&filtered, token)
+            }
+        }
+        
+        append_elems(&filtered, ..changed_tokens[:])
+        sort.quick_sort_proc(filtered[:], sort_proc)
+        tokens^ = filtered
     */
 }
 
@@ -446,7 +957,7 @@ override_node_type_ts :: proc(
 
     case "predefined_type":
         type_name := get_node_text(node, source)
-        node_type^ = strings.concatenate({type_name, "_type"})
+        node_type^ = strings.concatenate({type_name, "_type"}, context.temp_allocator)
     }
 }
 

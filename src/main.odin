@@ -14,7 +14,7 @@ import "core:time"
 import "core:thread"
 import "core:os"
 
-target_fps :: 240.0
+target_fps :: 120.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
@@ -75,7 +75,7 @@ main :: proc() {
     glfw.SwapBuffers(window)
     
     open_file("/home/v/prog/projects/elegance-js/src/build.ts")
-
+    
     for !glfw.WindowShouldClose(window) {
         glfw.PollEvents()
 
@@ -89,11 +89,9 @@ main :: proc() {
             continue
         }
         
-        when ODIN_DEBUG {
-            fps := 1 / frame_time
-            if int(fps) < 60 {
-                fmt.println(fps)
-            }
+        fps := 1 / frame_time
+        if int(fps) < 100 {
+            fmt.println("WARNING Low FPS: ", fps)
         }
 
         last_time = current_time
@@ -121,7 +119,7 @@ main :: proc() {
 
         when ODIN_OS == .Linux {
             if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
-               glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1
+               glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1 
             {
                 glfw.SwapBuffers(window)
 
@@ -137,4 +135,11 @@ main :: proc() {
     reset_rect_cache(&rect_cache)
 
     delete(default_cwd)
+    
+    for buffer in buffers {
+        for &line in buffer.lines {
+            delete(line.characters)
+        }
+        free(buffer)
+    }
 }

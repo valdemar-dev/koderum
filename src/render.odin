@@ -40,7 +40,7 @@ render :: proc() {
     frame_time = f32(time - prev_time)
     prev_time = time
 
-    draw_cursor()
+    draw_cursor()    
     draw_ui()
 
     draw_buffer()

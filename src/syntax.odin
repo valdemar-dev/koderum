@@ -91,7 +91,6 @@ export enum SemanticTokenModifiers {
 }
 */
 
-
 lsp_request_id := 10
 
 active_language_server : ^LanguageServer
@@ -149,7 +148,7 @@ lsp_handle_file_open :: proc() {
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
-    set_buffer_tokens(0, u32(len(active_buffer.content)))
+    set_buffer_tokens()
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -207,7 +206,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
     return tokens
 }
 
-set_buffer_tokens :: proc(change_start_byte, change_end_byte: u32) {
+set_buffer_tokens :: proc() {
     if active_language_server == nil {
         return
     }
@@ -231,18 +230,8 @@ set_buffer_tokens :: proc(change_start_byte, change_end_byte: u32) {
         return int(int(token_b.priority) - int(token_a.priority))
     }
     
-    set_buffer_keywords(&new_tokens, change_start_byte, change_end_byte)
+    set_buffer_keywords(&new_tokens)
     sort.quick_sort_proc(new_tokens[:], sort_proc)
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "to Tree-Sitter the tokens.")
-            
-            prev = now
-        }
-    }
     
     active_buffer.tokens = new_tokens
     
@@ -250,7 +239,7 @@ set_buffer_tokens :: proc(change_start_byte, change_end_byte: u32) {
         when ODIN_DEBUG {
             now := time.now()
             
-            fmt.println("Took", time.diff(prev, now), "to assign tokens.")
+            fmt.println("Took", time.diff(start, now), "to set single-threaded buffer tokens.")
             
             prev = now
         }
@@ -438,7 +427,7 @@ notify_server_of_change :: proc(
     )
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-    
+  
     if buffer.previous_tree != nil {        
         start_byte,old_end_byte,end_byte := apply_diff(
             buffer,
@@ -458,12 +447,12 @@ notify_server_of_change :: proc(
         
         ts.tree_edit(buffer.previous_tree, &edit)
         
-        set_buffer_tokens(u32(start_byte), u32(end_byte))
+        set_buffer_tokens()
         
         return
     }
     
-    set_buffer_tokens(0, u32(len(buffer.content)))
+    set_buffer_tokens()
 }
 
 compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -> int {
@@ -537,10 +526,10 @@ apply_diff :: proc(
     return start_off, end_off, start_off + len(new_bytes)
 }
 
-set_buffer_keywords :: proc(tokens: ^[dynamic]Token, change_start_byte, change_end_byte: u32) {
+set_buffer_keywords :: proc(tokens: ^[dynamic]Token) {
     switch active_buffer.ext {
     case ".js",".ts":
-        set_buffer_keywords_ts(tokens, change_start_byte, change_end_byte)
+        set_buffer_keywords_ts(tokens)
     }
 }
 
@@ -956,8 +945,8 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
         
         color := &active_language_server.ts_colors[node_type]
         
-        if color != nil && false {
-        /*
+        if color != nil {
+            /*
             for row in start_point.row..=end_point.row {
                 if int(row) > len(buffer.lines) - 1 {
                     continue
@@ -997,7 +986,7 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
                     end_byte = end_byte,
                 })
             }
-        */
+            */
             byte_offsets_for_range :: proc(line: string, start_rune: int, end_rune: int) -> (int, int) {
                 i := 0
                 rune_index := 0

@@ -1,5 +1,11 @@
 undo-redo history
 
+thoughts part 2:
+    - the editor MUST learn how to speak in tree-sitter nodes.
+    - more accurately, it MUST learn how to query, and parse, only those nodes that we want.
+      walking thorugh node lists is EXHAUSTING.
+      generating tokens for 8000 loc should take 2ms tops
+
 todo:
     - n/b term search case sensitive within buffer
     - selections with v mode

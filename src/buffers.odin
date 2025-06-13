@@ -73,6 +73,11 @@ Buffer :: struct {
     
     // Raw data that we read from file and modify for tree-sitter so it doesnt die
     content: []u8,
+    
+    query: ts.Query,
+    
+    first_drawn_line: int,
+    last_drawn_line: int,
 }
 
 @(private="package")
@@ -447,6 +452,9 @@ draw_text_buffer :: proc() {
 
     token_idx := new(int)
 
+    active_buffer.first_drawn_line = -1
+    active_buffer.last_drawn_line = -1
+
     for &buffer_line, index in buffer_lines {
         line_pos := vec2{
             pen.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
@@ -454,7 +462,17 @@ draw_text_buffer :: proc() {
         }
 
         if line_pos.y > fb_size.y {
+            active_buffer.last_drawn_line = index
             break
+        }
+        
+        if line_pos.y < 0 {
+            pen.y += ascender - descender
+            continue
+        }
+        
+        if active_buffer.first_drawn_line == -1 {
+            active_buffer.first_drawn_line = index
         }
 
         pen = draw_buffer_line(
