@@ -18,132 +18,289 @@ import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
 import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 ts_ts_colors : map[string]vec4 = {
-    // FUNCTIONS
-    "arrow_function_name"=YELLOW,
-    "method_call" = YELLOW,
-    "function_call" = YELLOW,
-    "function_name" = YELLOW,
-        
-    "const"=RED,
-    "let"=LIGHT_RED,
-    "function"=LIGHT_RED,
-    
-    // make code go somewhere else
-    "return"=PINK,
-    "continue"=PINK,
-    "break"=PINK,
-    
-    // BUILT IN TYPES
-    "object_type"=PURPLE,
-    "string_type"=GREEN,
-    "boolean_type"=BLUE,
-    "common_type"=CYAN,
-    "number_type"=LIGHT_GREEN,
-    
-    // NUMBERS
+    "string.fragment"=GREEN,
+    "string"=GREEN,
+
+    "async"=PINK,
+
+    "variable.declaration"=LIGHT_RED,
+
+    "error"=RED,
+
+    "keyword"=RED,
+    "keyword.special"=PINK,
+
+    "control.flow"=PINK,
+    "constant"=ORANGE,
+    "variable.builtin"=ORANGE,
+
+    "escape_sequence"=CYAN,
+
+    "private_field"=LIGHT_ORANGE,
+
+    "punctuation.delimiter"=GRAY,
+    "punctuation.bracket"=GRAY,
+    "punctuation.parenthesis"=GRAY,
+    "punctuation.special"=GRAY,
+
+    "operator"=GRAY,
+
+    "function.method"=YELLOW,
+    "function"=YELLOW,
+
+    "comment"=GRAY,
+    "property"=LIGHT_ORANGE,
+    "parameter"=LIGHT_ORANGE,
+
     "number"=LIGHT_GREEN,
-    
-    // STRINGS
-    "string_fragment"=GREEN,
-    "`"=GREEN,
-    "\""=GREEN,
-    "'"=GREEN,
-    //"template_string"=GREEN,
+ 
+    "constant.builtin"=BLUE,
 
-    // import export
-    "import"=RED,
-    "export"=RED,
-    
-    "from"=RED,
-    "typeof"=RED,
-    "throw"=RED,
-    
-    // async
-    "await"=CYAN,
-    "async"=CYAN,
-    
-    // casting
-    "as"=RED,
-    "any"=RED,
-    
-    // spookies
-    "delete"=RED,
-    "undefined"=RED,
-    
-    // make it gray
-    "--"=GRAY,
-    "++"=GRAY,
-    ":"=GRAY,
-    "+="=GRAY,
-    "}"=GRAY,
-    "{"=GRAY,
-    "."=GRAY,
-    "=>"=GRAY,
-    "("=GRAY,
-    ")"=GRAY,
-    "="=GRAY,
-    "/"=GRAY,
-    ";"=GRAY,
-    "["=GRAY,
-    "]"=GRAY,
-    "+"=GRAY,
-    ","=GRAY,
-    "${"=GRAY,
-    "==="=GRAY,
-    "..."=GRAY,
-    "!"=GRAY,
-    "||"=GRAY,
-    ">"=GRAY,
-    "<"=GRAY,
-    "?."=GRAY,
-    "|"=GRAY,
-    "comment"=DARK_GRAY,
-
-    // logical keywords
-    "if"=PINK,
-    "else"=PINK,
-    "in"=PINK,
-    "for"=PINK,
-    "of"=PINK,
-    "while"=PINK,
-    "with"=PINK,
-    "switch"=PINK,
-    "case"=PINK,
-    
-    "import_specifier"=ORANGE,
-
-    "variable_name"=ORANGE,    
-    
-    "true"=BLUE,    
-    "false"=BLUE,
-    
-    "regex_flags"=RED,
-    "regex_pattern"=YELLOW,
-    
-    "property_identifier"=LIGHT_ORANGE,
-    
-    "parameter_name"=LIGHT_ORANGE,
-    
-    "identifier"=ORANGE,
+    "type.builtin"=CYAN,
+    "type"=PURPLE,
+    "string.special"=RED,
 }
 
+query_src := strings.clone_to_cstring(strings.concatenate({`
+(ERROR) @error
+
+["meta"] @property
+(property_identifier) @property
+
+(function_expression
+  name: (identifier) @function)
+(function_declaration
+  name: (identifier) @function)
+(method_definition
+  name: (property_identifier) @function.method)
+
+(pair
+  key: (property_identifier) @function.method
+  value: [(function_expression) (arrow_function)])
+
+(assignment_expression
+  left: (member_expression
+    property: (property_identifier) @function.method)
+  right: [(function_expression) (arrow_function)])
+
+(variable_declarator
+  name: (identifier) @function
+  value: [(function_expression) (arrow_function)])
+
+(assignment_expression
+  left: (identifier) @function
+  right: [(function_expression) (arrow_function)])
+
+(call_expression
+  function: (identifier) @function)
+
+(call_expression
+  function: (member_expression
+    property: (property_identifier) @function.method))
+
+([
+    (identifier)
+    (shorthand_property_identifier)
+    (shorthand_property_identifier_pattern)
+ ] @constant
+ (#match? @constant "^[A-Z_][A-Z\\d_]+$"))
+
+(escape_sequence) @escape_sequence
+(this) @variable.builtin
+(super) @variable.builtin
+
+[
+  (true)
+  (false)
+  (null)
+  (undefined)
+] @constant.builtin
+
+(comment) @comment
+
+(template_string
+ (string_fragment) @string)
+
+(template_literal_type
+ (string_fragment) @string)
+
+
+(private_property_identifier) @private_field
+
+(formal_parameters (required_parameter (identifier) @parameter))
+
+(string) @string
+
+(regex) @string.special
+(number) @number
+
+[
+  ";"
+  (optional_chain)
+  "."
+  ","
+] @punctuation.delimiter
+
+[
+  "-"
+  "--"
+  "-="
+  "+"
+  "++"
+  "+="
+  "*"
+  "*="
+  "**"
+  "**="
+  "/"
+  "/="
+  "%"
+  "%="
+  "<"
+  "<="
+  "<<"
+  "<<="
+  "="
+  "=="
+  "==="
+  "!"
+  "!="
+  "!=="
+  "=>"
+  ">"
+  ">="
+  ">>"
+  ">>="
+  ">>>"
+  ">>>="
+  "~"
+  "^"
+  "&"
+  "|"
+  "^="
+  "&="
+  "|="
+  "&&"
+  "-?:"
+  "?"
+  "||"
+  "??"
+  "&&="
+  "||="
+  "??="
+  ":"
+  "@"
+  "..."
+] @operator
+
+[
+  "("
+  ")"
+  "["
+  "]"
+  "{"
+  "}"
+  "${"
+]  @punctuation.bracket
+
+[
+  "as"
+  "class"
+  "const"
+  "continue"
+  "debugger"
+  "delete"
+  "export"
+  "extends"
+  "from"
+  "function"
+  "get"
+  "import"
+  "in"
+  "instanceof"
+  "new"
+  "return"
+  "set"
+  "static"
+  "target"
+  "typeof"
+  "void"
+  "yield"
+] @keyword
+
+[
+  "var"
+  "let"
+] @variable.declaration
+
+[
+  "while"
+  "if"
+  "else"
+  "break"
+  "throw"
+  "with"
+  "catch"
+  "finally"
+  "case"
+  "switch"
+  "try"
+  "do"
+  "default"
+  "of"
+  "for"
+] @control.flow
+
+[
+  "async"
+  "await"
+] @async
+
+[
+    "global"
+    "module"
+    "infer"
+    "extends"
+    "keyof"
+    "as"
+    "asserts"
+    "is"
+] @keyword.special
+
+(type_identifier) @type
+(predefined_type) @type.builtin
+
+((identifier) @type
+ (#match? @type "^[A-Z]"))
+
+(type_arguments
+  "<" @punctuation.bracket
+  ">" @punctuation.bracket)
+
+(required_parameter (identifier) @variable.parameter)
+(optional_parameter (identifier) @variable.parameter)
+
+[ "abstract"
+  "declare"
+  "enum"
+  "export"
+  "implements"
+  "interface"
+  "keyof"
+  "namespace"
+  "private"
+  "protected"
+  "public"
+  "type"
+  "readonly"
+  "override"
+  "satisfies"
+] @keyword
+
+`, " [\"`\"] @string"}));
+
 ts_lsp_colors := map[string]vec4{
-    "type"=CYAN,
-    "property"=PURPLE,
-    
-    "function"=YELLOW,
-    "member"=YELLOW,
-
     "parameter"=LIGHT_ORANGE,
-    "namespace"=PURPLE,
-    
-    // "variable"=ORANGE,
-    
-    "interface"=CYAN,
-    "class"=RED,
-
-    "enum"=ORANGE,
-    "enumMember"=YELLOW,
 }
 
 @(private="package")
@@ -279,10 +436,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     
     modifiers := value_to_str_array(modifiers_arr)
     types := value_to_str_array(types_arr)
-    
-    defer delete(modifiers)
-    defer delete(types)
-    
+  
     server = new(LanguageServer)
     server^ = LanguageServer{
         lsp_stdin_w = stdin_w,
@@ -294,7 +448,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         colors=ts_lsp_colors,
         ts_colors=ts_ts_colors,
     }
-    
+ 
     when ODIN_DEBUG{
         fmt.println("TypeScript LSP has been initialized.")
     }
@@ -302,403 +456,8 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     return server,os2.ERROR_NONE
 }
 
-query_src : cstring = `
-    ; Types
-    ; Javascript
-    ; Variables
-    ;-----------
-    (identifier) @variable
-    
-    ; Properties
-    ;-----------
-    (property_identifier) @variable.member
-    
-    (shorthand_property_identifier) @variable.member
-    
-    (private_property_identifier) @variable.member
-    
-    (object_pattern
-      (shorthand_property_identifier_pattern) @variable)
-    
-    (object_pattern
-      (object_assignment_pattern
-        (shorthand_property_identifier_pattern) @variable))
-    
-    ; Special identifiers
-    ;--------------------
-    ((identifier) @type
-      (#lua-match? @type "^[A-Z]"))
-    
-    ((identifier) @constant
-      (#lua-match? @constant "^_*[A-Z][A-Z%d_]*$"))
-    
-    ((shorthand_property_identifier) @constant
-      (#lua-match? @constant "^_*[A-Z][A-Z%d_]*$"))
-    
-    ((identifier) @variable.builtin
-      (#any-of? @variable.builtin "arguments" "module" "console" "window" "document"))
-    
-    ((identifier) @type.builtin
-      (#any-of? @type.builtin
-        "Object" "Function" "Boolean" "Symbol" "Number" "Math" "Date" "String" "RegExp" "Map" "Set"
-        "WeakMap" "WeakSet" "Promise" "Array" "Int8Array" "Uint8Array" "Uint8ClampedArray" "Int16Array"
-        "Uint16Array" "Int32Array" "Uint32Array" "Float32Array" "Float64Array" "ArrayBuffer" "DataView"
-        "Error" "EvalError" "InternalError" "RangeError" "ReferenceError" "SyntaxError" "TypeError"
-        "URIError"))
-    
-    (statement_identifier) @label
-    
-    ; Function and method definitions
-    ;--------------------------------
-    (function_expression
-      name: (identifier) @function)
-    
-    (function_declaration
-      name: (identifier) @function)
-    
-    (generator_function
-      name: (identifier) @function)
-    
-    (generator_function_declaration
-      name: (identifier) @function)
-    
-    (method_definition
-      name: [
-        (property_identifier)
-        (private_property_identifier)
-      ] @function.method)
-    
-    (method_definition
-      name: (property_identifier) @constructor
-      (#eq? @constructor "constructor"))
-    
-    (pair
-      key: (property_identifier) @function.method
-      value: (function_expression))
-    
-    (pair
-      key: (property_identifier) @function.method
-      value: (arrow_function))
-    
-    (assignment_expression
-      left: (member_expression
-        property: (property_identifier) @function.method)
-      right: (arrow_function))
-    
-    (assignment_expression
-      left: (member_expression
-        property: (property_identifier) @function.method)
-      right: (function_expression))
-    
-    (variable_declarator
-      name: (identifier) @function
-      value: (arrow_function))
-    
-    (variable_declarator
-      name: (identifier) @function
-      value: (function_expression))
-    
-    (assignment_expression
-      left: (identifier) @function
-      right: (arrow_function))
-    
-    (assignment_expression
-      left: (identifier) @function
-      right: (function_expression))
-    
-    ; Function and method calls
-    ;--------------------------
-    (call_expression
-      function: (identifier) @function.call)
-    
-    (call_expression
-      function: (member_expression
-        property: [
-          (property_identifier)
-          (private_property_identifier)
-        ] @function.method.call))
-    
-    (call_expression
-      function: (await_expression
-        (identifier) @function.call))
-    
-    (call_expression
-      function: (await_expression
-        (member_expression
-          property: [
-            (property_identifier)
-            (private_property_identifier)
-          ] @function.method.call)))
-    
-    ; Builtins
-    ;---------
-    ((identifier) @module.builtin
-      (#eq? @module.builtin "Intl"))
-    
-    ((identifier) @function.builtin
-      (#any-of? @function.builtin
-        "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI" "decodeURIComponent" "encodeURI"
-        "encodeURIComponent" "require"))
-    
-    ; Constructor
-    ;------------
-    (new_expression
-      constructor: (identifier) @constructor)
-    
-    ; Decorators
-    ;----------
-    (decorator
-      "@" @attribute
-      (identifier) @attribute)
-    
-    (decorator
-      "@" @attribute
-      (call_expression
-        (identifier) @attribute))
-    
-    (decorator
-      "@" @attribute
-      (member_expression
-        (property_identifier) @attribute))
-    
-    (decorator
-      "@" @attribute
-      (call_expression
-        (member_expression
-          (property_identifier) @attribute)))
-    
-    ; Literals
-    ;---------
-    [
-      (this)
-      (super)
-    ] @variable.builtin
-    
-    ((identifier) @variable.builtin
-      (#eq? @variable.builtin "self"))
-    
-    [
-      (true)
-      (false)
-    ] @boolean
-    
-    [
-      (null)
-      (undefined)
-    ] @constant.builtin
-    
-    [
-      (comment)
-      (html_comment)
-    ] @comment @spell
-    
-    ((comment) @comment.documentation
-      (#lua-match? @comment.documentation "^/[*][*][^*].*[*]/$"))
-    
-    (hash_bang_line) @keyword.directive
-    
-    ((string_fragment) @keyword.directive
-      (#eq? @keyword.directive "use strict"))
-    
-    (string) @string
-    
-    (template_string) @string
-    
-    (escape_sequence) @string.escape
-    
-    (regex_pattern) @string.regexp
-    
-    (regex_flags) @character.special
-    
-    (regex
-      "/" @punctuation.bracket) ; Regex delimiters
-    
-    (number) @number
-    
-    ((identifier) @number
-      (#any-of? @number "NaN" "Infinity"))
-    
-    ; Punctuation
-    ;------------
-    [
-      ";"
-      "."
-      ","
-      ":"
-    ] @punctuation.delimiter
-    
-    [
-      "--"
-      "-"
-      "-="
-      "&&"
-      "+"
-      "++"
-      "+="
-      "&="
-      "/="
-      "**="
-      "<<="
-      "<"
-      "<="
-      "<<"
-      "="
-      "=="
-      "==="
-      "!="
-      "!=="
-      "=>"
-      ">"
-      ">="
-      ">>"
-      "||"
-      "%"
-      "%="
-      "*"
-      "**"
-      ">>>"
-      "&"
-      "|"
-      "^"
-      "??"
-      "*="
-      ">>="
-      ">>>="
-      "^="
-      "|="
-      "&&="
-      "||="
-      "??="
-      "..."
-    ] @operator
-    
-    (binary_expression
-      "/" @operator)
-    
-    (ternary_expression
-      [
-        "?"
-        ":"
-      ] @keyword.conditional.ternary)
-    
-    (unary_expression
-      [
-        "!"
-        "~"
-        "-"
-        "+"
-      ] @operator)
-    
-    (unary_expression
-      [
-        "delete"
-        "void"
-      ] @keyword.operator)
-    
-    [
-      "("
-      ")"
-      "["
-      "]"
-      "{"
-      "}"
-    ] @punctuation.bracket
-    
-    (template_substitution
-      [
-        "${"
-        "}"
-      ] @punctuation.special) @none
-    
-    ; Imports
-    ;----------
-    (namespace_import
-      "*" @character.special
-      (identifier) @module)
-    
-    (namespace_export
-      "*" @character.special
-      (identifier) @module)
-    
-    (export_statement
-      "*" @character.special)
-    
-    ; Keywords
-    ;----------
-    [
-      "if"
-      "else"
-      "switch"
-      "case"
-    ] @keyword.conditional
-    
-    [
-      "import"
-      "from"
-      "as"
-      "export"
-    ] @keyword.import
-    
-    [
-      "for"
-      "of"
-      "do"
-      "while"
-      "continue"
-    ] @keyword.repeat
-    
-    [
-      "break"
-      "const"
-      "debugger"
-      "extends"
-      "get"
-      "let"
-      "set"
-      "static"
-      "target"
-      "var"
-      "with"
-    ] @keyword
-    
-    "class" @keyword.type
-    
-    [
-      "async"
-      "await"
-    ] @keyword.coroutine
-    
-    [
-      "return"
-      "yield"
-    ] @keyword.return
-    
-    "function" @keyword.function
-    
-    [
-      "new"
-      "delete"
-      "in"
-      "instanceof"
-      "typeof"
-    ] @keyword.operator
-    
-    [
-      "throw"
-      "try"
-      "catch"
-      "finally"
-    ] @keyword.exception
-    
-    (export_statement
-      "default" @keyword)
-    
-    (switch_default
-      "default" @keyword.conditional)
-`
-
 @(private="package")
-set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
+set_buffer_keywords_ts :: proc() {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
     defer delete(active_buffer_cstring)
 
@@ -708,16 +467,22 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
-    
+
     if active_buffer.previous_tree == nil {
         error_offset := new(u32)
         error_type := new(ts.Query_Error)
         
-        query := ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), error_offset, error_type)
-        
+        query : ts.Query   
+
+        if active_buffer.ext == ".js" {
+            query = ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), error_offset, error_type)
+        } else {
+            query = ts._query_new(ts_ts_bindings.tree_sitter_typescript(), query_src, u32(len(query_src)), error_offset, error_type)
+        }
+
         if query == nil {
-            fmt.println(string(query_src)[int(error_offset^):int(error_offset^+10)])
-            fmt.println(error_type)
+            fmt.println(string(query_src)[int(error_offset^):int(error_offset^+1)])
+            fmt.println(error_type^)
             
             return
         }
@@ -741,147 +506,69 @@ set_buffer_keywords_ts :: proc(tokens: ^[dynamic]Token) {
     ts.query_cursor_set_point_range(cursor, start_point, end_point)
     
     match : ts.Query_Match
-    capture_count := new(u32)
-    
-    for ts._query_cursor_next_capture(cursor, &match, capture_count) && true {
-        capture := match.captures[capture_count^]
-        
+    capture_index := new(u32)
+   
+    line_number : u32 = 0 
+
+    for ts._query_cursor_next_capture(cursor, &match, capture_index) {
+        capture := match.captures[capture_index^]
+
+        name_len : u32
+        name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+ 
         node := capture.node
-        node_type := string(ts.node_type(node))
+        node_type := string(name)
 
         start_point := ts.node_start_point(node)
         end_point := ts.node_end_point(node)
-        
         start_byte := ts.node_start_byte(node)
         end_byte := ts.node_end_byte(node)
 
-        override_node_type(&node_type, node, active_buffer.content, &start_point, &end_point)
+        row := start_point.row 
         
+        when ODIN_DEBUG {
+            assert(row >= line_number)
+            assert(start_point.row == end_point.row)
+        }
+
+        line := &active_buffer.lines[row]
+         
+        override_node_type(&node_type, node, active_buffer.content, &start_point, &end_point, &line.tokens)
+        
+        if node_type == "SKIP" {
+            continue
+        }
+
         color := &active_language_server.ts_colors[node_type]
         
         if color == nil {
+            fmt.println(node_type, string(active_buffer.content[start_byte:end_byte]))
             continue
         }
-        
-        byte_offsets_for_range :: proc(line: string, start_rune: int, end_rune: int) -> (int, int) {
-            i := 0
-            rune_index := 0
-            start_byte := -1
-            end_byte := -1
-        
-            for i < len(line) {
-                if rune_index == start_rune {
-                    start_byte = i
-                }
-                if rune_index == end_rune {
-                    end_byte = i
-                    break
-                }
-                _, size := utf8.decode_rune(line[i:])
-                i += size
-                rune_index += 1
-            }
-        
-            if end_byte == -1 {
-                end_byte = len(line)
-            }
-        
-            return start_byte, end_byte
+
+        if row > line_number {
+            line_number = row
+
+            clear(&line.tokens)
         }
-        
-        for row in start_point.row ..= end_point.row {
-            if int(row) >= len(active_buffer.lines) {
-                continue
-            }
-        
-            line := active_buffer.lines[row]
-            
-            start_rune := row == start_point.row ? int(start_point.col) : 0
-            end_rune := row == end_point.row ? int(end_point.col) : len(line.characters)
-        
-            length := end_rune - start_rune
-            if length <= 0 {
-                continue
-            }
-        
-            append(tokens, Token{
-                char = i32(start_rune),
-                line = i32(row),
-                length = i32(length),
-                color = color^,
-                priority = 0,
-            })
+    
+        start_rune := row == start_point.row ? int(start_point.col) : 0
+        end_rune := row == end_point.row ? int(end_point.col) : len(line.characters)
+    
+        length := end_rune - start_rune
+        if length <= 0 {
+            continue
         }
+    
+        append(&line.tokens, Token{
+            char = i32(start_rune),
+            length = i32(length),
+            color = color^,
+            priority = 0,
+        })
     }
         
     active_buffer.previous_tree = tree
-    
-    /*
-    if active_buffer.previous_tree == nil || true {
-        walk_tree(ts.tree_root_node(tree), active_buffer.content, tokens, active_buffer)
-        
-        active_buffer.previous_tree = tree
-        return
-    }
-    */
-    
-    /*
-        changes_count := new(u32)
-        defer free(changes_count)
-        changes := ts._tree_get_changed_ranges(active_buffer.previous_tree, tree, changes_count)
-        
-        fmt.println(changes)
-        fmt.println(string(active_buffer.content))
-        active_buffer.previous_tree = tree
-    
-        if changes_count^ == 0 {
-            tokens^ = active_buffer.tokens
-            
-            return
-        }
-            
-        changed_tokens := make([dynamic]Token)
-        
-        change := changes[0]
-        root := ts.tree_root_node(tree)
-        
-        walk_changed_range(root, change.start_byte, change.end_byte, active_buffer.content, &changed_tokens, active_buffer)
-        
-        sort_proc :: proc(token_a: Token, token_b: Token) -> int {
-            if token_a.line != token_b.line {
-                return int(token_a.line - token_b.line)
-            } else if token_a.char != token_b.char {    
-                return int(token_a.char - token_b.char)
-            }
-            
-            return int(int(token_b.priority) - int(token_a.priority))
-        }
-        
-        sort.quick_sort_proc(changed_tokens[:], sort_proc)
-    
-        if len(changed_tokens) == 0 {
-            tokens^ = active_buffer.tokens
-            
-            return
-        }
-        
-        first := changed_tokens[0]
-        last := changed_tokens[len(changed_tokens)-1]
-        
-        first_byte := first.start_byte
-        last_byte := last.end_byte
-        filtered := make([dynamic]Token)
-        
-        for token in active_buffer.tokens {
-            if token.end_byte <= first_byte || token.start_byte >= last_byte {
-                append(&filtered, token)
-            }
-        }
-        
-        append_elems(&filtered, ..changed_tokens[:])
-        sort.quick_sort_proc(filtered[:], sort_proc)
-        tokens^ = filtered
-    */
 }
 
 
@@ -892,72 +579,43 @@ override_node_type_ts :: proc(
     source: []u8,
     start_point,
     end_point: ^ts.Point,
+    tokens: ^[dynamic]Token,
 ) {
-    if node_type^ == "identifier" || node_type^ == "property_identifier" {
-        parent := ts.node_parent(node)
-        if ts.node_is_null(parent) do return
+    if node_type^ == "function.method" || node_type^ == "parameter" {
+        resize(tokens, len(tokens)-1)
+    } else if len(tokens) > 0 {
+        latest_token := tokens[len(tokens)-1]
 
-        parent_type := string(ts.node_type(parent))
-    
-        switch parent_type {
-        case "function_declaration":
-            node_type^ = "function_name"
+        if latest_token.char == i32(start_point.col) {
+            node_type^ = "SKIP"
+        }
+    }
+}
 
-        case "variable_declarator":       
-            if value_node, found := get_value_node(parent); found {
-                node_type^ = string(ts.node_type(value_node))
-            
-                if node_type^ == "arrow_function" {
-                    node_type^ = "arrow_function_name"
-                } else {
-                    node_type^ = "variable_name"
-                }
-            }
-
-        case "method_definition":
-            node_type^ = "method_name"
-
-        case "formal_parameters", "parameter", "required_parameter":
-            node_type^ = "parameter_name"
-
-        case "member_expression":
-            if field_name := ts.node_field_name_for_child(parent, 1); field_name != nil {
-                if field_name == "property" && ts.node_eq(node, ts.node_child(parent, 1)) {
-                    node_type^ = "method_name"
-                } else if field_name == "object" {
-                    node_type^ = "object_property"
-                }
+@(private="package")
+set_buffer_tokens_threaded_ts :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+    get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
+        for &token, index in tokens {
+            if token.char == char {
+                return &token, index
             }
         }
-        return
+
+        return nil, -1
     }
-    
-    if node_type^ == "call_expression" || node_type^ == "function_expression" {
-        function_node := ts.node_child_by_field_name(node, "function")
-        if !ts.node_is_null(function_node) {
-            if string(ts.node_type(function_node)) == "member_expression" {
-                property_node := ts.node_child_by_field_name(function_node, "property")
-                if !ts.node_is_null(property_node) {
-                    start_point^ = ts.node_start_point(property_node)
-                    end_point^ = ts.node_end_point(property_node)
-                    node_type^ = "method_call"
-                }
-            } else {
-                start_point^ = ts.node_start_point(function_node)
-                end_point^ = ts.node_end_point(function_node)
-                node_type^ = "function_call"
-            }
+
+    for token in lsp_tokens {
+        if int(token.line) >= len(buffer.lines) do continue
+
+        line := &buffer.lines[token.line]
+
+        overlapping_token, index := get_overlapping_token(line.tokens, token.char)
+
+        if overlapping_token == nil {
+            continue
         }
-        return
-    }
 
-    switch node_type^ {
-    case "type_identifier":
-        node_type^ = "common_type"
-
-    case "predefined_type":
-        type_name := get_node_text(node, source)
-        node_type^ = strings.concatenate({type_name, "_type"}, context.temp_allocator)
+        line.tokens[index] = token
     }
 }
 

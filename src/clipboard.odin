@@ -42,30 +42,30 @@ generate_highlight_string :: proc(
             clamped_start := min(start_char, len(line.characters))
 
             if forward {
-                str = utf8.runes_to_string(line.characters[clamped_start:clamped_end])
+                str = string(line.characters[clamped_start:clamped_end])
             } else {
-                str = utf8.runes_to_string(line.characters[clamped_end:clamped_start])
+                str = string(line.characters[clamped_end:clamped_start])
             }
         } else if i == end {
             if is_negative_highlight {
                 clamped := min(start_char, len(line.characters))
-                str = utf8.runes_to_string(line.characters[:clamped])
+                str = string(line.characters[:clamped])
             } else {
                 clamped := min(end_char, len(line.characters))
-                str = utf8.runes_to_string(line.characters[:clamped])
+                str = string(line.characters[:clamped])
             }
         } else if i == start {
             if is_negative_highlight {
                 clamped := clamp(end_char, 0, len(line.characters))
 
-                str = utf8.runes_to_string(line.characters[clamped:])
+                str = string(line.characters[clamped:])
             } else {
                 clamped := clamp(start_char, 0, len(line.characters))
 
-                str = utf8.runes_to_string(line.characters[clamped:])
+                str = string(line.characters[clamped:])
             }
         } else {
-            str = utf8.runes_to_string(line.characters[:])
+            str = string(line.characters[:])
         }
 
         result = strings.concatenate({

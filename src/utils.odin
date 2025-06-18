@@ -5,6 +5,7 @@ import ft "../../alt-odin-freetype"
 import "core:math"
 import "core:encoding/json"
 import "core:unicode/utf8"
+import "core:strings"
 
 vec2 :: struct {
     x: f32,
@@ -137,7 +138,7 @@ rune_in_arr :: proc(el: rune, arr: []rune) -> (ok: bool) {
     return false
 }
 
-contains_runes :: proc(main: []rune, subset: []rune) -> (found: bool, start: int) {
+contains_runes :: proc(main: string, subset: []rune) -> (found: bool, start: int) {
     n := len(main)
     m := len(subset)
     if m == 0 || m > n {
@@ -148,7 +149,7 @@ contains_runes :: proc(main: []rune, subset: []rune) -> (found: bool, start: int
         ok := true
 
         for j in 0..<m {
-            if main[i + j] != subset[j] {
+            if main[i + j] != u8(subset[j]) {
                 ok = false
                 break
             }
@@ -170,7 +171,7 @@ value_to_str_array :: proc(arr: json.Array) -> []string {
             panic("Value in str array is not a str.")
         }
         
-        append(&values, str_value)
+        append(&values, strings.clone(str_value))
     }
     
     return values[:]

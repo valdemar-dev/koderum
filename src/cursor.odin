@@ -36,8 +36,8 @@ draw_cursor :: proc() {
 
     add_rect(&rect_cache,
         rect{
-            buffer_cursor_pos.x - buffer_horizontal_scroll_position + active_buffer.x_offset,
-            buffer_cursor_pos.y - buffer_scroll_position,
+            buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
+            buffer_cursor_pos.y - active_buffer.scroll_y,
             3,
             cursor_height,
         },
@@ -60,8 +60,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     buffer_lines := active_buffer.lines
     
     new_line := buffer_lines[line]
-    characters := new_line.characters
-
+    characters := string(new_line.characters[:])
     new_x : f32 = 0
 
     last_width : f32 = cursor_width
@@ -69,17 +68,21 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     buffer_cursor_line = line
     buffer_cursor_char_index = char_index
 
-    for index in 0..<char_index {
-        if index >= len(characters) {
-            break
+    char_map := get_char_map(buffer_font_size)
+
+    // looping through a string gives index as byte_index
+    rune_index := 0
+    for r,byte_index in characters { 
+        if rune_index >= char_index {
+            break 
         }
 
-        r := characters[index]
+        rune_index += 1
 
-        char := get_char(buffer_font_size, u64(r))
+        char := get_char_with_char_map(char_map, buffer_font_size, u64(r))
 
         if r == '\t' {
-            character := get_char(buffer_font_size, u64(' '))
+            character := get_char_with_char_map(char_map, buffer_font_size, u64(' '))
 
             if character == nil {
                 continue
@@ -93,13 +96,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
             continue
         }
 
-
         if char == nil {
-            char = get_char(buffer_font_size, u64(0))
-            
-            if char == nil {
-                continue
-            }
+            continue
         }
 
         new_x += (char.advance.x) 
@@ -118,6 +116,10 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     buffer_cursor_target_pos.x = new_x
     buffer_cursor_target_pos.y = f32(line) * line_height
+}
+
+move_buffer_cursor_x :: proc(amount: int) {
+    line := active_buffer.lines[buffer_cursor_line]
 }
 
 @(private="package")

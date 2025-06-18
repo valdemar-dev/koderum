@@ -417,7 +417,7 @@ process_highlights :: proc(i: int, is_hl_start,positive_dir,negative_dir,is_hl_e
 add_code_text :: proc(
     pos: vec2,
     font_height: f32,
-    text: ^[]rune,
+    text: ^string,
     z_index : f32,
     buffer_line: ^BufferLine,
     char_map: ^CharacterMap,
@@ -425,31 +425,22 @@ add_code_text :: proc(
     descender: f32,
     line_number: int,
     buffer: ^Buffer,
-    token_idx: ^int,
 ) -> (offset: f32, width: f32) {
     pen := vec2{ x = pos.x, y = pos.y }
     highlight_height := ascender - descender
     line_height := font_height * 1.2
     is_start_of_line := true
 
-    tokens := buffer.tokens
-    token: ^Token
+    tokens := buffer_line.tokens
+
+    token : ^Token
+    token_idx : int = 0
     
     highlight_width : f32 = 0
     highlight_offset : f32 = 0
 
-    if len(tokens) > 0 {
-        for &buffer_token, index in tokens {
-            if buffer_token.line < i32(line_number) {
-                continue
-            } else if buffer_token.line > i32(line_number) {
-                break
-            }
-
-            token_idx^ = index
-            token = &buffer_token
-            break
-        }
+    if len(tokens) > 0 && tokens[0].char == 0 {
+        token = &tokens[0]
     }
 
     is_hl_start := line_number == highlight_start_line
@@ -466,37 +457,30 @@ add_code_text :: proc(
     }
 
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
-    
-    hit_start := -1
-    hit_end := -1
-    for i in 0..<len(tokens) {
-        tok := tokens[i]
-        
-        if tok.line > i32(line_number) {
-            token_idx^ = i
-            hit_end = i
-            break
-        }
-        if tok.line < i32(line_number) {
-            continue
-        }
-        
-        if hit_start == -1 {
-            hit_start = i
-        }    
-    }
-    
-    if hit_start == -1 {
-        hit_start = 0
-    }
-    
-    if hit_end == -1 {
-        hit_end = len(tokens)
-    }
-    
-    token_ranges : []Token = tokens[hit_start:hit_end]
-
     for r, i in text {
+        defer if len(tokens) > 0 {
+            if token != nil && (token.char + token.length <= i32(i + 1)) {
+                token_idx += 1
+                if token_idx < len(tokens) {
+                    next_token := &tokens[token_idx]
+
+                    if i32(i + 1) >= next_token.char {
+                        token = next_token
+                    } else {
+                        token = nil
+                    }
+                } else {
+                    token = nil
+                }
+            } else if token == nil && token_idx < len(tokens) {
+                next_token := &tokens[token_idx]
+
+                if i32(i + 1) >= next_token.char {
+                    token = next_token
+                }
+            }
+        }        
+
         if r != ' ' && is_start_of_line {
             is_start_of_line = false
         }
@@ -561,13 +545,10 @@ add_code_text :: proc(
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
-        } else {
-            for range in token_ranges {
-                if i32(i) >= range.char && i32(i) < range.char + range.length {
-                    color = range.color
-                    break
-                }
-            }
+        } else if token != nil {
+            color = token.color
+        } else if active_language_server != nil {
+            color = ORANGE
         }
 
         add_rect(&text_rect_cache, rect{
@@ -603,231 +584,3 @@ TokenRange :: struct {
     color: vec4,
 }
 
-
-
-/*
-add_code_text :: proc(
-    pos: vec2,
-    font_height: f32,
-    text: ^[]rune,
-    z_index : f32,
-    buffer_line: ^BufferLine,
-    char_map: ^CharacterMap,
-    ascender: f32,
-    descender: f32,
-    line_number: int,
-
-    buffer: ^Buffer,
-    token_idx: ^int,
-) -> (offset: f32, width: f32) {
-    pen := vec2{
-        x=(pos.x),
-        y=(pos.y),
-    }
-
-    highlight_height := ascender - descender
-
-    line_height := font_height * 1.2
-
-    is_start_of_line := true
-
-    tokens := buffer.tokens    
-    token : ^Token
-
-    if len(tokens) > 0 {
-        for &buffer_token, index in tokens {
-            if buffer_token.line < i32(line_number) {
-                continue
-            } else if buffer_token.line > i32(line_number) {
-                break
-            }
-
-            token_idx^ = index
-            token = &buffer_token 
-
-            break
-        }
-    }
-
-    highlight_width : f32 = 0
-    highlight_offset : f32 = 0
-
-    is_hl_start := line_number == highlight_start_line
-    is_hl_end := line_number == buffer_cursor_line
-
-    positive_dir := buffer_cursor_line >= highlight_start_line
-    negative_dir := buffer_cursor_line < highlight_start_line
-
-    is_line_fully_highlighted : bool
-
-    if (
-        input_mode == .HIGHLIGHT &&
-        line_number > buffer_cursor_line &&
-        line_number < highlight_start_line
-    ) {
-        is_line_fully_highlighted = true
-    } else if (
-        input_mode == .HIGHLIGHT &&
-        line_number < buffer_cursor_line &&
-        line_number > highlight_start_line
-    ) {
-        is_line_fully_highlighted = true
-    }
-
-    is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
-
-    for r,i in text {
-        defer if token != nil {
-            if i32(i) >= token.char + (token.length-1) {
-                next_idx := token_idx^ + 1
-                
-                if next_idx > len(buffer.tokens) -1 {
-                    token = nil
-                } else {
-                    token_idx^ = token_idx^ + 1
-
-                    token_to_use := &buffer.tokens[next_idx]
-
-                    if token_to_use.line == i32(line_number) {
-                        token = token_to_use
-                    } else {
-                        token = nil
-                    }
-                }
-            }
-        }
-        
-        if r != ' ' && is_start_of_line == true {
-            is_start_of_line = false
-        } 
-
-        is_tab := (r == '\t')  
-        is_space := (r == ' ' && is_start_of_line)
-
-        if is_space || is_tab {
-            character := get_char_with_char_map(char_map, font_height, u64(' '))
-
-            if character == nil {
-                continue
-            }
-
-            advance_amount : f32
-
-            if is_space {
-                advance_amount = (character.advance.x)
-            } else if is_tab {
-                advance_amount = (character.advance.x) * f32(tab_spaces)
-            }
-
-            was_highlighted := process_highlights(
-                i,is_hl_start,positive_dir,
-                negative_dir,is_hl_end,
-                advance_amount,
-                &highlight_width,&highlight_offset,
-            )
-
-            if was_highlighted || is_line_fully_highlighted {
-                add_rect(&rect_cache,
-                    rect{
-                        pen.x + (advance_amount / 2) - 1,
-                        pen.y + (highlight_height / 2) - 1,
-                        2,
-                        2,
-                    },
-                    no_texture,
-                    text_highlight_color,
-                    vec2{},
-                    z_index,
-                )
-            } else if do_highlight_indents && i % tab_spaces == 0 {
-                add_rect(&rect_cache,
-                    rect{ pen.x, pen.y, general_line_thickness_px, highlight_height },
-                    no_texture,
-                    BG_MAIN_30,
-                    vec2{},
-                    z_index,
-                )
-            } 
-
-            pen.x += advance_amount
-
-            continue
-        }
-
-        character := get_char_with_char_map(char_map, font_height, u64(r))
-
-        if character == nil {
-            character = get_char_with_char_map(char_map, font_height, u64(0))
-
-            if character == nil {
-                continue
-            }
-        }
-        
-        if font_height in char_uv_maps == false {
-            continue
-        }
-
-        index := char_uv_maps[font_height]
-        char_uv_map := char_uv_maps_array[index]
-        uvs_index := char_uv_map[u64(r)]
-        uvs := char_rects[uvs_index]
-
-        color := TEXT_MAIN
-
-        advance_amount := character.advance.x
-
-        was_highlighted := process_highlights(
-            i,is_hl_start,positive_dir,
-            negative_dir,is_hl_end,
-            advance_amount,
-            &highlight_width,&highlight_offset,
-        )
-        
-        if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
-            color = RED
-        } else if was_highlighted || is_line_fully_highlighted {
-            color = text_highlight_color
-        } else if token != nil && token.char <= i32(i) {
-            color = token.color
-        }
-
-        add_rect(&text_rect_cache,
-            rect{
-                pen.x + character.offset.x + 0.1,
-                pen.y - character.offset.y + ascender,
-                f32(character.width),
-                f32(character.rows),
-            },
-            rect{
-                f32(uvs.x),
-                f32(uvs.y),
-                f32(uvs.w) - rect_pack_glyp_padding,
-                f32(uvs.h) - rect_pack_glyp_padding,
-            },
-            color,
-            char_uv_map_size,
-            z_index,
-        )
-
-        pen.x = pen.x + advance_amount
-        pen.y = pen.y + character.advance.y
-    }
-
-    if input_mode != .HIGHLIGHT {
-        return 0,0
-    }
-
-    if buffer_cursor_line == line_number {
-        return highlight_offset, highlight_width
-    } else if line_number == highlight_start_line {
-        return highlight_offset, highlight_width
-    }
-
-    if is_line_fully_highlighted {
-        return 0,pen.x - pos.x
-    }
-
-    return 0,0
-}
-*/

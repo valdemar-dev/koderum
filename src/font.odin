@@ -371,7 +371,7 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
     orig_bmp := face.glyph.bitmap
     
-    if orig_bmp.pixel_mode != 2 { // 2 = FT_PIXEL_MODE_GRAY
+    if orig_bmp.pixel_mode != 2 {
         return nil, "Wrong pixel mode"
     }
     
@@ -380,13 +380,13 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
         return nil, "Invalid bitmap size"
     }
 
-    new_buffer := make([dynamic]u8, size, context.allocator)
+    new_buffer := make([dynamic]u8, size)
 
     buffer_slice := mem.slice_ptr(orig_bmp.buffer, size)
 
     mem.copy(raw_data(new_buffer), raw_data(buffer_slice), size)
 
-    char := new(Character, context.allocator)
+    char := new(Character)
 
     char^ = Character{
         buffer=new_buffer,
@@ -530,7 +530,7 @@ get_char_map :: proc(font_height: f32) -> ^CharacterMap {
     index := character_maps[font_height]
 
     if font_height in character_maps == false {
-        new_map := make(CharacterMap, context.allocator)
+        new_map := make(CharacterMap)
 
         append(&character_maps_array, new_map)
 

@@ -28,15 +28,12 @@ LanguageServer :: struct {
 }
 
 Token :: struct {
-    line:        i32,
+    line: i32,
     char:        i32,
     length:      i32,
     color: vec4,
     modifiers:   []string,
     priority: u8,
-    
-    start_byte: u32,
-    end_byte: u32,
 }
 
 log_unhandled_treesitter_cases := false
@@ -146,9 +143,11 @@ lsp_handle_file_open :: proc() {
         fmt.println("LSP REQUEST", msg)
     }
     
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg) 
     
     set_buffer_tokens()
+
+    do_refresh_buffer_tokens = true
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -184,10 +183,11 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             char = delta_char
         }
 
-        type := active_language_server.token_types[token_type_index]
+        type := &active_language_server.token_types[token_type_index]
 
-        color := active_language_server.colors[type]
-        if type not_in active_language_server.colors {
+        color := &active_language_server.colors[type^]
+
+        if color == nil {
             continue
         }
 
@@ -195,7 +195,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             line = line,
             char = char,
             length = length,
-            color = color,
+            color = color^,
             modifiers = decode_modifiers(token_mod_bitset, token_modifiers),
             priority = 0,
         }
@@ -216,25 +216,10 @@ set_buffer_tokens :: proc() {
         prev := start
     }
     
-    start_version := active_buffer.version
+    start_version := active_buffer.version 
     
-    new_tokens := make([dynamic]Token)
+    set_buffer_keywords()
 
-    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
-        if token_a.line != token_b.line {
-            return int(token_a.line - token_b.line)
-        } else if token_a.char != token_b.char {    
-            return int(token_a.char - token_b.char)
-        }
-        
-        return int(int(token_b.priority) - int(token_a.priority))
-    }
-    
-    set_buffer_keywords(&new_tokens)
-    sort.quick_sort_proc(new_tokens[:], sort_proc)
-    
-    active_buffer.tokens = new_tokens
-    
     {
         when ODIN_DEBUG {
             now := time.now()
@@ -255,25 +240,17 @@ set_buffer_tokens_threaded :: proc() {
         start := time.now()
         prev := start
     }
-    
-    new_tokens := make([dynamic]Token)
-    
-    append_elems(&new_tokens, ..active_buffer.tokens[:])
-    
+  
     start_version := active_buffer.version
-    
-    request_full_tokens(active_buffer, &new_tokens)
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "to get LSP tokens.")
-            
-            prev = now
-        }
+
+    lsp_tokens := request_full_tokens(active_buffer) 
+
+    switch active_buffer.ext {
+    case ".js",".ts":
+        set_buffer_tokens_threaded_ts(active_buffer, lsp_tokens)
     }
- 
+    
+    /*
     sort_proc :: proc(token_a: Token, token_b: Token) -> int {
         if token_a.line != token_b.line {
             return int(token_a.line - token_b.line)
@@ -295,12 +272,12 @@ set_buffer_tokens_threaded :: proc() {
             prev = now
         }
     }
+    */
     
     // cool lag-behind system
     // forces set buffer tokens to catch up to the real buffer
     if start_version == active_buffer.version {
         do_refresh_buffer_tokens = false
-        active_buffer.tokens = new_tokens
     }
     
     {
@@ -313,7 +290,7 @@ set_buffer_tokens_threaded :: proc() {
     }
 }
 
-request_full_tokens :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
+request_full_tokens :: proc(buffer: ^Buffer) -> []Token {
     lsp_request_id += 1
     
     when ODIN_DEBUG {
@@ -329,14 +306,10 @@ request_full_tokens :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
         
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
-    bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator)
-    
-    when ODIN_DEBUG {
-        // fmt.println(string(bytes))
-    }
-    
+    bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator) 
+ 
     if read_err != os2.ERROR_NONE {
-        return
+        return {}
     }
     
     parsed,_ := json.parse(bytes)
@@ -364,39 +337,14 @@ request_full_tokens :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
     for value in data {
         append(&lsp_tokens, i32(value.(f64)))
     }
-    
+
     decoded_tokens := decode_semantic_tokens(
         lsp_tokens[:],
         active_language_server.token_types,
-        active_language_server.token_modifiers,
+        active_language_server.token_modifiers,  
     )
-    
-    for token,index in decoded_tokens {        
-        if int(token.line) > len(active_buffer.lines) - 1 {
-            fmt.println("Illegal semantic token. Greater than buffer line length.")
-            
-            break
-        } 
-        
-        append(tokens, token)
-    }
- 
-    delete(decoded_tokens)
-}
-
-request_token_delta :: proc(buffer: ^Buffer, tokens: ^[dynamic]Token) {
-    lsp_request_id += 1
-    
-    msg := semantic_tokens_delta_message(
-        lsp_request_id, 
-        strings.concatenate({
-            "file://",
-            buffer.file_name,
-        }),
-        buffer.token_set_id,
-    )
-
-    fmt.println()
+      
+    return decoded_tokens[:]
 }
 
 notify_server_of_change :: proc(
@@ -447,12 +395,11 @@ notify_server_of_change :: proc(
         
         ts.tree_edit(buffer.previous_tree, &edit)
         
-        set_buffer_tokens()
-        
-        return
     }
     
     set_buffer_tokens()
+
+    do_refresh_buffer_tokens = true
 }
 
 compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -> int {
@@ -526,10 +473,10 @@ apply_diff :: proc(
     return start_off, end_off, start_off + len(new_bytes)
 }
 
-set_buffer_keywords :: proc(tokens: ^[dynamic]Token) {
+set_buffer_keywords :: proc() {
     switch active_buffer.ext {
     case ".js",".ts":
-        set_buffer_keywords_ts(tokens)
+        set_buffer_keywords_ts()
     }
 }
 
@@ -919,19 +866,19 @@ override_node_type :: proc(
     source: []u8,
     start_point,
     end_point: ^ts.Point,
+    tokens: ^[dynamic]Token,
 ) {
     switch active_buffer.ext {
     case ".ts", ".js":
-        override_node_type_ts(node_type, node, source, start_point, end_point)
+        override_node_type_ts(node_type, node, source, start_point, end_point, tokens)
     }
 }
 
-
-walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer) {
+walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer, start_byte, end_byte: ^u32) {
     cursor := ts.tree_cursor_new(root_node)
     defer ts.tree_cursor_delete(&cursor)
-    
-    for {
+   
+    outer: for {
         node := ts.tree_cursor_current_node(&cursor)
         node_type := string(ts.node_type(node))
 
@@ -941,78 +888,11 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
         start_byte := ts.node_start_byte(node)
         end_byte := ts.node_end_byte(node)
 
-        override_node_type(&node_type, node, source, &start_point, &end_point)
-        
+        // override_node_type(&node_type, node, source, &start_point, &end_point)
+
         color := &active_language_server.ts_colors[node_type]
         
-        if color != nil {
-            /*
-            for row in start_point.row..=end_point.row {
-                if int(row) > len(buffer.lines) - 1 {
-                    continue
-                }
-    
-                line := buffer.lines[row]
-                line_string := utf8.runes_to_string(line.characters)
-    
-                start_col := row == start_point.row ? start_point.col : 0
-                end_col := row == end_point.row ? end_point.col : u32(len(line_string))
-                
-                byte_offset_to_rune_index :: proc(line: string, byte_offset: int) -> int {
-                    rune_index := 0
-                    i := 0
-                    for i < byte_offset && i < len(line) {
-                        _, size := utf8.decode_rune(line[i:])
-                        i += size
-                        rune_index += 1
-                    }
-                    return rune_index
-                }
-    
-                start_char := byte_offset_to_rune_index(line_string, int(start_col))
-                end_char := byte_offset_to_rune_index(line_string, int(end_col))
-    
-                length := end_char - start_char
-                if length <= 0 {
-                    continue
-                }
-                append(tokens, Token{
-                    char = i32(start_char),
-                    line = i32(row),
-                    length = i32(length),
-                    color = color^,
-                    priority = 0,
-                    start_byte = start_byte,
-                    end_byte = end_byte,
-                })
-            }
-            */
-            byte_offsets_for_range :: proc(line: string, start_rune: int, end_rune: int) -> (int, int) {
-                i := 0
-                rune_index := 0
-                start_byte := -1
-                end_byte := -1
-            
-                for i < len(line) {
-                    if rune_index == start_rune {
-                        start_byte = i
-                    }
-                    if rune_index == end_rune {
-                        end_byte = i
-                        break
-                    }
-                    _, size := utf8.decode_rune(line[i:])
-                    i += size
-                    rune_index += 1
-                }
-            
-                if end_byte == -1 {
-                    end_byte = len(line)
-                }
-            
-                return start_byte, end_byte
-            }
-            
+        if color != nil {           
             for row in start_point.row ..= end_point.row {
                 if int(row) >= len(buffer.lines) {
                     continue
@@ -1020,7 +900,7 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
             
                 line := buffer.lines[row]
                 runes := line.characters
-                line_string := utf8.runes_to_string(line.characters)
+                line_string := string(line.characters[:])
                 defer delete(line_string)
             
                 start_rune := row == start_point.row ? int(start_point.col) : 0
@@ -1031,16 +911,11 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
                     continue
                 }
             
-                start_byte, end_byte := byte_offsets_for_range(line_string, start_rune, end_rune)
-            
                 append(tokens, Token{
                     char = i32(start_rune),
-                    line = i32(row),
                     length = i32(length),
                     color = color^,
                     priority = 0,
-                    start_byte = u32(start_byte),
-                    end_byte = u32(end_byte),
                 })
             }
         
@@ -1057,29 +932,6 @@ walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buf
         }
     }
 }
-
-
-/*
-walk_changed_range :: proc(node: ts.Node, start_byte, end_byte: u32, content: []u8, out_tokens: ^[dynamic]Token, buffer: ^Buffer) {
-    node_start_byte := ts.node_start_byte(node)
-    node_end_byte := ts.node_end_byte(node)
-    
-    if node_end_byte <= start_byte || node_start_byte >= end_byte {
-        return
-    }
-
-    if node_start_byte >= start_byte && node_end_byte <= end_byte {
-        walk_tree(node, content, out_tokens, buffer)
-        return
-    }
-    
-    child_count := ts.node_child_count(node)
-    for i in 0..<child_count {
-        child := ts.node_child(node, i)
-        walk_changed_range(child, start_byte, end_byte, content, out_tokens, buffer)
-    }
-}
-*/
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {
     start := ts.node_start_byte(node)
@@ -1125,7 +977,7 @@ line_starts_match :: proc(comp: string, target: string, buffer_line: ^BufferLine
         return false
     }
 
-    string_val := utf8.runes_to_string(buffer_line.characters[0:len(comp)])
+    string_val := string(buffer_line.characters[0:len(comp)])
     defer delete(string_val)
 
     if string_val == comp {

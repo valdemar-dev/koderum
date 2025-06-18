@@ -1,10 +1,16 @@
 undo-redo history
 
+                    asdf
 thoughts part 2:
     - the editor MUST learn how to speak in tree-sitter nodes.
     - more accurately, it MUST learn how to query, and parse, only those nodes that we want.
       walking thorugh node lists is EXHAUSTING.
       generating tokens for 8000 loc should take 2ms tops
+    
+    - generating tokens was ridiculously cheap.
+      we gen the entire screen in less than 1ms.
+      something else is bugging us down.
+      im gonna try to make lines into [dynamic]u8 instead of []rune
 
 todo:
     - n/b term search case sensitive within buffer
