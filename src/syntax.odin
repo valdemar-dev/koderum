@@ -117,6 +117,26 @@ set_active_language_server :: proc(ext: string) {
         } else {
             active_language_server = language_servers[ext]
         }
+    case ".odin":
+        if ext not_in language_servers {
+            server,err := init_syntax_odin(ext)
+            
+            if err != os2.ERROR_NONE {
+                return
+            }
+            
+            if server == nil {
+                return
+            }
+            
+            language_servers[ext] = server
+            active_language_server = server
+            
+            return
+        } else {
+            active_language_server = language_servers[ext]
+        }
+
     }
 }
 
@@ -248,6 +268,8 @@ set_buffer_tokens_threaded :: proc() {
     switch active_buffer.ext {
     case ".js",".ts":
         set_buffer_tokens_threaded_ts(active_buffer, lsp_tokens)
+    case ".odin":
+        set_buffer_tokens_threaded_odin(active_buffer, lsp_tokens)
     }
     
     /*
@@ -313,6 +335,9 @@ request_full_tokens :: proc(buffer: ^Buffer) -> []Token {
     }
     
     parsed,_ := json.parse(bytes)
+
+    fmt.println(string(bytes))
+
     obj, ok := parsed.(json.Object)
     
     if !ok {

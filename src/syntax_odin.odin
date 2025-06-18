@@ -1,3 +1,4 @@
+
 #+feature dynamic-literals
 #+private file
 package main
@@ -14,10 +15,9 @@ import "core:sort"
 
 import ts "../../odin-tree-sitter"
 
-import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
-import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
+import ts_odin_bindings "../../odin-tree-sitter/parsers/odin"
 
-ts_ts_colors : map[string]vec4 = {
+ts_odin_colors : map[string]vec4 = {
     "string.fragment"=GREEN,
     "string"=GREEN,
 
@@ -299,24 +299,17 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
 
 `, " [\"`\"] @string"}));
 
-ts_lsp_colors := map[string]vec4{
+odin_lsp_colors := map[string]vec4{
     "parameter"=LIGHT_ORANGE,
 }
 
 @(private="package")
-init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
+init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
     parser := ts.parser_new()
     
-    if ext == ".js" {
-        if !ts.parser_set_language(parser, ts_js_bindings.tree_sitter_javascript()) {
-            fmt.println("Failed to set parser language")
-            return
-        }
-    } else {
-        if !ts.parser_set_language(parser, ts_ts_bindings.tree_sitter_typescript()) {
-            fmt.println("Failed to set parser language")
-            return
-        }
+    if !ts.parser_set_language(parser, ts_odin_bindings.tree_sitter_odin()) {
+        fmt.println("Failed to set parser language")
+        return
     }
     
     stdin_r, stdin_w := os2.pipe() or_return
@@ -329,9 +322,9 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     defer delete(dir)
 
     desc := os2.Process_Desc{
-        command = []string{"typescript-language-server", "--stdio"},
+        command = []string{"ols"},
         env = nil,
-        working_dir = dir,
+        working_dir = "/usr/bin/ols",
         stdin  = stdin_r,
         stdout = stdout_w,
         stderr = nil,
@@ -357,37 +350,15 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     delete(msg)
 
     bytes, read_err := read_lsp_message(stdout_r, allocator)
+
+    defer delete(bytes)
+
     if read_err != os2.ERROR_NONE {
         return server,read_err
     }
     
     when ODIN_DEBUG {
         fmt.println("LSP RESPONSE", string(bytes))
-    }
-    
-    
-    delete(bytes)
-    
-    base := fp.base(dir)
-    
-    msg = did_change_workspace_folders_message(
-        strings.concatenate({"file://",dir}), base
-    )
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-    
-    _, write_err = os2.write(stdin_w, transmute([]u8)msg)
-    if write_err != os2.ERROR_NONE {
-        return server,write_err
-    }
-    
-    bytes, read_err = read_lsp_message(stdout_r, allocator)
-    defer delete(bytes)
-    
-    if read_err != os2.ERROR_NONE {
-        return server,read_err
     }
     
     parsed,_ := json.parse(bytes, json.Specification.JSON, false, context.temp_allocator)
@@ -445,8 +416,8 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         token_modifiers = modifiers,
         token_types = types,
         ts_parser = parser,
-        colors=ts_lsp_colors,
-        ts_colors=ts_ts_colors,
+        colors=odin_lsp_colors,
+        ts_colors=ts_odin_colors,
     }
  
     when ODIN_DEBUG{
@@ -457,7 +428,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
 }
 
 @(private="package")
-set_buffer_keywords_ts :: proc() {
+set_buffer_keywords_odin :: proc() {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
     defer delete(active_buffer_cstring)
 
@@ -472,13 +443,7 @@ set_buffer_keywords_ts :: proc() {
         error_offset := new(u32)
         error_type := new(ts.Query_Error)
         
-        query : ts.Query   
-
-        if active_buffer.ext == ".js" {
-            query = ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), error_offset, error_type)
-        } else {
-            query = ts._query_new(ts_ts_bindings.tree_sitter_typescript(), query_src, u32(len(query_src)), error_offset, error_type)
-        }
+        query := ts._query_new(ts_odin_bindings.tree_sitter_odin(), query_src, u32(len(query_src)), error_offset, error_type)
 
         if query == nil {
             fmt.println(string(query_src)[int(error_offset^):int(error_offset^+1)])
@@ -573,7 +538,7 @@ set_buffer_keywords_ts :: proc() {
 
 
 @(private="package")
-override_node_type_ts :: proc(
+override_node_type_odin :: proc(
     node_type: ^string,
     node: ts.Node, 
     source: []u8,
@@ -593,7 +558,7 @@ override_node_type_ts :: proc(
 }
 
 @(private="package")
-set_buffer_tokens_threaded_ts :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {

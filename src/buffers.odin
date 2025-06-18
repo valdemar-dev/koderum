@@ -11,8 +11,9 @@ import "core:unicode/utf8"
 import "core:strconv"
 import "core:path/filepath"
 import ft "../../alt-odin-freetype" 
-import ts "../../odin-tree-sitter"
-    
+import ts "../../odin-tree-sitter"    
+import "core:time"
+
 @(private="package")
 BufferLine :: struct {
     characters: [dynamic]u8,
@@ -274,9 +275,9 @@ draw_buffer_line :: proc(
     } else if do_highlight_current_line && buffer_cursor_line == index {
         add_rect(&rect_cache,
             rect{
-                line_pos.x,
+                0,
                 line_pos.y,
-                active_buffer.width,
+                fb_size.x,
                 true_font_height,
             },
             no_texture,
@@ -287,9 +288,9 @@ draw_buffer_line :: proc(
 
         add_rect(&rect_cache,
             rect{
-                line_pos.x,
+                0,
                 line_pos.y + true_font_height - general_line_thickness_px,
-                active_buffer.width,
+                fb_size.x,
                 general_line_thickness_px,
             },
             no_texture,
@@ -300,9 +301,9 @@ draw_buffer_line :: proc(
 
         add_rect(&rect_cache,
             rect{
-                line_pos.x,
+                0,
                 line_pos.y,
-                active_buffer.width,
+                fb_size.x,
                 general_line_thickness_px,
             },
             no_texture,
@@ -597,35 +598,6 @@ close_file :: proc(file_name: string) -> (ok: bool) {
     }
     return true
 }
-
-/*
-save_buffer :: proc() {
-    buffer_to_save := make([dynamic]u8)
-    defer delete(buffer_to_save)
-
-    for line,index in active_buffer.lines {
-        if index != 0 {
-            append(&buffer_to_save, u8('\n'))
-        }
-
-        for character in line.characters {
-            append(&buffer_to_save, u8(character))
-        }
-    }    
-
-    ok := os.write_entire_file(
-        active_buffer.file_name,
-        buffer_to_save[:],
-        true,
-    )
-
-    if !ok {
-        panic("FAILED TO SAVE")
-    }
-
-    active_buffer^.is_saved = true
-}
-*/
 
 save_buffer :: proc() {
     buffer_to_save := make([dynamic]u8)
@@ -922,7 +894,11 @@ handle_text_input :: proc() -> bool {
 @(private="package")
 insert_into_buffer :: proc (key: rune) {
     line := &active_buffer.lines[buffer_cursor_line] 
-    
+
+    when ODIN_DEBUG {
+        start := time.now()
+    }
+
     old_length := len(string(line.characters[:]))
     old_byte_length := len(line.characters[:])
 
@@ -957,6 +933,12 @@ insert_into_buffer :: proc (key: rune) {
         len(line.characters),
         string(line.characters[:]),
     )
+
+    when ODIN_DEBUG {
+        now := time.now()
+
+        fmt.println(time.diff(start,now), "to insert a character.")
+    }
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -983,6 +965,37 @@ constrain_scroll_to_cursor :: proc() {
     if amnt_right_offscreen >= 0 {
         active_buffer.scroll_x += amnt_right_offscreen 
     }
+}
+
+constrain_cursor_to_scroll :: proc() {
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    assert(error == .Ok)
+
+    ascender  := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+    line_height := ascender - descender
+
+    // Compute top/bottom visible line range including vertical padding
+    top_visible_y := active_buffer.scroll_y + cursor_edge_padding
+    bottom_visible_y := active_buffer.scroll_y + fb_size.y - cursor_edge_padding
+
+    top_visible_line := int(top_visible_y / line_height)
+    bottom_visible_line := int(bottom_visible_y / line_height) - 1  // Inclusive
+
+    cursor_line_index := int(buffer_cursor_target_pos.y / line_height)
+
+    if cursor_line_index < top_visible_line {
+        cursor_line_index = top_visible_line
+    } else if cursor_line_index > bottom_visible_line {
+        cursor_line_index = bottom_visible_line
+    }
+
+    set_buffer_cursor_pos(
+        clamp(cursor_line_index, 0, len(active_buffer.lines)-1),
+        buffer_cursor_char_index,
+    )
+
+    buffer_cursor_pos = buffer_cursor_target_pos
 }
 
 move_up :: proc() {
@@ -1110,10 +1123,14 @@ move_forward_word :: proc() {
 
 scroll_down :: proc() {
     active_buffer.scroll_y += ((buffer_font_size * 1.2) * 80) * frame_time
+
+    constrain_cursor_to_scroll()
 }
 
 scroll_up :: proc() {
     active_buffer.scroll_y -= ((buffer_font_size * 1.2) * 80) * frame_time
+
+    constrain_cursor_to_scroll()
 }
 
 scroll_left :: proc() {
@@ -1536,6 +1553,8 @@ handle_buffer_input :: proc() -> bool {
         delete(de)
 
         input_mode = .BUFFER_INPUT
+
+        constrain_scroll_to_cursor()
 
         return false
     }
