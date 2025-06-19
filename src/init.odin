@@ -22,6 +22,7 @@ init :: proc() {
     init_fonts()
 
     init_update_thread()
+    init_message_thread()
 
     fb_width, fb_height := glfw.GetFramebufferSize(window)
     fb_size = vec2{f32(fb_width), f32(fb_height)}
@@ -58,6 +59,18 @@ init_update_thread :: proc() {
     update_thread = thread.create(update)
 
     thread.start(update_thread)
+}
+
+@(private="package")
+message_thread : ^thread.Thread
+init_message_thread :: proc() {
+    when ODIN_DEBUG {
+        fmt.println("Initializing update thread.")
+    }
+
+    message_thread = thread.create(message_loop)
+
+    thread.start(message_thread)
 }
 
 init_window :: proc() {

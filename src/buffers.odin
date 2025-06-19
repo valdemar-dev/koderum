@@ -54,7 +54,6 @@ Buffer :: struct {
 
     cursor_line: int,
     cursor_char_index: int,
-
     
     // Used for LSP stuff
     version: int,
@@ -73,7 +72,7 @@ Buffer :: struct {
     previous_tree: ts.Tree,
     
     // Raw data that we read from file and modify for tree-sitter so it doesnt die
-    content: []u8,
+    content: [dynamic]u8,
     
     query: ts.Query,
     
@@ -539,7 +538,7 @@ open_file :: proc(file_name: string) {
     content := make([dynamic]u8, len(data))
     copy(content[:], data)
     
-    new_buffer^.content = content[:]
+    new_buffer^.content = content
 
     new_buffer^.width = fb_size.x
     new_buffer^.height = fb_size.y
@@ -922,7 +921,7 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
     constrain_scroll_to_cursor()
-    
+  
     notify_server_of_change(
         active_buffer,
         buffer_cursor_line,
@@ -933,12 +932,12 @@ insert_into_buffer :: proc (key: rune) {
         len(line.characters),
         string(line.characters[:]),
     )
-
     when ODIN_DEBUG {
         now := time.now()
 
         fmt.println(time.diff(start,now), "to insert a character.")
-    }
+    } 
+ 
 }
 
 constrain_scroll_to_cursor :: proc() {

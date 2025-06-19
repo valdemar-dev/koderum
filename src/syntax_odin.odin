@@ -429,7 +429,7 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
 
 @(private="package")
 set_buffer_keywords_odin :: proc() {
-    active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content))
+    active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
     tree := ts._parser_parse_string(
@@ -498,7 +498,7 @@ set_buffer_keywords_odin :: proc() {
 
         line := &active_buffer.lines[row]
          
-        override_node_type(&node_type, node, active_buffer.content, &start_point, &end_point, &line.tokens)
+        override_node_type(&node_type, node, active_buffer.content[:], &start_point, &end_point, &line.tokens)
         
         if node_type == "SKIP" {
             continue

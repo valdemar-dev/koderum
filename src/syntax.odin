@@ -254,122 +254,75 @@ set_buffer_tokens :: proc() {
 set_buffer_tokens_threaded :: proc() {
     if active_language_server == nil {
         return
-    }
-    
-    when ODIN_DEBUG {
-        start := time.now()
-        prev := start
-    }
+    } 
+
+    do_refresh_buffer_tokens = false
   
-    start_version := active_buffer.version
+    start_version := new(int)
+    start_version^ = active_buffer.version
 
-    lsp_tokens := request_full_tokens(active_buffer) 
-
-    switch active_buffer.ext {
-    case ".js",".ts":
-        set_buffer_tokens_threaded_ts(active_buffer, lsp_tokens)
-    case ".odin":
-        set_buffer_tokens_threaded_odin(active_buffer, lsp_tokens)
-    }
+    lsp_request_id += 1 
     
-    /*
-    sort_proc :: proc(token_a: Token, token_b: Token) -> int {
-        if token_a.line != token_b.line {
-            return int(token_a.line - token_b.line)
-        } else if token_a.char != token_b.char {    
-            return int(token_a.char - token_b.char)
-        }
-        
-        return int(int(token_b.priority) - int(token_a.priority))
-    }
-    
-    sort.quick_sort_proc(new_tokens[:], sort_proc)
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(prev, now), "to sort buffer tokens.")
-            
-            prev = now
-        }
-    }
-    */
-    
-    // cool lag-behind system
-    // forces set buffer tokens to catch up to the real buffer
-    if start_version == active_buffer.version {
-        do_refresh_buffer_tokens = false
-    }
-    
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            prev = now
-            
-            fmt.println("Took", time.diff(start, now), "to update buffer tokens.")
-        }
-    }
-}
-
-request_full_tokens :: proc(buffer: ^Buffer) -> []Token {
-    lsp_request_id += 1
-    
-    when ODIN_DEBUG {
-        start := time.now()
-        prev := start
-    }
-    
-    msg := semantic_tokens_request_message(
+    msg,req_id_string := semantic_tokens_request_message(
         lsp_request_id,
         strings.concatenate({"file://",active_buffer.file_name}),
         0, len(active_buffer.lines)
     )
         
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-    
-    bytes, read_err := read_lsp_message(active_language_server.lsp_stdout_r, context.allocator) 
- 
-    if read_err != os2.ERROR_NONE {
-        return {}
-    }
-    
-    parsed,_ := json.parse(bytes)
-
-    fmt.println(string(bytes))
-
-    obj, ok := parsed.(json.Object)
-    
-    if !ok {
-        panic("Malformed json in set_buffer_tokens")
-    }
-    
-    result := obj["result"]
-    obj,ok = result.(json.Object)
-    
-    if !ok {
-        panic("Malformed json in set_buffer_tokens")
-    }
-    
-    data,data_ok := obj["data"].(json.Array)
-    
-    if !data_ok {
-        panic("Malformed json in set_buffer_tokens")
-    }
-    
-    lsp_tokens := make([dynamic]i32)
-    
-    for value in data {
-        append(&lsp_tokens, i32(value.(f64)))
-    }
-
-    decoded_tokens := decode_semantic_tokens(
-        lsp_tokens[:],
-        active_language_server.token_types,
-        active_language_server.token_modifiers,  
+    send_lsp_message(
+        msg,
+        req_id_string,
+        handle_response,
+        rawptr(start_version),
     )
-      
-    return decoded_tokens[:]
+
+    handle_response :: proc(response: json.Object, data: rawptr) {
+        start_version_ptr := cast(^int)(data)
+
+        start_version := (start_version_ptr^)
+
+        result := response["result"]
+
+        obj,ok := result.(json.Object)
+        
+        if !ok {
+            panic("Malformed json in set_buffer_tokens")
+        }
+        
+        obj_data,data_ok := obj["data"].(json.Array)
+        
+        if !data_ok {
+            panic("Malformed json in set_buffer_tokens")
+        }
+        
+        lsp_tokens := make([dynamic]i32)
+        
+        for value in obj_data {
+            append(&lsp_tokens, i32(value.(f64)))
+        }
+
+        decoded_tokens := decode_semantic_tokens(
+            lsp_tokens[:],
+            active_language_server.token_types,
+            active_language_server.token_modifiers,  
+        )
+          
+        switch active_buffer.ext {
+        case ".js",".ts":
+            set_buffer_tokens_threaded_ts(active_buffer, decoded_tokens[:])
+        case ".odin":
+            set_buffer_tokens_threaded_odin(active_buffer, decoded_tokens[:])
+        }
+
+        // cool lag-behind system
+        // forces set buffer tokens to catch up to the real buffer
+        if start_version != active_buffer.version {
+            fmt.println("start version did not match! invalidating tokens", active_buffer.version, start_version)
+            do_refresh_buffer_tokens = true
+        } 
+
+        free(data)
+    } 
 }
 
 notify_server_of_change :: proc(
@@ -427,7 +380,10 @@ notify_server_of_change :: proc(
     do_refresh_buffer_tokens = true
 }
 
-compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -> int {
+
+/*
+compute_byte_offset :: proc(buffer: ^Buffer, target_line: int, target_rune: int) -> int {
+    content := buffer.content
     line_count := 0
     byte_off := 0
     total_len := len(content)
@@ -456,45 +412,50 @@ compute_byte_offset :: proc(content: []u8, target_line: int, target_rune: int) -
     return byte_off
 }
 
+*/
+
+compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
+    byte_offset := 0
+    for i in 0..<line {
+        byte_offset += len(buffer.lines[i].characters[:])
+        byte_offset += 1
+    }
+
+    line_chars := buffer.lines[line].characters[:]
+    pos := utf8.rune_offset(string(line_chars), rune_index)
+
+    if pos == -1 {
+        byte_offset += len(line_chars)
+    } else {
+        byte_offset += pos
+    }
+
+    return byte_offset
+}
+
+
+
 apply_diff :: proc(
     buffer: ^Buffer,
-    start_line, start_char: int,
-    end_line, end_char: int,
+    start_line, start_col: int,
+    end_line, end_col: int,
     new_text: string,
 ) -> (start_byte: int, old_end_byte: int, new_end_byte: int) {
-    start_off := compute_byte_offset(buffer.content, start_line, start_char)
-    end_off := compute_byte_offset(buffer.content, end_line, end_char)
+    start_off := compute_byte_offset(buffer, start_line, start_col)
+    end_off := compute_byte_offset(buffer, end_line, end_col)
 
-    content_len := len(buffer.content)
-    if start_off < 0 || start_off > content_len {
-        fmt.println("apply_diff: start_off out of range ", start_off, " ", content_len)
+    fmt.println(start_off, end_off)
+
+    if start_off > end_off || end_off > len(buffer.content) {
+        fmt.println("apply_diff: invalid byte range")
         panic("")
     }
-    if end_off < 0 || end_off > content_len {
-        fmt.println("apply_diff: end_off out of range ", end_off, " ", content_len)
-        panic("")
-    }
-    if start_off > end_off {
-        fmt.println("apply_diff: start_off after end_off")
-        panic("")
-    }
+
+    remove_range(&buffer.content, start_off, end_off)
 
     new_bytes := transmute([]u8)new_text
+    inject_at(&buffer.content, start_off, ..new_bytes)
 
-    dyn := make([dynamic]u8)
-
-    for b in buffer.content[0:start_off] {
-        append(&dyn, b)
-    }
-    for b in new_bytes {
-        append(&dyn, b)
-    }
-    for b in buffer.content[end_off:content_len] {
-        append(&dyn, b)
-    }
-
-    buffer.content = dyn[:]
-    
     return start_off, end_off, start_off + len(new_bytes)
 }
 
@@ -830,7 +791,12 @@ completion_request_message :: proc(id: int, uri: string, line: int, character: i
     })
 }
 
-semantic_tokens_request_message :: proc(id: int, uri: string, line_start: int, line_end: int) -> string {
+semantic_tokens_request_message :: proc(
+    id: int,
+    uri: string,
+    line_start: int,
+    line_end: int,
+) -> (msg: string, id_string: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
 
@@ -854,7 +820,7 @@ semantic_tokens_request_message :: proc(id: int, uri: string, line_start: int, l
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    })
+    }), str_id
 }
 
 semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string) -> string {
