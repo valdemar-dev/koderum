@@ -325,15 +325,21 @@ set_buffer_tokens_threaded :: proc() {
     } 
 }
 
+/*
 notify_server_of_change :: proc(
     buffer: ^Buffer,
+
+    // TS STUFF
+    start_byte: int,
+    end_byte: int,
+    
+    // LSP STUFF
     start_line: int,
     start_char: int,
     end_line: int,
     end_char: int,
-    old_byte_length: int,
-    new_end_char: int,
-    new_text: string,
+
+    new_text: []u8,
 ) {
     if active_language_server == nil {
         return
@@ -341,7 +347,7 @@ notify_server_of_change :: proc(
     
     buffer^.version += 1
     
-    escaped := escape_json(new_text)
+    escaped := escape_json(string(new_text))
 
     msg := text_document_did_change_message(
         strings.concatenate({
@@ -355,30 +361,28 @@ notify_server_of_change :: proc(
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
   
     if buffer.previous_tree != nil {        
-        start_byte,old_end_byte,end_byte := apply_diff(
-            buffer,
-            start_line, start_char,
-            end_line, end_char,
-            new_text,
-        )
+        new_end_byte := start_byte + len(new_text)
+
+        remove_range(&buffer.content, start_byte, end_byte)
+        inject_at(&buffer.content, start_byte, ..new_text)
         
         edit := ts.Input_Edit{
             u32(start_byte),
-            u32(old_end_byte),
             u32(end_byte),
+            u32(new_end_byte),
             ts.Point{},
             ts.Point{},
             ts.Point{},
         }
         
         ts.tree_edit(buffer.previous_tree, &edit)
-        
     }
     
     set_buffer_tokens()
 
     do_refresh_buffer_tokens = true
 }
+*/
 
 
 /*
@@ -444,12 +448,13 @@ apply_diff :: proc(
     start_off := compute_byte_offset(buffer, start_line, start_col)
     end_off := compute_byte_offset(buffer, end_line, end_col)
 
-    fmt.println(start_off, end_off)
-
     if start_off > end_off || end_off > len(buffer.content) {
         fmt.println("apply_diff: invalid byte range")
         panic("")
     }
+
+    fmt.println("STARTING:", start_off, end_off)
+    fmt.println(string(buffer.content[start_off:end_off]))
 
     remove_range(&buffer.content, start_off, end_off)
 
@@ -463,6 +468,8 @@ set_buffer_keywords :: proc() {
     switch active_buffer.ext {
     case ".js",".ts":
         set_buffer_keywords_ts()
+    case ".odin":
+        set_buffer_keywords_odin()
     }
 }
 

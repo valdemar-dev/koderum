@@ -639,16 +639,7 @@ insert_tab_as_spaces:: proc() {
     
     inject_at(&line.characters, buffer_cursor_char_index, ..transmute([]u8)tab_string)
     
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_line,
-        0,
-        buffer_cursor_line,
-        old_length,
-        old_byte_length,
-        len(line.characters),
-        string(line.characters[:])
-    )
+    
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
@@ -690,16 +681,7 @@ remove_char :: proc() {
         
         ordered_remove(active_buffer.lines, buffer_cursor_line)
      
-        notify_server_of_change(
-            active_buffer,
-            buffer_cursor_line - 1,
-            prev_line_len,
-            buffer_cursor_line,
-            0,
-            1,
-            prev_line_len,
-            "",
-        )
+        
         
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
         
@@ -730,16 +712,7 @@ remove_char :: proc() {
     
     remove_range(&line.characters, target, target + target_rune_size)
     
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_line,
-        0,
-        buffer_cursor_line,
-        old_line_length,
-        old_byte_length,
-        len(line.characters),
-        string(line.characters[:]),
-    )
+    
 
     set_buffer_cursor_pos(buffer_cursor_line, char_index - 1)
 }
@@ -863,18 +836,7 @@ handle_text_input :: proc() -> bool {
             string(before_cursor),
             "\n",
             string(buffer_line.characters[:]),
-        }))
-        
-        notify_server_of_change(
-            active_buffer,
-            buffer_cursor_line,
-            0,
-            buffer_cursor_line,
-            old_line_length,
-            old_byte_length,
-            len(before_cursor),
-            new_text,
-        )
+        })) 
         
         delete(new_text)
         
@@ -898,9 +860,6 @@ insert_into_buffer :: proc (key: rune) {
         start := time.now()
     }
 
-    old_length := len(string(line.characters[:]))
-    old_byte_length := len(line.characters[:])
-
     buffer_cursor_byte_position := utf8.rune_offset(
         string(line.characters[:]), 
         buffer_cursor_char_index
@@ -921,23 +880,24 @@ insert_into_buffer :: proc (key: rune) {
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
     constrain_scroll_to_cursor()
-  
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_line,
-        0,
-        buffer_cursor_line,
-        old_length,
-        old_byte_length,
-        len(line.characters),
-        string(line.characters[:]),
-    )
+
     when ODIN_DEBUG {
         now := time.now()
 
         fmt.println(time.diff(start,now), "to insert a character.")
     } 
- 
+  
+    /*
+    notify_server_of_change(
+        active_buffer,
+        buffer_cursor_byte_position,
+        buffer_cursor_byte_position,
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+        buffer_cursor_char_index,
+        bytes[0:size]
+    )  
+    */
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -1188,15 +1148,7 @@ indent_selection :: proc(start_line: int, end_line: int) {
         }
     }
 
-    notify_server_of_change(
-        active_buffer,
-        start_line, 0,
-        end_line, 
-        len(string(active_buffer.lines[end_line].characters[:])) - len(chars),
-        old_bytes,
-        len(string(active_buffer.lines[end_line].characters[:])),
-        text,
-    )
+    
 }
 
 array_is_equal :: proc(a, b: []rune) -> bool {
@@ -1262,16 +1214,7 @@ unindent_selection :: proc(start_line: int, end_line: int) {
     old_last_len := len(old_lines[end_line - start_line])
     new_last_len := len(lines[end_line].characters)
 
-    notify_server_of_change(
-        active_buffer,
-        start_line,
-        0,
-        end_line,
-        old_last_len,
-        old_bytes,
-        new_last_len,
-        text,
-    )
+    
     
     cursor_line := lines[buffer_cursor_line]
     if buffer_cursor_char_index > len(cursor_line.characters) {
@@ -1281,6 +1224,7 @@ unindent_selection :: proc(start_line: int, end_line: int) {
         )
     }
 }
+
 
 @(private="package")
 remove_selection :: proc(
@@ -1292,6 +1236,22 @@ remove_selection :: proc(
     if a_line > b_line || (a_line == b_line && a_char > b_char) {
         a_line, b_line = b_line, a_line
         a_char, b_char = b_char, a_char
+    }
+
+    defer {
+        /*
+        notify_server_of_change(
+            active_buffer,
+            a_line,
+            a_char,
+            b_line,
+            b_char,
+            0,
+            a_char,
+            "",
+        )
+        */
+
     }
 
     lines_to_remove := [dynamic]int{}
@@ -1352,6 +1312,81 @@ remove_selection :: proc(
     set_buffer_cursor_pos(a_line, a_char)
 }
 
+
+/*
+@(private="package")
+remove_selection :: proc(
+    start_line: int, end_line: int,
+    start_char: int, end_char: int,
+) {
+    a_line, a_char := start_line, start_char
+    b_line, b_char := end_line,   end_char
+    if a_line > b_line || (a_line == b_line && a_char > b_char) {
+        a_line, b_line = b_line, a_line
+        a_char, b_char = b_char, a_char
+    }
+
+    lines_to_remove := [dynamic]int{}
+
+    if a_line == b_line {
+        line := &active_buffer.lines[a_line]
+        str_val := string(line.characters[:])
+
+        s := utf8.rune_offset(str_val, a_char)
+        e := utf8.rune_offset(str_val, b_char)
+
+        new_chars := [dynamic]u8{}
+        append(&new_chars, ..line.characters[:s])
+        append(&new_chars, ..line.characters[e:])
+
+        line^.characters = new_chars
+        set_buffer_cursor_pos(a_line, a_char)
+        return
+    }
+
+    for i in a_line..=b_line {
+        line := &active_buffer.lines[i]
+        str_val := string(line.characters[:])
+
+        count := utf8.rune_count(str_val)
+        
+        s := utf8.rune_offset(str_val, a_char)
+        e := utf8.rune_offset(str_val, b_char)
+
+        if i == a_line {
+            if a_char == 0 {
+                append(&lines_to_remove, i)
+            } else {
+                resize(&line.characters, s)
+            }
+
+        } else if i == b_line {
+            if b_char == count {
+                append(&lines_to_remove, i)
+            } else {
+                suffix := line.characters[e:]
+                new_chars := make([dynamic]u8)
+                append(&new_chars, ..suffix)
+                line.characters = new_chars
+            }
+
+        } else {
+            append(&lines_to_remove, i)
+        }
+    }
+
+    for i := len(lines_to_remove) - 1; i >= 0; i -= 1 {
+        ordered_remove(active_buffer.lines, lines_to_remove[i])
+    }
+
+    if len(active_buffer.lines) == 0 {
+        append(active_buffer.lines, BufferLine{})
+    }
+
+    set_buffer_cursor_pos(a_line, a_char) 
+}
+*/
+
 delete_line :: proc(line: int) {
     ordered_remove(active_buffer.lines, line)
     
@@ -1359,16 +1394,7 @@ delete_line :: proc(line: int) {
         append(active_buffer.lines, BufferLine{})
     }
 
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_line,
-        0,
-        buffer_cursor_line+1,
-        0,
-        0,
-        0,
-        "",
-    )
+    
 
     // edge case for deleting the last line
     if buffer_cursor_line > len(active_buffer.lines) - 1 {
@@ -1409,16 +1435,7 @@ inject_line :: proc() {
         "\n", strings.repeat(" ", indent_spaces),
     })
 
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_line,
-        old_line_length,
-        buffer_cursor_line,
-        old_line_length,
-        old_byte_length,
-        len(old_line.characters),
-        new_text,
-    )
+    
 
     fmt.println(new_text)
      
