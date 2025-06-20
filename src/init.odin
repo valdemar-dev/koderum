@@ -63,9 +63,19 @@ init_update_thread :: proc() {
 
 @(private="package")
 message_thread : ^thread.Thread
+
+@(private="package")
 init_message_thread :: proc() {
+    if message_thread != nil {
+        thread.terminate(message_thread, 0)
+
+        when ODIN_DEBUG {
+            fmt.println("Destroying existing LSP message thread.")
+        }
+    }
+
     when ODIN_DEBUG {
-        fmt.println("Initializing update thread.")
+        fmt.println("Initializing LSP message thread.")
     }
 
     message_thread = thread.create(message_loop)

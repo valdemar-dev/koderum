@@ -447,6 +447,11 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         ts_parser = parser,
         colors=ts_lsp_colors,
         ts_colors=ts_ts_colors,
+
+        override_node_type=override_node_type,
+
+        set_buffer_tokens=set_buffer_tokens,
+        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
     }
  
     when ODIN_DEBUG{
@@ -456,8 +461,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
     return server,os2.ERROR_NONE
 }
 
-@(private="package")
-set_buffer_keywords_ts :: proc() {
+set_buffer_tokens :: proc() {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -533,7 +537,14 @@ set_buffer_keywords_ts :: proc() {
 
         line := &active_buffer.lines[row]
          
-        override_node_type(&node_type, node, active_buffer.content[:], &start_point, &end_point, &line.tokens)
+        priority : u8 = 0
+
+        active_language_server.override_node_type(
+            &node_type, node,
+            active_buffer.content[:],
+            &start_point, &end_point,
+            &line.tokens, &priority,
+        )
         
         if node_type == "SKIP" {
             continue
@@ -571,15 +582,14 @@ set_buffer_keywords_ts :: proc() {
     active_buffer.previous_tree = tree
 }
 
-
-@(private="package")
-override_node_type_ts :: proc(
+override_node_type :: proc(
     node_type: ^string,
     node: ts.Node, 
     source: []u8,
     start_point,
     end_point: ^ts.Point,
     tokens: ^[dynamic]Token,
+    priority: ^u8,
 ) {
     if node_type^ == "function.method" || node_type^ == "parameter" {
         resize(tokens, len(tokens)-1)
@@ -592,8 +602,7 @@ override_node_type_ts :: proc(
     }
 }
 
-@(private="package")
-set_buffer_tokens_threaded_ts :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_buffer_tokens_threaded :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {

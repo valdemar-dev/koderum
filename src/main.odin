@@ -131,7 +131,10 @@ main :: proc() {
 
     clear_fonts()
     delete_rect_cache(&rect_cache)
+
     thread.destroy(update_thread)
+    thread.destroy(message_thread)
+
     reset_rect_cache(&rect_cache)
 
     delete(default_cwd)

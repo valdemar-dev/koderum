@@ -25,6 +25,21 @@ LanguageServer :: struct {
     
     colors : map[string]vec4,
     ts_colors : map[string]vec4,
+
+    name : string,
+
+    override_node_type: proc(
+        node_type: ^string,
+        node: ts.Node, 
+        source: []u8,
+        start_point,
+        end_point: ^ts.Point,
+        tokens: ^[dynamic]Token,  
+        priority: ^u8,
+    ),
+
+    set_buffer_tokens : proc(),
+    set_buffer_tokens_threaded : proc(buffer: ^Buffer, lsp_tokens: []Token),
 }
 
 Token :: struct {
@@ -96,6 +111,10 @@ language_servers : map[string]^LanguageServer = {}
 
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
+
+    defer {
+        init_message_thread()
+    }
     
     switch ext {
     case ".js",".ts":
@@ -131,9 +150,14 @@ set_active_language_server :: proc(ext: string) {
             
             language_servers[ext] = server
             active_language_server = server
-            
+
+            when ODIN_DEBUG {
+                fmt.println("Set Active Language server to ODIN.")
+            }
+
             return
         } else {
+            fmt.println("odin alredy in there")
             active_language_server = language_servers[ext]
         }
 
@@ -208,6 +232,13 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
         color := &active_language_server.colors[type^]
 
         if color == nil {
+            when ODIN_DEBUG {
+                fmt.println(
+                    "Warning: Missing LSP-Token Colour for Node Type",
+                    type^, 
+                )
+            }
+
             continue
         }
 
@@ -306,13 +337,9 @@ set_buffer_tokens_threaded :: proc() {
             active_language_server.token_types,
             active_language_server.token_modifiers,  
         )
-          
-        switch active_buffer.ext {
-        case ".js",".ts":
-            set_buffer_tokens_threaded_ts(active_buffer, decoded_tokens[:])
-        case ".odin":
-            set_buffer_tokens_threaded_odin(active_buffer, decoded_tokens[:])
-        }
+
+        assert(active_language_server != nil)
+        active_language_server.set_buffer_tokens_threaded(active_buffer, decoded_tokens[:])
 
         // cool lag-behind system
         // forces set buffer tokens to catch up to the real buffer
@@ -362,20 +389,8 @@ notify_server_of_change :: proc(
     if buffer.previous_tree != nil {        
         new_end_byte := start_byte + len(new_text)
 
-        fmt.println(string(buffer.content[0:500]))
-
-        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
-        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
-        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
-
-        fmt.println("Range:", string(buffer.content[start_byte:end_byte]))
-
         remove_range(&buffer.content, start_byte, end_byte)
         inject_at(&buffer.content, start_byte, ..new_text)        
-
-
-
-        fmt.println(string(buffer.content[0:500]))
 
         edit := ts.Input_Edit{
             u32(start_byte),
@@ -414,12 +429,7 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
 }
 
 set_buffer_keywords :: proc() {
-    switch active_buffer.ext {
-    case ".js",".ts":
-        set_buffer_keywords_ts()
-    case ".odin":
-        set_buffer_keywords_odin()
-    }
+    active_language_server.set_buffer_tokens()
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
@@ -805,20 +815,6 @@ semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string
         "\r\n",
         json,
     })
-}
-
-override_node_type :: proc(
-    node_type: ^string,
-    node: ts.Node, 
-    source: []u8,
-    start_point,
-    end_point: ^ts.Point,
-    tokens: ^[dynamic]Token,
-) {
-    switch active_buffer.ext {
-    case ".ts", ".js":
-        override_node_type_ts(node_type, node, source, start_point, end_point, tokens)
-    }
 }
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {

@@ -20,26 +20,40 @@ import ts_odin_bindings "../../odin-tree-sitter/parsers/odin"
 ts_odin_colors : map[string]vec4 = {
     "string.fragment"=GREEN,
     "string"=GREEN,
+    "operator"=GRAY,
+    "keyword"=RED,
+    "punctuation.bracket"=GRAY,
+    "punctuation.delimiter"=GRAY,
+    "comment"=GRAY,
+    "boolean"=BLUE,
+    "punctuation.special"=RED,   
+    "control.flow"=PINK,
+    "number"=LIGHT_GREEN,
+    "float"=LIGHT_GREEN,
+    "string.escape"=YELLOW,
+    "error"=RED,
+    "identifier"=ORANGE,
+    "function"=YELLOW,
+    "field"=LIGHT_ORANGE,
 }
 
 query_src := strings.clone_to_cstring(strings.concatenate({`
-; Preprocs
+;(identifier) @identifier
 
-[
-  (calling_convention)
-  (tag)
-] @preproc
+(member_expression
+  (_)
+  (identifier) @field)
 
-; Includes
+(call_expression
+  function: (identifier) @function)
 
+;[
+;  (calling_convention)
+;  (tag)
+;] @preproc
 [
   "import"
   "package"
-] @include
-
-; Keywords
-
-[
   "foreign"
   "using"
   "struct"
@@ -53,23 +67,12 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
   "bit_set"
   "matrix"
   "bit_field"
-] @keyword
-
-[
-  "proc"
-] @keyword.function
-
-[
-  "return"
-  "or_return"
-] @keyword.return
-
-[
   "distinct"
   "dynamic"
-] @storageclass
-
-; Conditionals
+  "return"
+  "or_return"
+  "proc"
+] @keyword
 
 [
   "if"
@@ -79,8 +82,16 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
   "case"
   "where"
   "break"
+  "for"
+  "do"
+  "continue"
+
+  "or_else"
+  "in"
+  "not_in"
+
   (fallthrough_statement)
-] @conditional
+] @control.flow
 
 ((ternary_expression
   [
@@ -91,54 +102,6 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
     "when"
   ] @conditional.ternary)
   (#set! "priority" 105))
-
-; Repeats
-
-[
-  "for"
-  "do"
-  "continue"
-] @repeat
-
-; Variables
-
-(identifier) @variable
-
-; Namespaces
-
-(package_declaration (identifier) @namespace)
-
-(import_declaration alias: (identifier) @namespace)
-
-(foreign_block (identifier) @namespace)
-
-(using_statement (identifier) @namespace)
-
-; Parameters
-
-(parameter (identifier) @parameter ":" "="? (identifier)? @constant)
-
-(default_parameter (identifier) @parameter ":=")
-
-(named_type (identifier) @parameter)
-
-(call_expression argument: (identifier) @parameter "=")
-
-; Functions
-
-(procedure_declaration (identifier) @type)
-
-(procedure_declaration (identifier) @function (procedure (block)))
-
-(procedure_declaration (identifier) @function (procedure (uninitialized)))
-
-(overloaded_procedure_declaration (identifier) @function)
-
-(call_expression function: (identifier) @function.call)
-
-; Types
-
-(type (identifier) @type)
 
 ((type (identifier) @type.builtin)
   (#any-of? @type.builtin
@@ -153,87 +116,17 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
     "rune" "string" "cstring" "rawptr" "typeid" "any"))
 
 "..." @type.builtin
-
-(struct_declaration (identifier) @type "::")
-
-(enum_declaration (identifier) @type "::")
-
-(union_declaration (identifier) @type "::")
-
-(bit_field_declaration (identifier) @type "::")
-
-(const_declaration (identifier) @type "::" [(array_type) (distinct_type) (bit_set_type) (pointer_type)])
-
-(struct . (identifier) @type)
-
-(field_type . (identifier) @namespace "." (identifier) @type)
-
-(bit_set_type (identifier) @type ";")
-
-(procedure_type (parameters (parameter (identifier) @type)))
-
-(polymorphic_parameters (identifier) @type)
-
-((identifier) @type
-  (#lua-match? @type "^[A-Z][a-zA-Z0-9]*$")
-  (#not-has-parent? @type parameter procedure_declaration call_expression))
-
-; Fields
-
-(member_expression "." (identifier) @field)
-
-(struct_type "{" (identifier) @field)
-
-(struct_field (identifier) @field "="?)
-
-(field (identifier) @field)
-
-; Constants
-
-((identifier) @constant
-  (#lua-match? @constant "^_*[A-Z][A-Z0-9_]*$")
-  (#not-has-parent? @constant type parameter))
-
-(member_expression . "." (identifier) @constant)
-
-(enum_declaration "{" (identifier) @constant)
-
-; Macros
-
-((call_expression function: (identifier) @function.macro)
-  (#lua-match? @function.macro "^_*[A-Z][A-Z0-9_]*$"))
-
-; Attributes
-
-(attribute (identifier) @attribute "="?)
-
-; Labels
-
-(label_statement (identifier) @label ":")
-
-; Literals
-
 (number) @number
-
 (float) @float
-
 (string) @string
-
 (character) @character
-
 (escape_sequence) @string.escape
-
 (boolean) @boolean
 
 [
   (uninitialized)
   (nil)
 ] @constant.builtin
-
-((identifier) @variable.builtin
-  (#any-of? @variable.builtin "context" "self"))
-
-; Operators
 
 [
   ":="
@@ -280,18 +173,8 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
   "?"
 ] @operator
 
-[
-  "or_else"
-  "in"
-  "not_in"
-] @keyword.operator
-
-; Punctuation
-
 [ "{" "}" ] @punctuation.bracket
-
 [ "(" ")" ] @punctuation.bracket
-
 [ "[" "]" ] @punctuation.bracket
 
 [
@@ -303,26 +186,29 @@ query_src := strings.clone_to_cstring(strings.concatenate({`
   ";"
 ] @punctuation.delimiter
 
-
 [
   "@"
   "$"
 ] @punctuation.special
 
-; Comments
-
 [
   (comment)
   (block_comment)
-] @comment @spell
-
-; Errors
+] @comment
 
 (ERROR) @error
 `, ""}));
 
 odin_lsp_colors := map[string]vec4{
-    "parameter"=LIGHT_ORANGE,
+    "function"=YELLOW,
+
+    "variable"=ORANGE,
+
+    "type"=CYAN,
+    "namespace"=ORANGE,
+
+    "enum"=RED,
+    "enumMember"=LIGHT_RED,
 }
 
 @(private="package")
@@ -343,6 +229,11 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     dir := fp.dir(active_buffer.file_name)
     defer delete(dir)
 
+    // odin specific thing
+    absolute_dir := strings.concatenate({
+        fp.dir(dir),
+    })
+
     desc := os2.Process_Desc{
         command = []string{"ols"},
         env = nil,
@@ -352,13 +243,17 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
         stderr = nil,
     }
 
+    when ODIN_DEBUG {
+        fmt.println("LSP Init: Setting Dir As:", absolute_dir)
+    }
+
     process, start_err := os2.process_start(desc)
     if start_err != os2.ERROR_NONE {
         fmt.println(start_err)
         panic("Failed to start TypeScript language server: ")
     }
     
-    msg := initialize_message(process.pid, dir)
+    msg := initialize_message(process.pid, absolute_dir)
     
     when ODIN_DEBUG {
         fmt.println("LSP REQUEST", msg)
@@ -440,6 +335,10 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
         ts_parser = parser,
         colors=odin_lsp_colors,
         ts_colors=ts_odin_colors,
+
+        set_buffer_tokens=set_buffer_tokens,
+        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
+        override_node_type=override_node_type,
     }
  
     when ODIN_DEBUG{
@@ -449,8 +348,7 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     return server,os2.ERROR_NONE
 }
 
-@(private="package")
-set_buffer_keywords_odin :: proc() {
+set_buffer_tokens :: proc() {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -520,7 +418,14 @@ set_buffer_keywords_odin :: proc() {
 
         line := &active_buffer.lines[row]
          
-        override_node_type(&node_type, node, active_buffer.content[:], &start_point, &end_point, &line.tokens)
+        priority : u8 = 0
+
+        active_language_server.override_node_type(
+            &node_type, node,
+            active_buffer.content[:],
+            &start_point, &end_point,
+            &line.tokens, &priority,
+        )
         
         if node_type == "SKIP" {
             continue
@@ -529,7 +434,15 @@ set_buffer_keywords_odin :: proc() {
         color := &active_language_server.ts_colors[node_type]
         
         if color == nil {
-            fmt.println(node_type, string(active_buffer.content[start_byte:end_byte]))
+            when ODIN_DEBUG {
+                fmt.println(
+                    "Warning: Missing TS-Token Colour for Node Type",
+                    node_type, 
+                    "with content",
+                    string(active_buffer.content[start_byte:end_byte])
+                )
+            }
+
             continue
         }
 
@@ -551,36 +464,28 @@ set_buffer_keywords_odin :: proc() {
             char = i32(start_rune),
             length = i32(length),
             color = color^,
-            priority = 0,
+            priority = u8(priority),
         })
     }
         
     active_buffer.previous_tree = tree
 }
 
-
-@(private="package")
-override_node_type_odin :: proc(
+override_node_type :: proc(
     node_type: ^string,
     node: ts.Node, 
     source: []u8,
     start_point,
     end_point: ^ts.Point,
     tokens: ^[dynamic]Token,
+    priority: ^u8,
 ) {
-    if node_type^ == "function.method" || node_type^ == "parameter" {
-        resize(tokens, len(tokens)-1)
-    } else if len(tokens) > 0 {
-        latest_token := tokens[len(tokens)-1]
-
-        if latest_token.char == i32(start_point.col) {
-            node_type^ = "SKIP"
-        }
+    if node_type^ == "field" {
+        priority^ = priority^ +1
     }
 }
 
-@(private="package")
-set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_buffer_tokens_threaded :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {
@@ -591,7 +496,7 @@ set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
         return nil, -1
     }
 
-    for token in lsp_tokens {
+    for &token in lsp_tokens {
         if int(token.line) >= len(buffer.lines) do continue
 
         line := &buffer.lines[token.line]
@@ -602,7 +507,12 @@ set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
             continue
         }
 
+        if overlapping_token.priority > token.priority {
+            continue
+        }
+
         line.tokens[index] = token
+
     }
 }
 

@@ -865,14 +865,33 @@ handle_text_input :: proc() -> bool {
         }
         
         inject_at(active_buffer.lines, new_line_num, buffer_line)
-        
-        new_text := strings.clone(strings.concatenate({
-            string(before_cursor),
+
+        cur_line_end_char := len(string(active_buffer.lines[buffer_cursor_line].characters[:]))
+        cur_line_end_byte := compute_byte_offset(
+            active_buffer,
+            buffer_cursor_line,
+            cur_line_end_char,
+        ) 
+ 
+        new_text := strings.concatenate({
             "\n",
-            string(buffer_line.characters[:]),
-        })) 
-        
-        delete(new_text)
+            strings.repeat(" ", indent_level )
+        })
+
+        notify_server_of_change(
+            active_buffer,
+
+            cur_line_end_byte,
+            cur_line_end_byte,
+
+            buffer_cursor_line,
+            cur_line_end_char,
+
+            buffer_cursor_line,
+            cur_line_end_char,
+
+            transmute([]u8)new_text
+        )
         
         set_buffer_cursor_pos(
             new_line_num,
@@ -880,6 +899,7 @@ handle_text_input :: proc() -> bool {
         )
         
         constrain_scroll_to_cursor()    
+
         return false
     }
     
@@ -1585,6 +1605,32 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_0) {
         set_buffer(10)
     }
+  
+    if is_key_pressed(glfw.KEY_B) {
+        key := key_store[glfw.KEY_B]
+        
+        if key.modifiers != CTRL {
+            return false
+        }
+        
+        buffer_search_term = ""
+
+        selected_hit = nil
+
+        clear(&search_hits)
+
+        input_mode = .COMMAND
+        
+        set_buffer_cursor_pos(
+            cached_buffer_cursor_line,
+            cached_buffer_cursor_char_index,
+        )
+        
+        constrain_scroll_to_cursor()
+        
+        return false
+    }
+
  
     return false
 }
@@ -1808,8 +1854,9 @@ handle_search_input :: proc() {
 
         input_mode = .COMMAND
         
-        cached_buffer_cursor_line = -1
-        cached_buffer_cursor_char_index = -1
+        // trying this out, let's *not* delete it. could be good productivity gains
+        // cached_buffer_cursor_line = -1
+        // cached_buffer_cursor_char_index = -1
 
         return
     }
@@ -1856,9 +1903,6 @@ handle_search_input :: proc() {
         
         constrain_scroll_to_cursor()
         
-        cached_buffer_cursor_line = -1
-        cached_buffer_cursor_char_index = -1
-
         return
     }
 
