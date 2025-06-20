@@ -17,7 +17,7 @@ LSPRequest :: struct {
     data: rawptr,
 }
 
-requests : [dynamic]LSPRequest = {}
+requests : [dynamic]LSPRequest
 
 @(private="package")
 update_state :: proc(current_time: f64) {

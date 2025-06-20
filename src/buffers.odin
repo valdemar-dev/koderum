@@ -666,23 +666,38 @@ remove_char :: proc() {
             return
         }
 
-        prev_line := &active_buffer.lines[buffer_cursor_line-1]
+        prev_line := &active_buffer.lines[buffer_cursor_line - 1]
         prev_line_len := len(string(prev_line.characters[:]))
-        old_byte_length := len(prev_line.characters)
 
-        new_bytes := make([dynamic]u8)
-        
-        append_elems(&new_bytes, ..prev_line.characters[:])
-        append_elems(&new_bytes, ..line.characters[:])
+        // Buffer Manipulation
+        {
+            new_bytes := make([dynamic]u8) 
 
-        prev_line^.characters = new_bytes
+            append_elems(&new_bytes, ..prev_line.characters[:])
+            append_elems(&new_bytes, ..line.characters[:])
 
-        new_text := strings.clone(string(prev_line.characters[:]))
-        
-        ordered_remove(active_buffer.lines, buffer_cursor_line)
-     
-        
-        
+            prev_line^.characters = new_bytes
+
+            ordered_remove(active_buffer.lines, buffer_cursor_line)
+        }
+
+        buffer_cursor_accumulated_byte_position := compute_byte_offset(
+            active_buffer, 
+            buffer_cursor_line-1,
+            prev_line_len,
+        )
+
+        notify_server_of_change(
+            active_buffer,
+            buffer_cursor_accumulated_byte_position,
+            buffer_cursor_accumulated_byte_position + 1,
+            buffer_cursor_line-1,
+            prev_line_len,
+            buffer_cursor_line,
+            0,
+            {},
+        )
+ 
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
         
         return
@@ -711,8 +726,27 @@ remove_char :: proc() {
     target_rune_size := utf8.rune_size(target_rune)
     
     remove_range(&line.characters, target, target + target_rune_size)
-    
-    
+
+    buffer_cursor_accumulated_byte_position := compute_byte_offset(
+        active_buffer, 
+        buffer_cursor_line,
+        buffer_cursor_char_index-1,
+    )
+
+    notify_server_of_change(
+        active_buffer,
+
+        buffer_cursor_accumulated_byte_position,
+        buffer_cursor_accumulated_byte_position + target_rune_size,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index-1,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
+        {},
+    ) 
 
     set_buffer_cursor_pos(buffer_cursor_line, char_index - 1)
 }
@@ -865,19 +899,17 @@ insert_into_buffer :: proc (key: rune) {
         buffer_cursor_char_index
     )
 
+    if buffer_cursor_byte_position == -1 {
+        buffer_cursor_byte_position = len(line.characters)
+    }
+
     bytes, _ := utf8.encode_rune(key)
     size := utf8.rune_size(key)
 
-    if buffer_cursor_byte_position >= len(line.characters) || buffer_cursor_byte_position == -1 {
-        append(&line.characters, ..bytes[0:size])
-    } else {
-        inject_at(&line.characters, buffer_cursor_byte_position, ..bytes[0:size])
-    }
+    inject_at(&line.characters, buffer_cursor_byte_position, ..bytes[0:size])
     
     get_char(buffer_font_size, u64(key))
     add_missing_characters()
-
-    set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
     constrain_scroll_to_cursor()
 
@@ -886,18 +918,29 @@ insert_into_buffer :: proc (key: rune) {
 
         fmt.println(time.diff(start,now), "to insert a character.")
     } 
-  
-    /*
-    notify_server_of_change(
-        active_buffer,
-        buffer_cursor_byte_position,
-        buffer_cursor_byte_position,
+
+    buffer_cursor_accumulated_byte_position := compute_byte_offset(
+        active_buffer, 
         buffer_cursor_line,
         buffer_cursor_char_index,
+    )
+  
+    notify_server_of_change(
+        active_buffer,
+
+        buffer_cursor_accumulated_byte_position,
+        buffer_cursor_accumulated_byte_position,
+
+        buffer_cursor_line,
         buffer_cursor_char_index,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
         bytes[0:size]
-    )  
-    */
+    )
+
+    set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -934,12 +977,11 @@ constrain_cursor_to_scroll :: proc() {
     descender := f32(primary_font.size.metrics.descender >> 6)
     line_height := ascender - descender
 
-    // Compute top/bottom visible line range including vertical padding
     top_visible_y := active_buffer.scroll_y + cursor_edge_padding
     bottom_visible_y := active_buffer.scroll_y + fb_size.y - cursor_edge_padding
 
     top_visible_line := int(top_visible_y / line_height)
-    bottom_visible_line := int(bottom_visible_y / line_height) - 1  // Inclusive
+    bottom_visible_line := int(bottom_visible_y / line_height) - 1
 
     cursor_line_index := int(buffer_cursor_target_pos.y / line_height)
 
@@ -1238,154 +1280,50 @@ remove_selection :: proc(
         a_char, b_char = b_char, a_char
     }
 
+    start_accumulated := compute_byte_offset(
+        active_buffer, 
+        a_line,
+        a_char,
+    )
+
+    end_accumulated := compute_byte_offset(
+        active_buffer, 
+        b_line,
+        b_char,
+    )
+
     defer {
-        /*
         notify_server_of_change(
             active_buffer,
+
+            start_accumulated,
+            end_accumulated,
+
             a_line,
             a_char,
+
             b_line,
             b_char,
-            0,
-            a_char,
-            "",
+
+            {},
         )
-        */
-
     }
-
-    lines_to_remove := [dynamic]int{}
 
     if a_line == b_line {
-        line := &active_buffer.lines[a_line]
-        s := min(a_char, len(line.characters))
-        e := min(b_char, len(line.characters))
-        
-        new_chars := [dynamic]u8{}
-        
-        runtime.append_elems(&new_chars, ..line.characters[:s])
-        runtime.append_elems(&new_chars, ..line.characters[e:])
+        target_line := &active_buffer.lines[a_line]
+        remove_range(&target_line.characters, a_char, b_char)
+    } else {
+        first_line := &active_buffer.lines[a_line]
+        last_line := &active_buffer.lines[b_line]
 
-        line^.characters = new_chars
+        remove_range(&last_line.characters, 0, b_char)
+        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char])
 
-        set_buffer_cursor_pos(a_line, a_char)
-        return
-    }
-
-    for i in a_line..=b_line {
-        line := &active_buffer.lines[i]
-        count := len(line.characters)
-        s := min(a_char, count)
-        e := min(b_char, count)
-
-        if i == a_line {
-            if s == 0 {
-                runtime.append_elem(&lines_to_remove, i)
-            } else {
-                resize(&line.characters, len(line.characters[:s]))
-            }
-
-        } else if i == b_line {
-            if e == count {
-                runtime.append_elem(&lines_to_remove, i)
-            } else {
-                new_chars := make([dynamic]u8)
-                append(&new_chars, ..line.characters[e:])
-                
-                line.characters = new_chars
-            }
-        } else {
-            runtime.append_elem(&lines_to_remove, i)
-        }
-    }
-    
-    j := len(lines_to_remove)
-    for j > 0 {
-        j -= 1
-        ordered_remove(active_buffer.lines, lines_to_remove[j])
-    }
-
-    if len(active_buffer.lines) == 0 {
-        append(active_buffer.lines, BufferLine{})
+        remove_range(active_buffer.lines, a_line, b_line)
     }
 
     set_buffer_cursor_pos(a_line, a_char)
 }
-
-
-/*
-@(private="package")
-remove_selection :: proc(
-    start_line: int, end_line: int,
-    start_char: int, end_char: int,
-) {
-    a_line, a_char := start_line, start_char
-    b_line, b_char := end_line,   end_char
-    if a_line > b_line || (a_line == b_line && a_char > b_char) {
-        a_line, b_line = b_line, a_line
-        a_char, b_char = b_char, a_char
-    }
-
-    lines_to_remove := [dynamic]int{}
-
-    if a_line == b_line {
-        line := &active_buffer.lines[a_line]
-        str_val := string(line.characters[:])
-
-        s := utf8.rune_offset(str_val, a_char)
-        e := utf8.rune_offset(str_val, b_char)
-
-        new_chars := [dynamic]u8{}
-        append(&new_chars, ..line.characters[:s])
-        append(&new_chars, ..line.characters[e:])
-
-        line^.characters = new_chars
-        set_buffer_cursor_pos(a_line, a_char)
-        return
-    }
-
-    for i in a_line..=b_line {
-        line := &active_buffer.lines[i]
-        str_val := string(line.characters[:])
-
-        count := utf8.rune_count(str_val)
-        
-        s := utf8.rune_offset(str_val, a_char)
-        e := utf8.rune_offset(str_val, b_char)
-
-        if i == a_line {
-            if a_char == 0 {
-                append(&lines_to_remove, i)
-            } else {
-                resize(&line.characters, s)
-            }
-
-        } else if i == b_line {
-            if b_char == count {
-                append(&lines_to_remove, i)
-            } else {
-                suffix := line.characters[e:]
-                new_chars := make([dynamic]u8)
-                append(&new_chars, ..suffix)
-                line.characters = new_chars
-            }
-
-        } else {
-            append(&lines_to_remove, i)
-        }
-    }
-
-    for i := len(lines_to_remove) - 1; i >= 0; i -= 1 {
-        ordered_remove(active_buffer.lines, lines_to_remove[i])
-    }
-
-    if len(active_buffer.lines) == 0 {
-        append(active_buffer.lines, BufferLine{})
-    }
-
-    set_buffer_cursor_pos(a_line, a_char) 
-}
-*/
 
 delete_line :: proc(line: int) {
     ordered_remove(active_buffer.lines, line)
@@ -1394,9 +1332,6 @@ delete_line :: proc(line: int) {
         append(active_buffer.lines, BufferLine{})
     }
 
-    
-
-    // edge case for deleting the last line
     if buffer_cursor_line > len(active_buffer.lines) - 1 {
         set_buffer_cursor_pos(
             buffer_cursor_line - (buffer_cursor_line - (len(active_buffer.lines)-1)),
@@ -1421,24 +1356,20 @@ inject_line :: proc() {
         
     indent_spaces := determine_line_indent(buffer_cursor_line + 1)
 
+    cur_line_end_char := len(string(active_buffer.lines[buffer_cursor_line].characters[:]))
+    cur_line_end_byte := compute_byte_offset(
+        active_buffer,
+        buffer_cursor_line,
+        cur_line_end_char,
+    ) 
+
     bytes, _ := utf8.encode_rune(' ')
+    space_size := utf8.rune_size(' ')
     
     for i in 0..<indent_spaces {
-        inject_at(&buffer_line.characters, 0, ..bytes[:])
+        inject_at(&buffer_line.characters, 0, ..bytes[:space_size])
     }
-
-    old_line := active_buffer.lines[buffer_cursor_line]
-    old_line_length := len(string(old_line.characters[:]))
-    old_byte_length := len(old_line.characters)
-
-    new_text := strings.concatenate({
-        "\n", strings.repeat(" ", indent_spaces),
-    })
-
-    
-
-    fmt.println(new_text)
-     
+   
     inject_at(active_buffer.lines, buffer_cursor_line + 1, buffer_line)
 
     set_buffer_cursor_pos(
@@ -1455,6 +1386,26 @@ inject_line :: proc() {
     delete(de)
     
     input_mode = .BUFFER_INPUT
+
+    new_text := strings.concatenate({
+        "\n",
+        strings.repeat(" ", indent_spaces)
+    })
+
+    notify_server_of_change(
+        active_buffer,
+
+        cur_line_end_byte,
+        cur_line_end_byte,
+
+        buffer_cursor_line,
+        cur_line_end_char,
+
+        buffer_cursor_line,
+        cur_line_end_char,
+
+        transmute([]u8)new_text
+    )
 }
 
 @(private="package")
@@ -1648,59 +1599,68 @@ paste_string :: proc(str: string, line: int, char: int) {
 
     defer delete(split)
 
-    buffer_line := &active_buffer.lines[line]
+    absolute_byte_offset := compute_byte_offset(active_buffer, line, char)
 
-    if len(split) == 1 {
-        runes := utf8.string_to_runes(str)
-        
-        inject_at(&buffer_line.characters, char, ..transmute([]u8)str)
+    defer {
+        notify_server_of_change(
+            active_buffer,
 
-        set_buffer_cursor_pos(
+            absolute_byte_offset,
+            absolute_byte_offset,
+
             line,
-            buffer_cursor_char_index + len(str),
+            char,
+
+            line,
+            char,
+
+            transmute([]u8)str,
         )
+    }
+
+    start_line := &active_buffer.lines[line]
+    start_chars := start_line.characters[:]
+
+    byte_offset := utf8.rune_offset(
+        string(start_chars),
+        char,
+    )
+
+    if len(split) == 0 {
+        first_paste_line := split[0]
+
+        inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
 
         return
     }
 
-
-    clamped := clamp(char, 0, len(buffer_line.characters))
-
-    prev := buffer_line.characters[:clamped]
-    after := buffer_line.characters[clamped:]
+    pre := active_buffer.lines[line].characters[:char]
+    post := active_buffer.lines[line].characters[char:]
 
     for i in 0..<len(split) {
-        line_index := line + i
+        text_line := split[i]
 
         if i == 0 {
-            runes := utf8.string_to_runes(split[i])
-            
-            new_chars := make([dynamic]u8)
-            
-            append(&new_chars, ..prev[:])
-            append(&new_chars, ..transmute([]u8)split[i])
-            
+            buffer_line := &active_buffer.lines[line]
+
+            inject_at(&buffer_line.characters, byte_offset, ..transmute([]u8)text_line)
+            resize(&buffer_line.characters, byte_offset + len(text_line))
+
             continue
         }
-        
-        chars := make([dynamic]u8)
-        
-        append(&chars, ..transmute([]u8)split[i])
-        
-        inserted := BufferLine{ characters = chars }
 
-        if i == len(split)-1 {
-            append(&inserted.characters, ..after)
+        buffer_line_index := line + i
+
+        new_buffer_line := BufferLine{}
+
+        append(&new_buffer_line.characters, ..transmute([]u8)text_line)
+
+        if i == (len(split) - 1) {
+            append(&new_buffer_line.characters, ..post)
         }
 
-        inject_at(active_buffer.lines, line_index, inserted)
-        constrain_scroll_to_cursor()
-
-        if i == len(split)-1 {
-            set_buffer_cursor_pos(line_index, len(chars))
-        }
+        inject_at(active_buffer.lines, buffer_line_index, new_buffer_line)
     }
-
 }
 
 @(private="package")
@@ -1983,3 +1943,4 @@ escape_json :: proc(text: string) -> string {
 
     return strings.clone(strings.to_string(builder))
 }
+

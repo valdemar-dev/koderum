@@ -25,7 +25,7 @@ parse_args :: proc() {
     for arg in os.args {
         if arg == "-save_logs" {
             fmt.println("NOTE: All output will be directed to stdout.txt")
-            
+
             file_handle, err := os.open("stdout.txt", os.O_WRONLY | os.O_CREATE, 0o644)
             if err != os.ERROR_NONE {
                 fmt.println("Failed to open file:", os.error_string(err))

@@ -325,7 +325,6 @@ set_buffer_tokens_threaded :: proc() {
     } 
 }
 
-/*
 notify_server_of_change :: proc(
     buffer: ^Buffer,
 
@@ -363,9 +362,21 @@ notify_server_of_change :: proc(
     if buffer.previous_tree != nil {        
         new_end_byte := start_byte + len(new_text)
 
+        fmt.println(string(buffer.content[0:500]))
+
+        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
+        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
+        fmt.println("AAAAAAAAA KJSDLFKJSDFLK SJDFL KSJDFL KJSDFLK J")
+
+        fmt.println("Range:", string(buffer.content[start_byte:end_byte]))
+
         remove_range(&buffer.content, start_byte, end_byte)
-        inject_at(&buffer.content, start_byte, ..new_text)
-        
+        inject_at(&buffer.content, start_byte, ..new_text)        
+
+
+
+        fmt.println(string(buffer.content[0:500]))
+
         edit := ts.Input_Edit{
             u32(start_byte),
             u32(end_byte),
@@ -382,41 +393,6 @@ notify_server_of_change :: proc(
 
     do_refresh_buffer_tokens = true
 }
-*/
-
-
-/*
-compute_byte_offset :: proc(buffer: ^Buffer, target_line: int, target_rune: int) -> int {
-    content := buffer.content
-    line_count := 0
-    byte_off := 0
-    total_len := len(content)
-
-    for line_count < target_line {
-        if byte_off >= total_len {
-            fmt.println("compute_byte_offset: requested line ", target_line, " out of range")
-            panic("")
-        }
-        if content[byte_off] == '\n' {
-            line_count += 1
-        }
-        byte_off += 1
-    }
-
-    rune_count := 0
-    for rune_count < target_rune {
-        if byte_off >= total_len {
-            fmt.println("compute_byte_offset: requested rune ", target_rune, " on line ", target_line, " out of range")
-            panic("")
-        }
-        _, width := utf8.decode_rune(content[byte_off:])
-        byte_off += width
-        rune_count += 1
-    }
-    return byte_off
-}
-
-*/
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
     byte_offset := 0
@@ -435,33 +411,6 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
     }
 
     return byte_offset
-}
-
-
-
-apply_diff :: proc(
-    buffer: ^Buffer,
-    start_line, start_col: int,
-    end_line, end_col: int,
-    new_text: string,
-) -> (start_byte: int, old_end_byte: int, new_end_byte: int) {
-    start_off := compute_byte_offset(buffer, start_line, start_col)
-    end_off := compute_byte_offset(buffer, end_line, end_col)
-
-    if start_off > end_off || end_off > len(buffer.content) {
-        fmt.println("apply_diff: invalid byte range")
-        panic("")
-    }
-
-    fmt.println("STARTING:", start_off, end_off)
-    fmt.println(string(buffer.content[start_off:end_off]))
-
-    remove_range(&buffer.content, start_off, end_off)
-
-    new_bytes := transmute([]u8)new_text
-    inject_at(&buffer.content, start_off, ..new_bytes)
-
-    return start_off, end_off, start_off + len(new_bytes)
 }
 
 set_buffer_keywords :: proc() {
@@ -869,65 +818,6 @@ override_node_type :: proc(
     switch active_buffer.ext {
     case ".ts", ".js":
         override_node_type_ts(node_type, node, source, start_point, end_point, tokens)
-    }
-}
-
-walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer, start_byte, end_byte: ^u32) {
-    cursor := ts.tree_cursor_new(root_node)
-    defer ts.tree_cursor_delete(&cursor)
-   
-    outer: for {
-        node := ts.tree_cursor_current_node(&cursor)
-        node_type := string(ts.node_type(node))
-
-        start_point := ts.node_start_point(node)
-        end_point := ts.node_end_point(node)
-
-        start_byte := ts.node_start_byte(node)
-        end_byte := ts.node_end_byte(node)
-
-        // override_node_type(&node_type, node, source, &start_point, &end_point)
-
-        color := &active_language_server.ts_colors[node_type]
-        
-        if color != nil {           
-            for row in start_point.row ..= end_point.row {
-                if int(row) >= len(buffer.lines) {
-                    continue
-                }
-            
-                line := buffer.lines[row]
-                runes := line.characters
-                line_string := string(line.characters[:])
-                defer delete(line_string)
-            
-                start_rune := row == start_point.row ? int(start_point.col) : 0
-                end_rune := row == end_point.row ? int(end_point.col) : len(runes)
-            
-                length := end_rune - start_rune
-                if length <= 0 {
-                    continue
-                }
-            
-                append(tokens, Token{
-                    char = i32(start_rune),
-                    length = i32(length),
-                    color = color^,
-                    priority = 0,
-                })
-            }
-        
-        }
-        
-        if ts.tree_cursor_goto_first_child(&cursor) {
-            continue
-        }
-
-        for !ts.tree_cursor_goto_next_sibling(&cursor) {
-            if !ts.tree_cursor_goto_parent(&cursor) {
-                return
-            }
-        }
     }
 }
 
