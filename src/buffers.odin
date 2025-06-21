@@ -561,10 +561,6 @@ open_file :: proc(file_name: string) {
         fmt.println("Validating buffer lines")
     }
     
-    when ODIN_DEBUG {
-        fmt.println("Finished creating a buffer.", new_buffer)
-    }
-
     for line in lines { 
         chars := make([dynamic]u8)
         
@@ -1046,18 +1042,10 @@ move_left :: proc() {
 }
 
 move_right :: proc() {
-    line := active_buffer.lines[buffer_cursor_line]
-
-    if buffer_cursor_char_index < len(line.characters) {
-        line := active_buffer.lines[buffer_cursor_line]
-
-        new := min(buffer_cursor_char_index + 1, len(line.characters)-1)
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            new,
-        )
-    }
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        buffer_cursor_char_index + 1,
+    )
 
     constrain_scroll_to_cursor()
 }
@@ -1076,67 +1064,91 @@ move_down :: proc() {
 }
 
 move_back_word :: proc() {
-    line := active_buffer.lines[buffer_cursor_line]
+    current_line := active_buffer.lines[buffer_cursor_line]
 
-    clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
-    chars_before_cursor := string(line.characters[:clamped_index])
- 
-    new_char_index := clamped_index
+    line_str := string(current_line.characters[:])
 
-    prev_was_break := false
+    byte_offset := utf8.rune_offset(line_str, buffer_cursor_char_index - 1)
 
-    #reverse for r,index in chars_before_cursor {
-        if index == 0 {
-            new_char_index = 0
-        }
+    if byte_offset == -1 {
+        return
+    }
 
-        if rune_in_arr(r, word_break_chars) {
-            new_char_index = index+1
+    current_rune := utf8.rune_at_pos(line_str, buffer_cursor_char_index - 1)
 
-            if new_char_index == buffer_cursor_char_index {
-                new_char_index -= 1
+    chars_before_cursor := string(current_line.characters[:byte_offset])
+
+    is_delimiter_sequence := is_delimiter_rune(current_rune)
+
+    new_index := -1
+
+    #reverse for char, rune_index in utf8.string_to_runes(chars_before_cursor) {
+        is_delimiter := is_delimiter_rune(char)
+
+        if is_delimiter {
+            if is_delimiter_sequence == false {
+                new_index = rune_index+1
+
+                break
             }
+        } else {
+            if is_delimiter_sequence == true {
+                new_index = rune_index+1
 
-            break
+                break
+            }
         }
+    }
+
+    if new_index == -1 {
+        new_index = 0
     }
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
-        new_char_index,
+        new_index,
     )
 
     constrain_scroll_to_cursor()
 }
 
 move_forward_word :: proc() {
-    line := active_buffer.lines[buffer_cursor_line]
+    current_line := active_buffer.lines[buffer_cursor_line]
 
-    clamped_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
-    chars_after_cursor := string(line.characters[clamped_index:])
+    line_str := string(current_line.characters[:])
 
-    new_char_index := clamped_index
+    byte_offset := utf8.rune_offset(line_str, buffer_cursor_char_index)
 
-    prev_was_space := false
-    for r,index in chars_after_cursor {
-        if index == len(chars_after_cursor) - 1 {
-            new_char_index = index + buffer_cursor_char_index + 1
-        }
-
-        if rune_in_arr(r, word_break_chars) {
-            if index == 0 {
-                new_char_index = index + buffer_cursor_char_index + 1
-            } else {
-                new_char_index = index + buffer_cursor_char_index
-            }
-
-            break
-        }
+    if byte_offset == -1 {
+        return
     }
+
+    current_rune := utf8.rune_at_pos(line_str, buffer_cursor_char_index)
+
+    chars_after_cursor := string(current_line.characters[byte_offset:])
+
+    is_delimiter_sequence := is_delimiter_rune(current_rune)
+
+    rune_index := buffer_cursor_char_index
+    for char in chars_after_cursor {
+        is_delimiter := is_delimiter_rune(char)
+
+        if is_delimiter {
+            if is_delimiter_sequence == false {
+                break
+            }
+        } else {
+            if is_delimiter_sequence == true {
+                break
+            }
+        }
+
+        rune_index += 1
+    } 
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
-        new_char_index,
+        rune_index,
     )
 
     constrain_scroll_to_cursor()

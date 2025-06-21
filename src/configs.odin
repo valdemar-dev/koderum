@@ -32,6 +32,8 @@ text_highlight_color : vec4 = TEXT_MAIN
 text_highlight_bg : vec4 = BG_MAIN_40
 //text_highlight_bg : vec4 = vec4{1,1,1,1}
 
+delimiter_runes : []rune = {}
+
 general_line_thickness_px : f32
 line_count_padding_px : f32
 
@@ -104,8 +106,7 @@ load_configs :: proc() {
             continue
         }
 
-        trimmed,_ := strings.replace_all(line, " ", "")
-        values := strings.split(trimmed, "=")
+        values := strings.split(line, " = ")
 
         when ODIN_DEBUG {
             fmt.println("Loading option:", values)
@@ -114,7 +115,6 @@ load_configs :: proc() {
         set_option(values)
 
         delete(values)
-        delete(trimmed)
     }
 
     delete(bytes)
@@ -193,6 +193,8 @@ set_option :: proc(options: []string) {
         delete(chars)
     case "search_ignored_dir":
         append(&search_ignored_dirs, strings.clone(value))
+    case "delimiter_runes":
+        delimiter_runes = utf8.string_to_runes(strings.clone(value))
     case:
         fmt.eprintln("Unknown option,", option_name)
     }

@@ -65,9 +65,6 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     last_width : f32 = cursor_width
 
-    buffer_cursor_line = line
-    buffer_cursor_char_index = char_index
-
     char_map := get_char_map(buffer_font_size)
 
     // looping through a string gives index as byte_index
@@ -103,6 +100,10 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
         new_x += (char.advance.x) 
         last_width = (char.advance.x)
     }
+
+    buffer_cursor_line = line
+
+    buffer_cursor_char_index = rune_index
 
     cursor_width = last_width
 

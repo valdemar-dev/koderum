@@ -848,29 +848,12 @@ generic_indent_rule_list : map[string]IndentRule = {
     },
 }
 
-match_all :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    return true
-}
-
-whole_word_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    return comp == target
-}
-
-line_starts_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    if len(buffer_line.characters) < len(comp) {
-        return false
-    }
-
-    string_val := string(buffer_line.characters[0:len(comp)])
-    defer delete(string_val)
-
-    if string_val == comp {
-        return true
+@(private="package")
+is_delimiter_rune :: proc(r: rune) -> bool {
+    for delimiter in delimiter_runes {
+        if r == delimiter do return true
     }
 
     return false
 }
 
-word_break_chars : []rune = {
-    ' ',
-}

@@ -413,7 +413,11 @@ set_buffer_tokens :: proc() {
         
         when ODIN_DEBUG {
             assert(row >= line_number)
-            assert(start_point.row == end_point.row)
+            // assert(start_point.row == end_point.row)
+        }
+
+        if start_point.row != end_point.row {
+            fmt.println(name, node_type, start_point)
         }
 
         line := &active_buffer.lines[row]
