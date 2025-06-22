@@ -78,18 +78,30 @@ message_loop :: proc(thread: ^thread.Thread) {
                     request.response_proc(obj, request.data)
                 }
             }
+
+            continue
         } 
+
+        fmt.println("Received Notification: ",parsed)
     }
 }
 
 @(private="package")
 send_lsp_message :: proc(
     content: string,
-    id: string,
-    response_proc: proc(response: json.Object, data: rawptr),
-    data: rawptr,
+    id: string = "",
+    response_proc: proc(response: json.Object, data: rawptr) = nil,
+    data: rawptr = nil,
 ) {
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
+
+    when ODIN_DEBUG {
+        fmt.println("LSP Message: Sent a message with ID", id)
+    }
+
+    if id == "" {
+        return
+    }
 
     append(&requests, LSPRequest{
         content,
@@ -97,11 +109,18 @@ send_lsp_message :: proc(
         response_proc,
         data,
     })
+}
+
+@(private="package")
+send_lsp_init_message :: proc(
+    content: string,
+    fd: ^os2.File,
+) {
+    _, write_err := os2.write(fd, transmute([]u8)content)
 
     when ODIN_DEBUG {
-        fmt.println("LSP Message Loop: Sent a message with ID", id)
+        fmt.println("LSP Message: Sent n initilization request.",)
     }
-
 }
 
 @(private="package")

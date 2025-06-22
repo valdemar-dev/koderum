@@ -348,7 +348,7 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     return server,os2.ERROR_NONE
 }
 
-set_buffer_tokens :: proc() {
+set_buffer_tokens :: proc(first_line, last_line: int) {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -379,12 +379,12 @@ set_buffer_tokens :: proc() {
     ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
     
     start_point := ts.Point{
-        row=u32(max(active_buffer.first_drawn_line, 0)),
+        row=u32(max(first_line, 0)),
         col=0, 
     }
   
     end_point := ts.Point{
-        row=u32(max(active_buffer.last_drawn_line, 0)),
+        row=u32(max(last_line, 0)),
         col=0,
     }
     

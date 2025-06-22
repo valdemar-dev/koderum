@@ -13,6 +13,7 @@ import "core:path/filepath"
 import ft "../../alt-odin-freetype" 
 import ts "../../odin-tree-sitter"    
 import "core:time"
+import "core:math"
 
 @(private="package")
 BufferLine :: struct {
@@ -28,6 +29,22 @@ BufferError :: struct {
 
 @(private="package")
 buffer_errors : [dynamic]BufferError = {}
+
+@(private="package")
+CompletionHit :: struct {
+    label: string,
+    kind: int,
+    detail: string,
+    documentation: string,
+    insertText: string,
+    insertTextFormat: int,
+}
+
+@(private="package")
+completion_hits : [dynamic]CompletionHit = {}
+
+@(private="package")
+is_incomplete_completion_list := false
 
 @(private="package")
 Buffer :: struct {
@@ -70,6 +87,7 @@ Buffer :: struct {
     
     // Tree-sitter tree
     previous_tree: ts.Tree,
+    is_tree_locked: bool,
     
     // Raw data that we read from file and modify for tree-sitter so it doesnt die
     content: [dynamic]u8,
@@ -475,6 +493,66 @@ draw_text_buffer :: proc() {
             descender,
             char_map,
             buffer_font_size,
+        )
+    }
+
+    if len(completion_hits) > 0 && input_mode == .BUFFER_INPUT {
+        padding := math.round_f32((buffer_font_size) * .25)
+
+        y_pos := buffer_cursor_pos.y - active_buffer.scroll_y + ascender-descender + (padding * 2)
+
+        pen := vec2{
+            buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
+            y_pos,
+        }
+
+        widest : f32 = 0
+
+        for i in 0..<min(5, len(completion_hits))  {
+            hit := completion_hits[i]
+
+            size := add_text_measure(
+                &text_rect_cache,
+                pen,
+                vec4{1,1,1,1},
+                buffer_font_size,
+                hit.label,
+                10,
+            )
+
+            if size.x > widest do widest = size.x
+
+            pen.y += ascender - descender
+        }
+
+        border_width := general_line_thickness_px
+
+        add_rect(
+            &rect_cache,
+            rect{
+                pen.x - padding,
+                y_pos - padding,
+                widest + padding * 2,
+                pen.y - y_pos + padding * 2,
+            },
+            no_texture,
+            BG_MAIN_10,
+            vec2{},
+            9,
+        )
+
+        add_rect(
+            &rect_cache,
+            rect{
+                pen.x - padding - border_width,
+                y_pos - padding - border_width,
+                widest + padding * 2 + border_width * 2,
+                pen.y - y_pos + padding * 2 + border_width * 2,
+            },
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            9,
         )
     }
     
@@ -957,6 +1035,13 @@ insert_into_buffer :: proc (key: rune) {
     )
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
+
+    trigger_kind : string = "1"
+
+    encoded_key,_ := utf8.encode_rune(key)
+    key_string := string(encoded_key[:])
+
+    get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, trigger_kind, key_string)
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -1027,6 +1112,8 @@ move_up :: proc() {
 }
 
 move_left :: proc() {
+    buffer_cursor_desired_char_index = -1
+
     if buffer_cursor_char_index > 0 {
         line := active_buffer.lines[buffer_cursor_line]
 
@@ -1042,6 +1129,8 @@ move_left :: proc() {
 }
 
 move_right :: proc() {
+    buffer_cursor_desired_char_index = -1
+
     set_buffer_cursor_pos(
         buffer_cursor_line,
         buffer_cursor_char_index + 1,

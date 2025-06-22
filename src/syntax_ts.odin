@@ -304,18 +304,16 @@ ts_lsp_colors := map[string]vec4{
 }
 
 @(private="package")
-init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (server: ^LanguageServer, err: os2.Error) {
+init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> os2.Error {
     parser := ts.parser_new()
     
     if ext == ".js" {
         if !ts.parser_set_language(parser, ts_js_bindings.tree_sitter_javascript()) {
-            fmt.println("Failed to set parser language")
-            return
+            panic("Failed to set parser language to javascript.")
         }
     } else {
         if !ts.parser_set_language(parser, ts_ts_bindings.tree_sitter_typescript()) {
-            fmt.println("Failed to set parser language")
-            return
+            panic("Failed to set parser language to typescript.")
         }
     }
     
@@ -342,126 +340,95 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> (
         fmt.println(start_err)
         panic("Failed to start TypeScript language server: ")
     }
-    
-    msg := initialize_message(process.pid, dir)
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-    
-    _, write_err := os2.write(stdin_w, transmute([]u8)msg)
-    if write_err != os2.ERROR_NONE {
-        return server,write_err
-    }
-    
-    delete(msg)
 
-    bytes, read_err := read_lsp_message(stdout_r, allocator)
-    if read_err != os2.ERROR_NONE {
-        return server,read_err
+    server := new(LanguageServer)
+    server^ = LanguageServer{
+        lsp_stdin_w = stdin_w,
+        lsp_stdout_r = stdout_r,
+        lsp_server_pid = process.pid,
+        override_node_type=override_node_type,
+        set_buffer_tokens=set_buffer_tokens,
+        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
+        ts_parser=parser,
+        token_types={},
+        token_modifiers={},
+        completion_trigger_runes={},
     }
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP RESPONSE", string(bytes))
-    }
-    
-    
-    delete(bytes)
-    
+
+    active_language_server = server
+    language_servers[ext] = server
+
+    msg := initialize_message(process.pid, dir)
+
+    send_lsp_message(msg, "1", set_capabilities, rawptr(server))
+
     base := fp.base(dir)
     
     msg = did_change_workspace_folders_message(
         strings.concatenate({"file://",dir}), base
     )
     
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-    
-    _, write_err = os2.write(stdin_w, transmute([]u8)msg)
-    if write_err != os2.ERROR_NONE {
-        return server,write_err
-    }
-    
-    bytes, read_err = read_lsp_message(stdout_r, allocator)
-    defer delete(bytes)
-    
-    if read_err != os2.ERROR_NONE {
-        return server,read_err
-    }
-    
-    parsed,_ := json.parse(bytes, json.Specification.JSON, false, context.temp_allocator)
-    defer delete(parsed.(json.Object))
-        
-    obj, obj_ok := parsed.(json.Object)
-    
-    if !obj_ok {
-        panic("Received incorrect packet.")
-    }
-    
-    result_obj, result_ok := obj["result"].(json.Object)
-    defer delete(result_obj)
-        
-    if !result_ok {
-        panic("Missing result from lsp packet.")
-    }
-    
-    capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
-    defer delete(capabilities_obj)
-    
-    if !capabilities_ok {
-        panic("Missing result from lsp packet.")
-    }
-    
-    provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
-    defer delete(provider_obj)
-    
-    if !provider_ok {
-        panic("Missing semanticTokensProvider from lsp response.")
-    }
-    
-    legend_obj, legend_ok := provider_obj["legend"].(json.Object)
-    defer delete(legend_obj)
-        
-    if !provider_ok {
-        panic("Missing legend from lsp response.")
-    }
-    
-    modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
-    types_arr, types_ok := legend_obj["tokenTypes"].(json.Array)
-    
-    if !modifiers_ok || !types_ok {
-        panic("LSP Legend did not contain types or modifiers.")
-    }
-    
-    modifiers := value_to_str_array(modifiers_arr)
-    types := value_to_str_array(types_arr)
-  
-    server = new(LanguageServer)
-    server^ = LanguageServer{
-        lsp_stdin_w = stdin_w,
-        lsp_stdout_r = stdout_r,
-        lsp_server_pid = process.pid,
-        token_modifiers = modifiers,
-        token_types = types,
-        ts_parser = parser,
-        colors=ts_lsp_colors,
-        ts_colors=ts_ts_colors,
+    send_lsp_init_message(msg, stdin_w)
 
-        override_node_type=override_node_type,
+    set_capabilities :: proc(response: json.Object, data: rawptr) {
 
-        set_buffer_tokens=set_buffer_tokens,
-        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
-    }
+        result_obj, _ := response["result"].(json.Object)
+                   
+        capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
+
+        when ODIN_DEBUG {
+            fmt.println("SETTING CAPABILITIES")
+            fmt.println(capabilities_obj)
+        }
  
-    when ODIN_DEBUG{
-        fmt.println("TypeScript LSP has been initialized.")
+        trigger_characters := (
+            capabilities_obj["completionProvider"].(json.Object)
+            ["triggerCharacters"].(json.Array)
+        )
+
+        trigger_runes : [dynamic]rune = {}
+        for trigger_character in trigger_characters {
+            r := utf8.rune_at_pos(trigger_character.(string), 0)
+
+            append(&trigger_runes, r)
+        }
+       
+        provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
+        
+        legend_obj := provider_obj["legend"].(json.Object)
+            
+        modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
+        types_arr := legend_obj["tokenTypes"].(json.Array)
+
+        server := cast(^LanguageServer)data
+        
+        modifiers := value_to_str_array(modifiers_arr)
+        types := value_to_str_array(types_arr)
+
+        server^.token_modifiers = modifiers
+        server^.token_types = types
+        server^.colors=ts_lsp_colors
+        server^.ts_colors=ts_ts_colors
+        server^.completion_trigger_runes=trigger_runes[:]
+        
+        when ODIN_DEBUG{
+            fmt.println("TypeScript LSP has been initialized.")
+        }
+
+        set_buffer_tokens(0, len(active_buffer.lines))
+        do_refresh_buffer_tokens = true
     }
-    
-    return server,os2.ERROR_NONE
+
+    return os2.ERROR_NONE
 }
 
-set_buffer_tokens :: proc() {
+set_buffer_tokens :: proc(first_line, last_line: int) { 
+    if active_buffer.is_tree_locked == true {
+        return
+    }
+
+    active_buffer.is_tree_locked = true
+
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -473,6 +440,7 @@ set_buffer_tokens :: proc() {
     )
 
     if active_buffer.previous_tree == nil {
+        fmt.println("WARNING: CREATING NEW QUERY")
         error_offset := new(u32)
         error_type := new(ts.Query_Error)
         
@@ -498,12 +466,12 @@ set_buffer_tokens :: proc() {
     ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
     
     start_point := ts.Point{
-        row=u32(max(active_buffer.first_drawn_line, 0)),
+        row=u32(max(first_line, 0)),
         col=0, 
     }
   
     end_point := ts.Point{
-        row=u32(max(active_buffer.last_drawn_line, 0)),
+        row=u32(max(last_line, 0)),
         col=0,
     }
     
@@ -531,8 +499,10 @@ set_buffer_tokens :: proc() {
         row := int(start_point.row)
         
         when ODIN_DEBUG {
+            /*
             assert(row >= line_number)
             assert(start_point.row == end_point.row)
+            */
         }
 
         line := &active_buffer.lines[row]
@@ -553,7 +523,7 @@ set_buffer_tokens :: proc() {
         color := &active_language_server.ts_colors[node_type]
         
         if color == nil {
-            fmt.println(node_type, string(active_buffer.content[start_byte:end_byte]))
+            //fmt.println(node_type, string(active_buffer.content[start_byte:end_byte]))
             continue
         }
 
@@ -580,6 +550,8 @@ set_buffer_tokens :: proc() {
     }
         
     active_buffer.previous_tree = tree
+
+    active_buffer.is_tree_locked = false
 }
 
 override_node_type :: proc(

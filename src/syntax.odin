@@ -20,6 +20,8 @@ LanguageServer :: struct {
     
     token_types : []string,
     token_modifiers : []string,
+
+    completion_trigger_runes : []rune,
     
     ts_parser: ts.Parser,
     
@@ -38,7 +40,7 @@ LanguageServer :: struct {
         priority: ^u8,
     ),
 
-    set_buffer_tokens : proc(),
+    set_buffer_tokens : proc(first_line, last_line: int),
     set_buffer_tokens_threaded : proc(buffer: ^Buffer, lsp_tokens: []Token),
 }
 
@@ -119,20 +121,7 @@ set_active_language_server :: proc(ext: string) {
     switch ext {
     case ".js",".ts":
         if ext not_in language_servers {
-            server,err := init_syntax_typescript(ext)
-            
-            if err != os2.ERROR_NONE {
-                return
-            }
-            
-            if server == nil {
-                return
-            }
-            
-            language_servers[ext] = server
-            active_language_server = server
-            
-            return
+            init_syntax_typescript(ext)
         } else {
             active_language_server = language_servers[ext]
         }
@@ -151,13 +140,8 @@ set_active_language_server :: proc(ext: string) {
             language_servers[ext] = server
             active_language_server = server
 
-            when ODIN_DEBUG {
-                fmt.println("Set Active Language server to ODIN.")
-            }
-
             return
         } else {
-            fmt.println("odin alredy in there")
             active_language_server = language_servers[ext]
         }
 
@@ -182,16 +166,8 @@ lsp_handle_file_open :: proc() {
         1,
         escaped,
     )
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-    
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg) 
-    
-    set_buffer_tokens()
 
-    do_refresh_buffer_tokens = true
+    send_lsp_message(msg) 
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -202,6 +178,7 @@ decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
             append(&result, modifiers[i])
         }
     }
+
     return result[:]
 }
 
@@ -233,10 +210,12 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
 
         if color == nil {
             when ODIN_DEBUG {
+                /*
                 fmt.println(
                     "Warning: Missing LSP-Token Colour for Node Type",
                     type^, 
                 )
+                */
             }
 
             continue
@@ -307,6 +286,10 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
+    if active_buffer.is_tree_locked == false {
+        active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
+    }
+
     handle_response :: proc(response: json.Object, data: rawptr) {
         start_version_ptr := cast(^int)(data)
 
@@ -341,10 +324,7 @@ set_buffer_tokens_threaded :: proc() {
         assert(active_language_server != nil)
         active_language_server.set_buffer_tokens_threaded(active_buffer, decoded_tokens[:])
 
-        // cool lag-behind system
-        // forces set buffer tokens to catch up to the real buffer
         if start_version != active_buffer.version {
-            fmt.println("start version did not match! invalidating tokens", active_buffer.version, start_version)
             do_refresh_buffer_tokens = true
         } 
 
@@ -429,7 +409,7 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
 }
 
 set_buffer_keywords :: proc() {
-    active_language_server.set_buffer_tokens()
+    active_language_server.set_buffer_tokens(active_buffer.first_drawn_line, active_buffer.last_drawn_line)
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
@@ -725,12 +705,24 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
         json,
     })
 }
+completion_request_message :: proc(
+    id: int,
+    uri: string,
+    line: int,
+    character: int,
 
-completion_request_message :: proc(id: int, uri: string, line: int, character: int) -> string {
+    trigger_kind: string,
+    trigger_character: string,
+) -> (msg, id_str: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
 
-    json := strings.concatenate({
+    line_buf := make([dynamic]u8, 16)
+    char_buf := make([dynamic]u8, 16)
+    line_str := strconv.itoa(line_buf[:], line)
+    char_str := strconv.itoa(char_buf[:], character)
+
+    json_parts := [dynamic]string{
         "{\n",
         "  \"jsonrpc\": \"2.0\",\n",
         "  \"id\": \"", str_id, "\",\n",
@@ -740,21 +732,143 @@ completion_request_message :: proc(id: int, uri: string, line: int, character: i
         "      \"uri\": \"", uri, "\"\n",
         "    },\n",
         "    \"position\": {\n",
-        "      \"line\": ", strconv.itoa(make([dynamic]u8, 16)[:], line), ",\n",
-        "      \"character\": ", strconv.itoa(make([dynamic]u8, 16)[:], character), "\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    })
+        "      \"line\": ", line_str, ",\n",
+        "      \"character\": ", char_str, "\n",
+        "    },\n",
+        "    \"context\": {\n",
+        "      \"triggerKind\": ", trigger_kind,
+    }
 
-    buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
+    if trigger_kind == "2" {
+        append(&json_parts, ",\n")
+        append(&json_parts, "      \"triggerCharacter\": \"", trigger_character, "\"")
+    }
+
+    append(&json_parts, "\n    }\n  }\n}\n")
+
+    json := strings.concatenate(json_parts[:])
+
+    len_buf := make([dynamic]u8, 32)
+    length := strconv.itoa(len_buf[:], len(json))
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    })
+    }), str_id
+}
+
+get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
+    lsp_request_id += 1
+
+    msg, req_id_string := completion_request_message(
+        lsp_request_id,
+        strings.concatenate({
+            "file://",
+            active_buffer.file_name,
+        }),
+        line,
+        character,
+        trigger_kind,
+        trigger_character,
+    )
+
+    fmt.println(msg)
+
+    start_version := new(int)
+    start_version^ = active_buffer.version
+
+    send_lsp_message(
+        msg,
+        req_id_string,
+        handle_response,
+        rawptr(start_version),
+    )
+
+    handle_response :: proc(response: json.Object, data: rawptr) {
+        result,_ := response["result"].(json.Object)
+
+        items,ok := result["items"].(json.Array)
+        is_incomplete := result["isIncomplete"].(json.Boolean)
+
+        if !ok {
+            panic("Failed")
+        }
+
+        new_hits := make([dynamic]CompletionHit)
+
+        sort_proc :: proc(a: json.Value, b: json.Value) -> int {
+            a_sort := a.(json.Object)["sortText"].(string)
+            b_sort := b.(json.Object)["sortText"].(string)
+
+            if a_sort == b_sort {
+                a_label := a.(json.Object)["label"].(string)
+                b_label := b.(json.Object)["label"].(string)
+
+                less := a_label < b_label
+
+                if less do return 0
+                return 1
+            }
+
+            less := a_sort < b_sort
+
+            if less do return 0
+            return 1
+        }
+
+        sort.quick_sort_proc(items[:], sort_proc)
+
+        cur_line := active_buffer.lines[buffer_cursor_line]
+        line_string := string(cur_line.characters[:])
+
+        byte_offset := utf8.rune_offset(line_string, buffer_cursor_char_index)
+        if byte_offset == -1 {
+            byte_offset = len(line_string)
+        }
+
+        last_delimiter_byte := 0
+
+        for char, byte in line_string {
+            if byte == byte_offset {
+                break
+            }
+
+            if rune_in_arr(char, delimiter_runes) {
+                last_delimiter_byte = byte+1
+            }
+        }
+
+        token := strings.trim_left_space(line_string[last_delimiter_byte:byte_offset])
+
+        for item in items {
+            label, ok := item.(json.Object)["label"].(string)
+
+            fmt.println(item)
+
+            hit :=  CompletionHit{
+                label=label,
+            }
+
+            if len(token) > 0 {
+                if strings.contains(label, token) == false {
+                    continue
+                }
+
+                if label == token {
+                    inject_at(&new_hits, 0, hit)
+
+                    continue
+                }
+            }
+
+            append(&new_hits, hit)
+        }
+
+        completion_hits = new_hits
+
+        is_incomplete_completion_list = is_incomplete
+    }
 }
 
 semantic_tokens_request_message :: proc(
