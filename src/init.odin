@@ -28,6 +28,7 @@ init :: proc() {
     fb_size = vec2{f32(fb_width), f32(fb_height)}
 
     home_dir := os.get_env("HOME")
+    defer delete(home_dir)
 
     if home_dir != "" {
         os.set_current_directory(home_dir)

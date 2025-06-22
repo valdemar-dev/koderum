@@ -44,7 +44,13 @@ CompletionHit :: struct {
 completion_hits : [dynamic]CompletionHit = {}
 
 @(private="package")
+selected_completion_hit : int
+
+@(private="package")
 is_incomplete_completion_list := false
+
+@(private="package")
+completion_filter_token : string
 
 @(private="package")
 Buffer :: struct {
@@ -499,7 +505,8 @@ draw_text_buffer :: proc() {
     if len(completion_hits) > 0 && input_mode == .BUFFER_INPUT {
         padding := math.round_f32((buffer_font_size) * .25)
 
-        y_pos := buffer_cursor_pos.y - active_buffer.scroll_y + ascender-descender + (padding * 2)
+        y_pos := buffer_cursor_pos.y -
+            active_buffer.scroll_y + ascender-descender + (padding * 2)
 
         pen := vec2{
             buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
@@ -508,7 +515,13 @@ draw_text_buffer :: proc() {
 
         widest : f32 = 0
 
-        for i in 0..<min(5, len(completion_hits))  {
+        end_idx := min(selected_completion_hit + 5, len(completion_hits))
+
+        if selected_completion_hit >= len(completion_hits) {
+            selected_completion_hit = 0
+        }
+
+        for i in selected_completion_hit..<end_idx {
             hit := completion_hits[i]
 
             size := add_text_measure(
@@ -596,6 +609,7 @@ open_file :: proc(file_name: string) {
     }
 
     data, ok := os.read_entire_file_from_filename(file_name)
+    defer delete(data)
 
     if !ok {
         fmt.println("failed to open file")
@@ -606,6 +620,7 @@ open_file :: proc(file_name: string) {
     data_string := string(data)
     
     lines := strings.split(data_string, "\n")
+    defer delete(lines)
 
     buffer_lines := new([dynamic]BufferLine)
 
@@ -643,16 +658,14 @@ open_file :: proc(file_name: string) {
         chars := make([dynamic]u8)
         
         append_elems(&chars, ..transmute([]u8)line)
-        
-        buffer_line := BufferLine{
-            characters=chars,
-        }
 
         for r in line {
             get_char(buffer_font_size, u64(r))
         }
 
-        append_elem(buffer_lines, buffer_line)
+        append_elem(buffer_lines, BufferLine{
+            characters=chars,
+        })
     }
 
     append(&buffers, new_buffer)
@@ -907,7 +920,35 @@ handle_text_input :: proc() -> bool {
         remove_char()
 
         return false
+    }
+
+    if is_key_pressed(glfw.KEY_W) {
+        key := key_store[glfw.KEY_W]
+
+        if key.modifiers == CTRL {
+            selected_completion_hit = clamp(
+                selected_completion_hit - 1,
+                0,
+                len(completion_hits) - 1
+            )
+        }
     } 
+
+    if is_key_pressed(glfw.KEY_E) {
+        key := key_store[glfw.KEY_E]
+
+        if key.modifiers == CTRL {
+            selected_completion_hit = clamp(
+                selected_completion_hit + 1,
+                0,
+                len(completion_hits) - 1
+            )
+        }
+    }
+
+    if is_key_pressed(glfw.KEY_LEFT_ALT) {
+        insert_completion()
+    }
     
     if is_key_pressed(glfw.KEY_ENTER) {
         index := clamp(buffer_cursor_char_index, 0, len(line.characters))
@@ -1036,12 +1077,7 @@ insert_into_buffer :: proc (key: rune) {
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
 
-    trigger_kind : string = "1"
-
-    encoded_key,_ := utf8.encode_rune(key)
-    key_string := string(encoded_key[:])
-
-    get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, trigger_kind, key_string)
+    get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
 }
 
 constrain_scroll_to_cursor :: proc() {
@@ -2061,10 +2097,61 @@ serialize_buffer :: proc(buffer: ^Buffer) -> string {
     return strings.clone(string(buffer_to_save[:]))
 }
 
+insert_completion :: proc() {
+    completion := completion_hits[selected_completion_hit]
+
+    insert_string := strings.trim_left(completion.label, completion_filter_token)
+
+    line := &active_buffer.lines[buffer_cursor_line]
+    byte_offset := utf8.rune_offset(string(line.characters[:]), buffer_cursor_char_index)
+
+    if byte_offset == -1 {
+        byte_offset = len(line.characters)
+    }
+
+    inject_at(
+        &line.characters,
+        byte_offset,
+        ..transmute([]u8)insert_string,
+    )
+
+    buffer_cursor_accumulated_byte_position := compute_byte_offset(
+        active_buffer, 
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+    )
+  
+    notify_server_of_change(
+        active_buffer,
+
+        buffer_cursor_accumulated_byte_position,
+        buffer_cursor_accumulated_byte_position,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
+        transmute([]u8)insert_string
+    )
+
+    count := utf8.rune_count(insert_string)
+
+    set_buffer_cursor_pos(
+        buffer_cursor_line,
+        buffer_cursor_char_index + count
+    )
+
+    get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
+}
+
+builder := strings.builder_make()
+
 @(private="package")
 escape_json :: proc(text: string) -> string {
-    builder := strings.builder_make()
-    
+    strings.builder_reset(&builder)
+
     for c in text {
         switch c {
         case '"':

@@ -130,19 +130,45 @@ main :: proc() {
     }
 
     clear_fonts()
-    delete_rect_cache(&rect_cache)
 
-    thread.destroy(update_thread)
-    thread.destroy(message_thread)
+    delete_rect_cache(&rect_cache)
+    delete_rect_cache(&text_rect_cache)
+
+    thread.terminate(update_thread, 9)
+    thread.terminate(message_thread, 9)
+
+    free(update_thread)
+    free(message_thread)
 
     reset_rect_cache(&rect_cache)
-
-    delete(default_cwd)
     
     for buffer in buffers {
         for &line in buffer.lines {
             delete(line.characters)
+            delete(line.tokens)
         }
+
+        delete(buffer.content)
+
+        delete(buffer.lines^)
+        free(buffer.lines)
+
         free(buffer)
     }
+
+    for dir in search_ignored_dirs {
+        delete(dir)
+    }
+
+    for key,server in language_servers {
+        free(server)
+    }
+
+    delete(default_cwd)
+    delete(language_servers)
+    delete(font_list)
+    delete(delimiter_runes)
+    delete(search_ignored_dirs)
+    delete(requests)
+    delete(buffers)
 }

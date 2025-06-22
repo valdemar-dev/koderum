@@ -11,11 +11,15 @@ import "core:encoding/json"
 import "core:text/regex"
 import "core:unicode/utf8"
 import "core:sort"
+import "core:sync"
+import "core:time"
 
 import ts "../../odin-tree-sitter"
 
 import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
 import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
+
+tree_mutex : sync.Mutex
 
 ts_ts_colors : map[string]vec4 = {
     "string.fragment"=GREEN,
@@ -363,17 +367,18 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     send_lsp_message(msg, "1", set_capabilities, rawptr(server))
 
     base := fp.base(dir)
-    
-    msg = did_change_workspace_folders_message(
-        strings.concatenate({"file://",dir}), base
+
+    msg_2 := did_change_workspace_folders_message(
+        strings.concatenate({"file://",dir}, context.temp_allocator), base
     )
-    
-    send_lsp_init_message(msg, stdin_w)
+ 
+    send_lsp_init_message(msg_2, stdin_w)
+
+    defer delete(msg_2)
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
-
         result_obj, _ := response["result"].(json.Object)
-                   
+
         capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
 
         when ODIN_DEBUG {
@@ -423,11 +428,11 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
 }
 
 set_buffer_tokens :: proc(first_line, last_line: int) { 
-    if active_buffer.is_tree_locked == true {
+    if active_language_server == nil {
         return
     }
 
-    active_buffer.is_tree_locked = true
+    sync.lock(&tree_mutex)
 
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
@@ -440,21 +445,19 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
     )
 
     if active_buffer.previous_tree == nil {
-        fmt.println("WARNING: CREATING NEW QUERY")
-        error_offset := new(u32)
-        error_type := new(ts.Query_Error)
+        error_offset : u32
+        error_type : ts.Query_Error
         
         query : ts.Query   
 
         if active_buffer.ext == ".js" {
-            query = ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), error_offset, error_type)
+            query = ts._query_new(ts_js_bindings.tree_sitter_javascript(), query_src, u32(len(query_src)), &error_offset, &error_type)
         } else {
-            query = ts._query_new(ts_ts_bindings.tree_sitter_typescript(), query_src, u32(len(query_src)), error_offset, error_type)
+            query = ts._query_new(ts_ts_bindings.tree_sitter_typescript(), query_src, u32(len(query_src)), &error_offset, &error_type)
         }
 
         if query == nil {
-            fmt.println(string(query_src)[int(error_offset^):int(error_offset^+1)])
-            fmt.println(error_type^)
+            fmt.println(error_type)
             
             return
         }
@@ -464,6 +467,7 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
     
     cursor := ts.query_cursor_new()
     ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
+    defer ts.query_cursor_delete(cursor)
     
     start_point := ts.Point{
         row=u32(max(first_line, 0)),
@@ -479,6 +483,8 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
     
     match : ts.Query_Match
     capture_index := new(u32)
+
+    defer free(capture_index)
    
     line_number : int = -1
 
@@ -548,10 +554,14 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
             priority = 0,
         })
     }
-        
+
+    if active_buffer.previous_tree != nil {
+        ts.tree_delete(active_buffer.previous_tree)
+    }
+
     active_buffer.previous_tree = tree
 
-    active_buffer.is_tree_locked = false
+    sync.unlock(&tree_mutex)
 }
 
 override_node_type :: proc(

@@ -9,6 +9,7 @@ import gl "vendor:OpenGL"
 import "core:encoding/json"
 import "core:os/os2"
 import "core:os"
+import "core:strings"
 
 LSPRequest :: struct {
     content: string,
@@ -17,7 +18,8 @@ LSPRequest :: struct {
     data: rawptr,
 }
 
-requests : [dynamic]LSPRequest
+@(private="package")
+requests : [dynamic]^LSPRequest
 
 @(private="package")
 update_state :: proc(current_time: f64) {
@@ -66,16 +68,30 @@ message_loop :: proc(thread: ^thread.Thread) {
 
         id_value := &obj["id"]
 
+        defer {
+            delete(bytes)
+            delete(obj)
+        }
+
+        fmt.println(len(requests))
+
         if id_value != nil {
             id, ok := id_value^.(string)
+            defer delete(id)
 
             when ODIN_DEBUG {
                 fmt.println("LSP Message Loop: Processing Request Response with ID", id)
             }
-            
-            for request in requests {
+
+            for &request,index in requests {
                 if request.id == id {
                     request.response_proc(obj, request.data)
+
+                    free(request)
+
+                    ordered_remove(&requests, index)
+
+                    break
                 }
             }
 
@@ -83,13 +99,14 @@ message_loop :: proc(thread: ^thread.Thread) {
         } 
 
         fmt.println("Received Notification: ",parsed)
+
     }
 }
 
 @(private="package")
 send_lsp_message :: proc(
     content: string,
-    id: string = "",
+    id: string,
     response_proc: proc(response: json.Object, data: rawptr) = nil,
     data: rawptr = nil,
 ) {
@@ -103,12 +120,16 @@ send_lsp_message :: proc(
         return
     }
 
-    append(&requests, LSPRequest{
+    request := new(LSPRequest)
+   
+    request^ = LSPRequest{
         content,
-        id,
+        strings.clone(id),
         response_proc,
         data,
-    })
+    }
+
+    append(&requests, request)
 }
 
 @(private="package")

@@ -157,8 +157,9 @@ lsp_handle_file_open :: proc() {
     
     serialized_buffer := serialize_buffer(active_buffer)
     escaped := escape_json(serialized_buffer)
-    
+
     defer delete(serialized_buffer)
+    defer delete(escaped)
     
     msg := did_open_message(
         strings.concatenate({"file://",active_buffer.file_name}),
@@ -167,7 +168,9 @@ lsp_handle_file_open :: proc() {
         escaped,
     )
 
-    send_lsp_message(msg) 
+    defer delete(msg)
+
+    send_lsp_message(msg, "2") 
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -275,10 +278,13 @@ set_buffer_tokens_threaded :: proc() {
     
     msg,req_id_string := semantic_tokens_request_message(
         lsp_request_id,
-        strings.concatenate({"file://",active_buffer.file_name}),
+        strings.concatenate({"file://",active_buffer.file_name}, context.temp_allocator),
         0, len(active_buffer.lines)
     )
-        
+
+    defer delete(msg)
+    defer delete(req_id_string)
+
     send_lsp_message(
         msg,
         req_id_string,
@@ -286,30 +292,29 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
-    if active_buffer.is_tree_locked == false {
-        active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
-    }
+    active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
 
     handle_response :: proc(response: json.Object, data: rawptr) {
         start_version_ptr := cast(^int)(data)
 
         start_version := (start_version_ptr^)
 
-        result := response["result"]
-
-        obj,ok := result.(json.Object)
+        obj,ok := response["result"].(json.Object)
+        defer delete(obj)
         
         if !ok {
             panic("Malformed json in set_buffer_tokens")
         }
         
         obj_data,data_ok := obj["data"].(json.Array)
+        defer delete(obj_data)
         
         if !data_ok {
             panic("Malformed json in set_buffer_tokens")
         }
         
         lsp_tokens := make([dynamic]i32)
+        defer delete(lsp_tokens)
         
         for value in obj_data {
             append(&lsp_tokens, i32(value.(f64)))
@@ -328,8 +333,10 @@ set_buffer_tokens_threaded :: proc() {
             do_refresh_buffer_tokens = true
         } 
 
+        delete(decoded_tokens)
+
         free(data)
-    } 
+    }
 }
 
 notify_server_of_change :: proc(
@@ -354,15 +361,18 @@ notify_server_of_change :: proc(
     buffer^.version += 1
     
     escaped := escape_json(string(new_text))
+    defer delete(escaped)
 
     msg := text_document_did_change_message(
         strings.concatenate({
             "file://",
             buffer.file_name,
-        }),
+        }, context.temp_allocator),
         buffer.version,
         start_line, start_char, end_line, end_char, escaped,
     )
+
+    defer delete(msg)
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
   
@@ -515,7 +525,7 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
 }
 
 text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
-    buf := [32]u8{}
+    buf := make([dynamic]u8, 32)
 
     version_str := strings.clone(strconv.itoa(buf[:], version), context.temp_allocator)
     
@@ -544,18 +554,22 @@ text_document_did_change_message :: proc(doc_uri: string, version: int, start_li
         "    ]\n",
         "  }\n",
         "}\n"
-    })
+    }, context.temp_allocator)
 
-    buf = [32]u8{}
+    delete(buf)
+
+    buf = make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
 
     header := strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    })
+    }, context.temp_allocator)
 
-    return header
+    defer delete(buf)
+
+    return strings.clone(header)
 }
 
 
@@ -669,9 +683,12 @@ initialize_message :: proc(pid: int, project_dir: string) -> string {
         "}\n",
     })
 
-    delete(buf)
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
+    len_buf := make([dynamic]u8, 32)
+
+    length := strings.clone(strconv.itoa(len_buf[:], len(json)))
+
+    defer delete(buf)
+    defer delete(len_buf)
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
@@ -697,6 +714,7 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
     })
 
     buf := make([dynamic]u8, 32)
+    defer delete(buf)
     length := strconv.itoa(buf[:], len(json))
 
     return strings.concatenate({
@@ -705,6 +723,7 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
         json,
     })
 }
+
 completion_request_message :: proc(
     id: int,
     uri: string,
@@ -716,13 +735,17 @@ completion_request_message :: proc(
 ) -> (msg, id_str: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
+    defer delete(id_buf)
 
     line_buf := make([dynamic]u8, 16)
     char_buf := make([dynamic]u8, 16)
+    defer delete(line_buf)
+    defer delete(char_buf)
+
     line_str := strconv.itoa(line_buf[:], line)
     char_str := strconv.itoa(char_buf[:], character)
 
-    json_parts := [dynamic]string{
+    body := strings.concatenate({
         "{\n",
         "  \"jsonrpc\": \"2.0\",\n",
         "  \"id\": \"", str_id, "\",\n",
@@ -736,59 +759,69 @@ completion_request_message :: proc(
         "      \"character\": ", char_str, "\n",
         "    },\n",
         "    \"context\": {\n",
-        "      \"triggerKind\": ", trigger_kind,
-    }
+        "      \"triggerKind\": ", trigger_kind
+    }, context.temp_allocator)
 
     if trigger_kind == "2" {
-        append(&json_parts, ",\n")
-        append(&json_parts, "      \"triggerCharacter\": \"", trigger_character, "\"")
+        body = strings.concatenate({
+            body,
+            ",\n",
+            "      \"triggerCharacter\": \"", trigger_character, "\""
+        }, context.temp_allocator)
     }
 
-    append(&json_parts, "\n    }\n  }\n}\n")
-
-    json := strings.concatenate(json_parts[:])
+    body = strings.concatenate({body, "\n    }\n  }\n}\n"}, context.temp_allocator)
 
     len_buf := make([dynamic]u8, 32)
-    length := strconv.itoa(len_buf[:], len(json))
+    defer delete(len_buf)
 
-    return strings.concatenate({
+    length := strconv.itoa(len_buf[:], len(body))
+
+    final := strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
-        json,
-    }), str_id
+        body
+    }, context.temp_allocator)
+
+    return strings.clone(final), strings.clone(str_id)
 }
 
 get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
     lsp_request_id += 1
+    selected_completion_hit = 0
 
     msg, req_id_string := completion_request_message(
         lsp_request_id,
         strings.concatenate({
             "file://",
             active_buffer.file_name,
-        }),
+        }, context.temp_allocator),
         line,
         character,
         trigger_kind,
         trigger_character,
     )
 
-    fmt.println(msg)
-
-    start_version := new(int)
-    start_version^ = active_buffer.version
+    defer delete(msg)
+    defer delete(req_id_string)
+    defer delete(trigger_character)
 
     send_lsp_message(
         msg,
         req_id_string,
         handle_response,
-        rawptr(start_version),
+        nil,
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        defer free(data)
+        /*
         result,_ := response["result"].(json.Object)
+        defer delete(result)
 
         items,ok := result["items"].(json.Array)
+        defer delete(items)
+
         is_incomplete := result["isIncomplete"].(json.Boolean)
 
         if !ok {
@@ -839,23 +872,20 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             }
         }
 
-        token := strings.trim_left_space(line_string[last_delimiter_byte:byte_offset])
-
+        completion_filter_token = line_string[last_delimiter_byte:byte_offset]
         for item in items {
             label, ok := item.(json.Object)["label"].(string)
 
-            fmt.println(item)
-
-            hit :=  CompletionHit{
+            hit := CompletionHit{
                 label=label,
             }
 
-            if len(token) > 0 {
-                if strings.contains(label, token) == false {
+            if len(completion_filter_token) > 0 {
+                if strings.contains(label, completion_filter_token) == false {
                     continue
                 }
 
-                if label == token {
+                if label == completion_filter_token {
                     inject_at(&new_hits, 0, hit)
 
                     continue
@@ -865,9 +895,10 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             append(&new_hits, hit)
         }
 
+        delete(completion_hits)
         completion_hits = new_hits
-
         is_incomplete_completion_list = is_incomplete
+        */
     }
 }
 
@@ -879,6 +910,8 @@ semantic_tokens_request_message :: proc(
 ) -> (msg: string, id_string: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
+
+    defer delete(id_buf)
 
     json := strings.concatenate({
         "{\n",
@@ -894,13 +927,16 @@ semantic_tokens_request_message :: proc(
     })
 
     buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
+
+    length := strings.clone(strconv.itoa(buf[:], len(json)))
+
+    defer delete(buf)
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    }), str_id
+    }), strings.clone(str_id)
 }
 
 semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string) -> string {
