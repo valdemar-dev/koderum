@@ -69,6 +69,7 @@ message_thread : ^thread.Thread
 init_message_thread :: proc() {
     if message_thread != nil {
         thread.terminate(message_thread, 0)
+        thread.destroy(message_thread)
 
         when ODIN_DEBUG {
             fmt.println("Destroying existing LSP message thread.")

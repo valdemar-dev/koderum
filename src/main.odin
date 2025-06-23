@@ -137,8 +137,8 @@ main :: proc() {
     thread.terminate(update_thread, 9)
     thread.terminate(message_thread, 9)
 
-    free(update_thread)
-    free(message_thread)
+    thread.destroy(update_thread)
+    thread.destroy(message_thread)
 
     reset_rect_cache(&rect_cache)
     
@@ -169,6 +169,13 @@ main :: proc() {
     delete(font_list)
     delete(delimiter_runes)
     delete(search_ignored_dirs)
-    delete(requests)
     delete(buffers)
+
+    for request in requests {
+        fmt.println(request)
+
+        fmt.println(request.id)
+    }
+
+    delete(requests)
 }

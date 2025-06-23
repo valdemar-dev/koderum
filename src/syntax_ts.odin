@@ -331,7 +331,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     defer delete(dir)
 
     desc := os2.Process_Desc{
-        command = []string{"typescript-language-server", "--stdio"},
+        command = []string{"typescript-language-server", "--stdio", "--log-level", "1"},
         env = nil,
         working_dir = dir,
         stdin  = stdin_r,
@@ -363,8 +363,11 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     language_servers[ext] = server
 
     msg := initialize_message(process.pid, dir)
+    defer delete(msg)
 
-    send_lsp_message(msg, "1", set_capabilities, rawptr(server))
+    id := "1"
+
+    send_lsp_message(msg, id, set_capabilities, rawptr(server))
 
     base := fp.base(dir)
 
@@ -443,6 +446,8 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
+
+    sync.unlock(&tree_mutex)
 
     if active_buffer.previous_tree == nil {
         error_offset : u32
@@ -560,8 +565,6 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
     }
 
     active_buffer.previous_tree = tree
-
-    sync.unlock(&tree_mutex)
 }
 
 override_node_type :: proc(

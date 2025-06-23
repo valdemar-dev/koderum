@@ -194,7 +194,7 @@ set_option :: proc(options: []string) {
     case "search_ignored_dir":
         append(&search_ignored_dirs, strings.clone(value))
     case "delimiter_runes":
-        delimiter_runes = utf8.string_to_runes(strings.clone(value))
+        delimiter_runes = utf8.string_to_runes(value)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }
