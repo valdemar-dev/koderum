@@ -781,8 +781,134 @@ completion_request_message :: proc(id: int, uri: string, line: int, character: i
         "}\n",
     })
 
+<<<<<<< Updated upstream
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
+=======
+    return (final), strings.clone(str_id)
+}
+
+get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
+
+    lsp_request_id += 1
+    selected_completion_hit = 0
+
+    msg, req_id_string := completion_request_message(
+        lsp_request_id,
+        strings.concatenate({
+            "file://",
+            active_buffer.file_name,
+        }, context.temp_allocator),
+        line,
+        character,
+        trigger_kind,
+        trigger_character,
+    )
+
+    defer delete(msg)
+    defer delete(req_id_string)
+    defer delete(trigger_character)
+
+    send_lsp_message(
+        msg,
+        req_id_string,
+        handle_response,
+    )
+
+    handle_response :: proc(response: json.Object, data: rawptr) {
+        free(data)
+
+        result,_ := response["result"].(json.Object)
+        items,ok := result["items"].(json.Array)
+
+
+        if !ok {
+            panic("Failed")
+        }
+
+        new_hits := make([dynamic]CompletionHit)
+
+        sort_proc :: proc(a: json.Value, b: json.Value) -> int {
+            a_sort := a.(json.Object)["sortText"].(string)
+            b_sort := b.(json.Object)["sortText"].(string)
+
+            if a_sort == b_sort {
+                a_label := a.(json.Object)["label"].(string)
+                b_label := b.(json.Object)["label"].(string)
+
+                if a_label < b_label {
+                    return -1
+                } else if a_label > b_label {
+                    return 1
+                }
+                return 0
+            }
+
+            if a_sort < b_sort {
+                return -1
+            } else {
+                return 1
+            }
+        }
+
+
+        sort.quick_sort_proc(items[:], sort_proc)
+
+        cur_line := active_buffer.lines[buffer_cursor_line]
+        line_string := string(cur_line.characters[:])
+
+        byte_offset := utf8.rune_offset(line_string, buffer_cursor_char_index)
+        if byte_offset == -1 {
+            byte_offset = len(line_string)
+        }
+
+        last_delimiter_byte := 0
+
+        for char, byte in line_string {
+            if byte == byte_offset {
+                break
+            }
+
+            if rune_in_arr(char, delimiter_runes) {
+                last_delimiter_byte = byte+1
+            }
+        }
+
+        completion_filter_token = line_string[last_delimiter_byte:byte_offset]
+        for item in items {
+            label, ok := item.(json.Object)["label"].(string)
+
+            hit := CompletionHit{
+                label=strings.clone(label),
+            }
+
+            if len(completion_filter_token) > 0 {
+                if strings.contains(label, completion_filter_token) == false {
+                    continue
+                }
+
+                if label == completion_filter_token {
+                    inject_at(&new_hits, 0, hit)
+
+                    continue
+                }
+            }
+
+            append(&new_hits, hit)
+        }
+
+        for &hit in completion_hits {
+            delete(hit.detail)
+            delete(hit.documentation)
+            delete(hit.insertText)
+            delete(hit.label)
+        }
+
+        delete(completion_hits)
+
+        completion_hits = new_hits
+    }
+>>>>>>> Stashed changes
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
