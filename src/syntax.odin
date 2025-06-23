@@ -790,6 +790,9 @@ completion_request_message :: proc(
 }
 
 get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
+    if active_language_server == nil {
+        return
+    }
 
     lsp_request_id += 1
     selected_completion_hit = 0
@@ -822,13 +825,13 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
         result,_ := response["result"].(json.Object)
         items,ok := result["items"].(json.Array)
 
-
         if !ok {
             panic("Failed")
         }
 
         new_hits := make([dynamic]CompletionHit)
 
+        /*
         sort_proc :: proc(a: json.Value, b: json.Value) -> int {
             a_sort := a.(json.Object)["sortText"].(string)
             b_sort := b.(json.Object)["sortText"].(string)
@@ -852,8 +855,8 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             }
         }
 
-
         sort.quick_sort_proc(items[:], sort_proc)
+        */
 
         cur_line := active_buffer.lines[buffer_cursor_line]
         line_string := string(cur_line.characters[:])
@@ -877,10 +880,15 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
 
         completion_filter_token = line_string[last_delimiter_byte:byte_offset]
         for item in items {
-            label, ok := item.(json.Object)["label"].(string)
+            label, label_ok := item.(json.Object)["label"].(string)
+            documentation, documentation_ok := item.(json.Object)["documentation"].(string)
 
             hit := CompletionHit{
                 label=strings.clone(label),
+            }
+
+            if documentation_ok {
+                hit.documentation = strings.clone(documentation)
             }
 
             if len(completion_filter_token) > 0 {

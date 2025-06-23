@@ -521,13 +521,18 @@ draw_text_buffer :: proc() {
             selected_completion_hit = 0
         }
 
+        first_hit : ^CompletionHit
         for i in selected_completion_hit..<end_idx {
-            hit := completion_hits[i]
+            hit := &completion_hits[i]
+
+            if i == selected_completion_hit {
+                first_hit = hit
+            }
 
             size := add_text_measure(
                 &text_rect_cache,
                 pen,
-                vec4{1,1,1,1},
+                i == selected_completion_hit ? TEXT_MAIN : TEXT_DARKER,
                 buffer_font_size,
                 hit.label,
                 10,
@@ -540,14 +545,16 @@ draw_text_buffer :: proc() {
 
         border_width := general_line_thickness_px
 
+        base_rect := rect{
+            pen.x - padding,
+            y_pos - padding,
+            widest + padding * 2,
+            pen.y - y_pos + padding * 2,
+        }
+
         add_rect(
             &rect_cache,
-            rect{
-                pen.x - padding,
-                y_pos - padding,
-                widest + padding * 2,
-                pen.y - y_pos + padding * 2,
-            },
+            base_rect,
             no_texture,
             BG_MAIN_10,
             vec2{},
@@ -567,6 +574,65 @@ draw_text_buffer :: proc() {
             vec2{},
             9,
         )
+
+        if first_hit != nil && len(first_hit.documentation) > 0 {
+            start_pen := vec2{
+                base_rect.x + base_rect.width + padding*2,
+                base_rect.y + padding*2,
+            }
+
+            pen := vec2{start_pen.x, start_pen.y}
+
+            em := ui_smaller_font_size
+
+            pen = add_text(
+                &text_rect_cache,
+                pen,
+                TEXT_MAIN,
+                ui_smaller_font_size,
+                first_hit.documentation,
+                10,
+                false,
+                em * 20,
+                true,
+                true
+            )
+
+            width := pen.x - start_pen.x
+            height := (pen.y - start_pen.y)
+
+            border_width := general_line_thickness_px
+
+            box := rect{
+                start_pen.x - padding,
+                start_pen.y - padding,
+                width + padding * 2,
+                height + padding * 2,
+            }
+
+            add_rect(
+                &rect_cache,
+                box,
+                no_texture,
+                BG_MAIN_10,
+                vec2{},
+                8,
+            )
+
+            add_rect(
+                &rect_cache,
+                rect{
+                    start_pen.x - border_width - padding,
+                    start_pen.y - padding - border_width,
+                    width + padding * 2 + border_width * 2,
+                    height + padding * 2 + border_width * 2,
+                },
+                no_texture,
+                BG_MAIN_30,
+                vec2{},
+                8,
+            )
+        }
     }
     
     draw_rects(&rect_cache)
@@ -726,7 +792,26 @@ insert_tab_as_spaces:: proc() {
     
     inject_at(&line.characters, buffer_cursor_char_index, ..transmute([]u8)tab_string)
     
-    
+    buffer_cursor_accumulated_byte_position := compute_byte_offset(
+        active_buffer, 
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+    )
+
+    notify_server_of_change(
+        active_buffer,
+
+        buffer_cursor_accumulated_byte_position,
+        buffer_cursor_accumulated_byte_position,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+
+        transmute([]u8)tab_string,
+    )    
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
@@ -735,6 +820,10 @@ insert_tab_as_spaces:: proc() {
 }
 
 remove_char :: proc() {
+    defer {
+        get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
+    }
+
     line := &active_buffer.lines[buffer_cursor_line] 
     line_string := string(line.characters[:])
     
@@ -800,6 +889,27 @@ remove_char :: proc() {
         set_buffer_cursor_pos(
             buffer_cursor_line,
             char_index-tab_spaces,
+        )
+
+        buffer_cursor_accumulated_byte_position := compute_byte_offset(
+            active_buffer, 
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+        )
+
+        notify_server_of_change(
+            active_buffer,
+
+            buffer_cursor_accumulated_byte_position,
+            buffer_cursor_accumulated_byte_position + tab_spaces,
+
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+
+            buffer_cursor_line,
+            buffer_cursor_char_index + tab_spaces,
+
+            {},
         )
 
         return
@@ -951,6 +1061,10 @@ handle_text_input :: proc() -> bool {
     }
     
     if is_key_pressed(glfw.KEY_ENTER) {
+        defer {
+            get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
+        }
+
         index := clamp(buffer_cursor_char_index, 0, len(line.characters))
         
         after_cursor := line.characters[index:]

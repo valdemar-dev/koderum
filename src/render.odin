@@ -247,9 +247,21 @@ add_text :: proc(
         y=pos.y,
     }
 
-    line_height := font_height * 1.2
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+    assert(error == .Ok)
 
+    ascend := primary_font.size.metrics.ascender >> 6
+    descend := primary_font.size.metrics.descender >> 6
+
+    line_height := f32(ascend - descend)
+
+    highest_x : f32
+       
     for r,i in text {
+        defer if pen.x > highest_x {
+            highest_x = pen.x
+        }
+
         if split_new_lines == true && r == '\n' {
             pen.y += line_height
             pen.x = pos.x
@@ -268,14 +280,6 @@ add_text :: proc(
             pen.x += advance_amount
 
             continue
-        }
-
-        if pen.x - pos.x > max_width && max_width > -1 {
-            break
-        }
-
-        if pen.x > fb_size.x {
-            break
         }
 
         character := get_char(font_height, u64(r))
@@ -306,11 +310,15 @@ add_text :: proc(
         height := f32(character.rows)
         width := f32(character.width)
 
-        error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
-        assert(error == .Ok)
+        if math.round_f32(pen.x - pos.x) > max_width && max_width > -1 {
+            if do_wrap {
+                pen.y += line_height
+                pen.x = pos.x
+            } else {
+                break
+            }
+        }
 
-        ascend := primary_font.size.metrics.ascender >> 6
-       
         add_rect(rect_cache,
             rect{
                 pen.x + character.offset.x + 0.1,
@@ -331,6 +339,11 @@ add_text :: proc(
 
         pen.x = pen.x + (character.advance.x)
         pen.y = pen.y + character.advance.y
+    }
+
+    if do_wrap {
+        pen.y += line_height
+        pen.x = highest_x
     }
 
     return pen
