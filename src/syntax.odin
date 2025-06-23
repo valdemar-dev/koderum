@@ -20,11 +20,28 @@ LanguageServer :: struct {
     
     token_types : []string,
     token_modifiers : []string,
+
+    completion_trigger_runes : []rune,
     
     ts_parser: ts.Parser,
     
     colors : map[string]vec4,
     ts_colors : map[string]vec4,
+
+    name : string,
+
+    override_node_type: proc(
+        node_type: ^string,
+        node: ts.Node, 
+        source: []u8,
+        start_point,
+        end_point: ^ts.Point,
+        tokens: ^[dynamic]Token,  
+        priority: ^u8,
+    ),
+
+    set_buffer_tokens : proc(first_line, last_line: int),
+    set_buffer_tokens_threaded : proc(buffer: ^Buffer, lsp_tokens: []Token),
 }
 
 Token :: struct {
@@ -96,24 +113,15 @@ language_servers : map[string]^LanguageServer = {}
 
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
+
+    defer {
+        init_message_thread()
+    }
     
     switch ext {
     case ".js",".ts":
         if ext not_in language_servers {
-            server,err := init_syntax_typescript(ext)
-            
-            if err != os2.ERROR_NONE {
-                return
-            }
-            
-            if server == nil {
-                return
-            }
-            
-            language_servers[ext] = server
-            active_language_server = server
-            
-            return
+            init_syntax_typescript(ext)
         } else {
             active_language_server = language_servers[ext]
         }
@@ -131,7 +139,7 @@ set_active_language_server :: proc(ext: string) {
             
             language_servers[ext] = server
             active_language_server = server
-            
+
             return
         } else {
             active_language_server = language_servers[ext]
@@ -149,25 +157,20 @@ lsp_handle_file_open :: proc() {
     
     serialized_buffer := serialize_buffer(active_buffer)
     escaped := escape_json(serialized_buffer)
-    
+
     defer delete(serialized_buffer)
+    defer delete(escaped)
     
     msg := did_open_message(
-        strings.concatenate({"file://",active_buffer.file_name}),
+        strings.concatenate({"file://",active_buffer.file_name}, context.temp_allocator),
         "typescript",
         1,
         escaped,
     )
-    
-    when ODIN_DEBUG {
-        fmt.println("LSP REQUEST", msg)
-    }
-    
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg) 
-    
-    set_buffer_tokens()
 
-    do_refresh_buffer_tokens = true
+    defer delete(msg)
+
+    send_lsp_message(msg, "") 
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -178,6 +181,7 @@ decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
             append(&result, modifiers[i])
         }
     }
+
     return result[:]
 }
 
@@ -208,6 +212,15 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
         color := &active_language_server.colors[type^]
 
         if color == nil {
+            when ODIN_DEBUG {
+                /*
+                fmt.println(
+                    "Warning: Missing LSP-Token Colour for Node Type",
+                    type^, 
+                )
+                */
+            }
+
             continue
         }
 
@@ -265,10 +278,13 @@ set_buffer_tokens_threaded :: proc() {
     
     msg,req_id_string := semantic_tokens_request_message(
         lsp_request_id,
-        strings.concatenate({"file://",active_buffer.file_name}),
+        strings.concatenate({"file://",active_buffer.file_name}, context.temp_allocator),
         0, len(active_buffer.lines)
     )
-        
+
+    defer delete(msg)
+    defer delete(req_id_string)
+
     send_lsp_message(
         msg,
         req_id_string,
@@ -276,14 +292,16 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
+    active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
+
     handle_response :: proc(response: json.Object, data: rawptr) {
-        start_version_ptr := cast(^int)(data)
+        start_version_ptr := (cast(^int)data)
 
         start_version := (start_version_ptr^)
 
-        result := response["result"]
+        defer free(data)
 
-        obj,ok := result.(json.Object)
+        obj,ok := response["result"].(json.Object)
         
         if !ok {
             panic("Malformed json in set_buffer_tokens")
@@ -296,7 +314,8 @@ set_buffer_tokens_threaded :: proc() {
         }
         
         lsp_tokens := make([dynamic]i32)
-        
+        defer delete(lsp_tokens)
+
         for value in obj_data {
             append(&lsp_tokens, i32(value.(f64)))
         }
@@ -306,34 +325,33 @@ set_buffer_tokens_threaded :: proc() {
             active_language_server.token_types,
             active_language_server.token_modifiers,  
         )
-          
-        switch active_buffer.ext {
-        case ".js",".ts":
-            set_buffer_tokens_threaded_ts(active_buffer, decoded_tokens[:])
-        case ".odin":
-            set_buffer_tokens_threaded_odin(active_buffer, decoded_tokens[:])
-        }
+       
 
-        // cool lag-behind system
-        // forces set buffer tokens to catch up to the real buffer
+        assert(active_language_server != nil)
+        active_language_server.set_buffer_tokens_threaded(active_buffer, decoded_tokens[:])
+
         if start_version != active_buffer.version {
-            fmt.println("start version did not match! invalidating tokens", active_buffer.version, start_version)
             do_refresh_buffer_tokens = true
         } 
 
-        free(data)
-    } 
+        delete(decoded_tokens)
+    }
 }
 
 notify_server_of_change :: proc(
     buffer: ^Buffer,
+
+    // TS STUFF
+    start_byte: int,
+    end_byte: int,
+    
+    // LSP STUFF
     start_line: int,
     start_char: int,
     end_line: int,
     end_char: int,
-    old_byte_length: int,
-    new_end_char: int,
-    new_text: string,
+
+    new_text: []u8,
 ) {
     if active_language_server == nil {
         return
@@ -341,78 +359,44 @@ notify_server_of_change :: proc(
     
     buffer^.version += 1
     
-    escaped := escape_json(new_text)
+    escaped := escape_json(string(new_text))
+    defer delete(escaped)
 
     msg := text_document_did_change_message(
         strings.concatenate({
             "file://",
             buffer.file_name,
-        }),
+        }, context.temp_allocator),
         buffer.version,
         start_line, start_char, end_line, end_char, escaped,
     )
+
+    defer delete(msg)
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
   
     if buffer.previous_tree != nil {        
-        start_byte,old_end_byte,end_byte := apply_diff(
-            buffer,
-            start_line, start_char,
-            end_line, end_char,
-            new_text,
-        )
-        
+        new_end_byte := start_byte + len(new_text)
+
+        remove_range(&buffer.content, start_byte, end_byte)
+        inject_at(&buffer.content, start_byte, ..new_text)        
+
         edit := ts.Input_Edit{
             u32(start_byte),
-            u32(old_end_byte),
             u32(end_byte),
+            u32(new_end_byte),
             ts.Point{},
             ts.Point{},
             ts.Point{},
         }
         
         ts.tree_edit(buffer.previous_tree, &edit)
-        
     }
     
     set_buffer_tokens()
 
     do_refresh_buffer_tokens = true
 }
-
-
-/*
-compute_byte_offset :: proc(buffer: ^Buffer, target_line: int, target_rune: int) -> int {
-    content := buffer.content
-    line_count := 0
-    byte_off := 0
-    total_len := len(content)
-
-    for line_count < target_line {
-        if byte_off >= total_len {
-            fmt.println("compute_byte_offset: requested line ", target_line, " out of range")
-            panic("")
-        }
-        if content[byte_off] == '\n' {
-            line_count += 1
-        }
-        byte_off += 1
-    }
-
-    rune_count := 0
-    for rune_count < target_rune {
-        if byte_off >= total_len {
-            fmt.println("compute_byte_offset: requested rune ", target_rune, " on line ", target_line, " out of range")
-            panic("")
-        }
-        _, width := utf8.decode_rune(content[byte_off:])
-        byte_off += width
-        rune_count += 1
-    }
-    return byte_off
-}
-
-*/
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
     byte_offset := 0
@@ -433,37 +417,8 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
     return byte_offset
 }
 
-
-
-apply_diff :: proc(
-    buffer: ^Buffer,
-    start_line, start_col: int,
-    end_line, end_col: int,
-    new_text: string,
-) -> (start_byte: int, old_end_byte: int, new_end_byte: int) {
-    start_off := compute_byte_offset(buffer, start_line, start_col)
-    end_off := compute_byte_offset(buffer, end_line, end_col)
-
-    fmt.println(start_off, end_off)
-
-    if start_off > end_off || end_off > len(buffer.content) {
-        fmt.println("apply_diff: invalid byte range")
-        panic("")
-    }
-
-    remove_range(&buffer.content, start_off, end_off)
-
-    new_bytes := transmute([]u8)new_text
-    inject_at(&buffer.content, start_off, ..new_bytes)
-
-    return start_off, end_off, start_off + len(new_bytes)
-}
-
 set_buffer_keywords :: proc() {
-    switch active_buffer.ext {
-    case ".js",".ts":
-        set_buffer_keywords_ts()
-    }
+    active_language_server.set_buffer_tokens(active_buffer.first_drawn_line, active_buffer.last_drawn_line)
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
@@ -569,7 +524,7 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
 }
 
 text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
-    buf := [32]u8{}
+    buf := make([dynamic]u8, 32)
 
     version_str := strings.clone(strconv.itoa(buf[:], version), context.temp_allocator)
     
@@ -598,18 +553,22 @@ text_document_did_change_message :: proc(doc_uri: string, version: int, start_li
         "    ]\n",
         "  }\n",
         "}\n"
-    })
+    }, context.temp_allocator)
 
-    buf = [32]u8{}
+    delete(buf)
+
+    buf = make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
 
     header := strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    })
+    }, context.temp_allocator)
 
-    return header
+    defer delete(buf)
+
+    return strings.clone(header)
 }
 
 
@@ -659,7 +618,7 @@ did_change_workspace_folders_message :: proc(folder_uri: string, folder_name: st
         "    }\n",
         "  }\n",
         "}\n",
-    })
+    }, context.temp_allocator)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -721,11 +680,14 @@ initialize_message :: proc(pid: int, project_dir: string) -> string {
         "    \"capabilities\": {}\n",
         "  }\n",
         "}\n",
-    })
+    }, context.temp_allocator)
 
-    delete(buf)
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
+    len_buf := make([dynamic]u8, 32)
+
+    length := (strconv.itoa(len_buf[:], len(json)))
+
+    defer delete(buf)
+    defer delete(len_buf)
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
@@ -735,6 +697,9 @@ initialize_message :: proc(pid: int, project_dir: string) -> string {
 }
 
 did_open_message :: proc(uri: string, languageId: string, version: int, text: string) -> string {
+    version_buf := make([dynamic]u8, 16)
+    defer delete(version_buf)
+
     json := strings.concatenate({
         "{\n",
         "  \"jsonrpc\": \"2.0\",\n",
@@ -743,14 +708,15 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
         "    \"textDocument\": {\n",
         "      \"uri\": \"", uri, "\",\n",
         "      \"languageId\": \"", languageId, "\",\n",
-        "      \"version\": ", strconv.itoa(make([dynamic]u8, 16)[:], version), ",\n",
+        "      \"version\": ", strconv.itoa(version_buf[:], version), ",\n",
         "      \"text\": \"", text, "\"\n",
         "    }\n",
         "  }\n",
         "}\n",
-    })
+    }, context.temp_allocator)
 
     buf := make([dynamic]u8, 32)
+    defer delete(buf)
     length := strconv.itoa(buf[:], len(json))
 
     return strings.concatenate({
@@ -760,11 +726,28 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
     })
 }
 
-completion_request_message :: proc(id: int, uri: string, line: int, character: int) -> string {
+completion_request_message :: proc(
+    id: int,
+    uri: string,
+    line: int,
+    character: int,
+
+    trigger_kind: string,
+    trigger_character: string,
+) -> (msg, id_str: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
+    defer delete(id_buf)
 
-    json := strings.concatenate({
+    line_buf := make([dynamic]u8, 16)
+    char_buf := make([dynamic]u8, 16)
+    defer delete(line_buf)
+    defer delete(char_buf)
+
+    line_str := strconv.itoa(line_buf[:], line)
+    char_str := strconv.itoa(char_buf[:], character)
+
+    body := strings.concatenate({
         "{\n",
         "  \"jsonrpc\": \"2.0\",\n",
         "  \"id\": \"", str_id, "\",\n",
@@ -774,17 +757,34 @@ completion_request_message :: proc(id: int, uri: string, line: int, character: i
         "      \"uri\": \"", uri, "\"\n",
         "    },\n",
         "    \"position\": {\n",
-        "      \"line\": ", strconv.itoa(make([dynamic]u8, 16)[:], line), ",\n",
-        "      \"character\": ", strconv.itoa(make([dynamic]u8, 16)[:], character), "\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
+        "      \"line\": ", line_str, ",\n",
+        "      \"character\": ", char_str, "\n",
+        "    },\n",
+        "    \"context\": {\n",
+        "      \"triggerKind\": ", trigger_kind
+    }, context.temp_allocator)
+
+    if trigger_kind == "2" {
+        body = strings.concatenate({
+            body,
+            ",\n",
+            "      \"triggerCharacter\": \"", trigger_character, "\""
+        }, context.temp_allocator)
+    }
+
+    body = strings.concatenate({body, "\n    }\n  }\n}\n"}, context.temp_allocator)
+
+    len_buf := make([dynamic]u8, 32)
+    defer delete(len_buf)
+
+    length := strconv.itoa(len_buf[:], len(body))
+
+    final := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        body
     })
 
-<<<<<<< Updated upstream
-    buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-=======
     return (final), strings.clone(str_id)
 }
 
@@ -836,21 +836,17 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                 a_label := a.(json.Object)["label"].(string)
                 b_label := b.(json.Object)["label"].(string)
 
-                if a_label < b_label {
-                    return -1
-                } else if a_label > b_label {
-                    return 1
-                }
-                return 0
-            }
+                less := a_label < b_label
 
-            if a_sort < b_sort {
-                return -1
-            } else {
+                if less do return 0
                 return 1
             }
-        }
 
+            less := a_sort < b_sort
+
+            if less do return 0
+            return 1
+        }
 
         sort.quick_sort_proc(items[:], sort_proc)
 
@@ -882,6 +878,7 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                 label=strings.clone(label),
             }
 
+            /*
             if len(completion_filter_token) > 0 {
                 if strings.contains(label, completion_filter_token) == false {
                     continue
@@ -893,6 +890,7 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                     continue
                 }
             }
+            */
 
             append(&new_hits, hit)
         }
@@ -908,13 +906,7 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
 
         completion_hits = new_hits
     }
->>>>>>> Stashed changes
 
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
 }
 
 semantic_tokens_request_message :: proc(
@@ -925,6 +917,8 @@ semantic_tokens_request_message :: proc(
 ) -> (msg: string, id_string: string) {
     id_buf := make([dynamic]u8, 16)
     str_id := strconv.itoa(id_buf[:], id)
+
+    defer delete(id_buf)
 
     json := strings.concatenate({
         "{\n",
@@ -937,16 +931,19 @@ semantic_tokens_request_message :: proc(
         "    }\n",
         "  }\n",
         "}\n",
-    })
+    }, context.temp_allocator)
 
     buf := make([dynamic]u8, 32)
+
     length := strconv.itoa(buf[:], len(json))
+
+    defer delete(buf)
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    }), str_id
+    }), strings.clone(str_id)
 }
 
 semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string) -> string {
@@ -975,79 +972,6 @@ semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string
         "\r\n",
         json,
     })
-}
-
-override_node_type :: proc(
-    node_type: ^string,
-    node: ts.Node, 
-    source: []u8,
-    start_point,
-    end_point: ^ts.Point,
-    tokens: ^[dynamic]Token,
-) {
-    switch active_buffer.ext {
-    case ".ts", ".js":
-        override_node_type_ts(node_type, node, source, start_point, end_point, tokens)
-    }
-}
-
-walk_tree :: proc(root_node: ts.Node, source: []u8, tokens: ^[dynamic]Token, buffer: ^Buffer, start_byte, end_byte: ^u32) {
-    cursor := ts.tree_cursor_new(root_node)
-    defer ts.tree_cursor_delete(&cursor)
-   
-    outer: for {
-        node := ts.tree_cursor_current_node(&cursor)
-        node_type := string(ts.node_type(node))
-
-        start_point := ts.node_start_point(node)
-        end_point := ts.node_end_point(node)
-
-        start_byte := ts.node_start_byte(node)
-        end_byte := ts.node_end_byte(node)
-
-        // override_node_type(&node_type, node, source, &start_point, &end_point)
-
-        color := &active_language_server.ts_colors[node_type]
-        
-        if color != nil {           
-            for row in start_point.row ..= end_point.row {
-                if int(row) >= len(buffer.lines) {
-                    continue
-                }
-            
-                line := buffer.lines[row]
-                runes := line.characters
-                line_string := string(line.characters[:])
-                defer delete(line_string)
-            
-                start_rune := row == start_point.row ? int(start_point.col) : 0
-                end_rune := row == end_point.row ? int(end_point.col) : len(runes)
-            
-                length := end_rune - start_rune
-                if length <= 0 {
-                    continue
-                }
-            
-                append(tokens, Token{
-                    char = i32(start_rune),
-                    length = i32(length),
-                    color = color^,
-                    priority = 0,
-                })
-            }
-        
-        }
-        
-        if ts.tree_cursor_goto_first_child(&cursor) {
-            continue
-        }
-
-        for !ts.tree_cursor_goto_next_sibling(&cursor) {
-            if !ts.tree_cursor_goto_parent(&cursor) {
-                return
-            }
-        }
-    }
 }
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {
@@ -1081,29 +1005,12 @@ generic_indent_rule_list : map[string]IndentRule = {
     },
 }
 
-match_all :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    return true
-}
-
-whole_word_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    return comp == target
-}
-
-line_starts_match :: proc(comp: string, target: string, buffer_line: ^BufferLine) -> bool {
-    if len(buffer_line.characters) < len(comp) {
-        return false
-    }
-
-    string_val := string(buffer_line.characters[0:len(comp)])
-    defer delete(string_val)
-
-    if string_val == comp {
-        return true
+@(private="package")
+is_delimiter_rune :: proc(r: rune) -> bool {
+    for delimiter in delimiter_runes {
+        if r == delimiter do return true
     }
 
     return false
 }
 
-word_break_chars : []rune = {
-    ' ',
-}

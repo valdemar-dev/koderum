@@ -19,18 +19,46 @@ generate_highlight_string :: proc(
     start_char: int,
     end_char: int,
 ) -> string {
-    result : string
+    result := make([dynamic]u8)
 
-    start := start_line
-    end := end_line
+    start_line := start_line
+    start_char := start_char
+
+    end_line := end_line
+    end_char := end_char
 
     is_negative_highlight := start_line >= end_line
     if is_negative_highlight {
-        temp := start
-        start = end
-        end = temp
+        temp := start_line
+
+        temp_char := start_char
+
+        start_line = end_line
+        end_char = temp
+
+        start_char = end_char
+        end_char = temp_char
     }
 
+    start_buffer_line := active_buffer.lines[start_line]
+    start_offset := utf8.rune_offset(string(start_buffer_line.characters[:]), start_char)
+
+    append(&result, ..start_buffer_line.characters[:start_offset])
+
+    for i in start_line..<end_line {
+        line := active_buffer.lines[i]
+
+        append(&result, ..line.characters[:])
+        append(&result, u8('\n'))
+    }
+
+    end_buffer_line := active_buffer.lines[end_line]
+
+    end_offset := utf8.rune_offset(string(end_buffer_line.characters[:]), end_char)
+
+    append(&result, ..end_buffer_line.characters[:end_char])
+
+    /*
     for i in start..=end {
         line := active_buffer.lines[i]
         str : string
@@ -74,8 +102,9 @@ generate_highlight_string :: proc(
             i != end ? "\n" : "",
         })
     }
+    */
 
-    return result
+    return string(result[:])
 }
 
 @(private="package")

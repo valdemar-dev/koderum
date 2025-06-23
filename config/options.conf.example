@@ -1,13 +1,14 @@
 [fonts]
+font = /usr/share/fonts/CascadiaMono/CaskaydiaCoveNerdFontMono-Regular.ttf
+font = /usr/share/fonts/noto/NotoSansMono-Regular.ttf
 font = /usr/share/fonts/liberation/LiberationMono-Regular.ttf
 font = /usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf
 
-ui_general_font_size = 20
-ui_smaller_font_size = 16
-ui_bigger_font_size = 30
+ui_general_font_size = 16
+ui_smaller_font_size = 14
+ui_bigger_font_size = 24
 
-buffer_font_size = 24
-
+buffer_font_size = 16
 
 [cursor]
 cursor_edge_padding = 200
@@ -20,33 +21,19 @@ do_draw_line_count = true
 do_highlight_current_line = false
 do_highlight_indents = true
 differentiate_tab_and_spaces = true
-tab_spaces = 4
 
+tab_spaces = 4
+do_highlight_current_line = true
 
 [general]
-default_cwd = /home/v/prog/projects/text-editor
+default_cwd = /home/v/prog/projects/koderum
+always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
+delimiter_runes =  ()[]{}'?!|/+:_~^*`&=*`´§,.-";
 
-[color]
-BG_MAIN_10 = 2F243AFF
-BG_MAIN_20 = 3D2F4BFF
-BG_MAIN_30 = 473758FF
-BG_MAIN_40 = 513B3BFF
-BG_MAIN_50 = 694C4CFF
+[style]
+general_line_thickness_px = 1
+line_count_padding_px = 4
 
-TEXT_MAIN = F1E4E8FF
-TEXT_DARKER = F1E4E8FF
-
-COLOR_1 = F06449FF
-COLOR_2 = ADFF88FF
-COLOR_3 = A7A6B5FF
-COLOR_4 = EDF060FF
-COLOR_5 = FF9442FF
-COLOR_6 = 50F7D5FF
-
-RED 
-GREEN 
-GRAY 
-YELLOW 
-ORANGE 
-CYAN 
-
+[search]
+search_ignored_dir = node_modules
+search_ignored_dir = .git

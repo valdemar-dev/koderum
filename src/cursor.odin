@@ -7,7 +7,10 @@ buffer_cursor_pos := vec2{}
 buffer_cursor_target_pos := vec2{}
 
 buffer_cursor_line : int
+
 buffer_cursor_char_index : int
+
+buffer_cursor_desired_char_index : int = -1
 
 cursor_width : f32
 cursor_height : f32
@@ -52,6 +55,13 @@ draw_cursor :: proc() {
 
 set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     line := min(line, len(active_buffer.lines)-1)
+    char_index := char_index
+
+    if buffer_cursor_desired_char_index != -1 {
+        char_index = buffer_cursor_desired_char_index 
+
+        buffer_cursor_desired_char_index = -1
+    }
     
     if active_buffer == nil {
         return
@@ -64,9 +74,6 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     new_x : f32 = 0
 
     last_width : f32 = cursor_width
-
-    buffer_cursor_line = line
-    buffer_cursor_char_index = char_index
 
     char_map := get_char_map(buffer_font_size)
 
@@ -103,6 +110,13 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
         new_x += (char.advance.x) 
         last_width = (char.advance.x)
     }
+
+    if rune_index < char_index && line != buffer_cursor_line {
+        buffer_cursor_desired_char_index = char_index
+    }
+
+    buffer_cursor_line = line
+    buffer_cursor_char_index = rune_index
 
     cursor_width = last_width
 

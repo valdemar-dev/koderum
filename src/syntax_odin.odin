@@ -20,287 +20,195 @@ import ts_odin_bindings "../../odin-tree-sitter/parsers/odin"
 ts_odin_colors : map[string]vec4 = {
     "string.fragment"=GREEN,
     "string"=GREEN,
-
-    "async"=PINK,
-
-    "variable.declaration"=LIGHT_RED,
-
-    "error"=RED,
-
-    "keyword"=RED,
-    "keyword.special"=PINK,
-
-    "control.flow"=PINK,
-    "constant"=ORANGE,
-    "variable.builtin"=ORANGE,
-
-    "escape_sequence"=CYAN,
-
-    "private_field"=LIGHT_ORANGE,
-
-    "punctuation.delimiter"=GRAY,
-    "punctuation.bracket"=GRAY,
-    "punctuation.parenthesis"=GRAY,
-    "punctuation.special"=GRAY,
-
     "operator"=GRAY,
-
-    "function.method"=YELLOW,
-    "function"=YELLOW,
-
+    "keyword"=RED,
+    "punctuation.bracket"=GRAY,
+    "punctuation.delimiter"=GRAY,
     "comment"=GRAY,
-    "property"=LIGHT_ORANGE,
-    "parameter"=LIGHT_ORANGE,
-
+    "boolean"=BLUE,
+    "punctuation.special"=RED,   
+    "control.flow"=PINK,
     "number"=LIGHT_GREEN,
- 
-    "constant.builtin"=BLUE,
-
-    "type.builtin"=CYAN,
-    "type"=PURPLE,
-    "string.special"=RED,
+    "float"=LIGHT_GREEN,
+    "string.escape"=YELLOW,
+    "error"=RED,
+    "identifier"=ORANGE,
+    "function"=YELLOW,
+    "field"=LIGHT_ORANGE,
 }
 
 query_src := strings.clone_to_cstring(strings.concatenate({`
-(ERROR) @error
+;(identifier) @identifier
 
-["meta"] @property
-(property_identifier) @property
-
-(function_expression
-  name: (identifier) @function)
-(function_declaration
-  name: (identifier) @function)
-(method_definition
-  name: (property_identifier) @function.method)
-
-(pair
-  key: (property_identifier) @function.method
-  value: [(function_expression) (arrow_function)])
-
-(assignment_expression
-  left: (member_expression
-    property: (property_identifier) @function.method)
-  right: [(function_expression) (arrow_function)])
-
-(variable_declarator
-  name: (identifier) @function
-  value: [(function_expression) (arrow_function)])
-
-(assignment_expression
-  left: (identifier) @function
-  right: [(function_expression) (arrow_function)])
+(member_expression
+  (_)
+  (identifier) @field)
 
 (call_expression
   function: (identifier) @function)
 
-(call_expression
-  function: (member_expression
-    property: (property_identifier) @function.method))
-
-([
-    (identifier)
-    (shorthand_property_identifier)
-    (shorthand_property_identifier_pattern)
- ] @constant
- (#match? @constant "^[A-Z_][A-Z\\d_]+$"))
-
-(escape_sequence) @escape_sequence
-(this) @variable.builtin
-(super) @variable.builtin
+;[
+;  (calling_convention)
+;  (tag)
+;] @preproc
+[
+  "import"
+  "package"
+  "foreign"
+  "using"
+  "struct"
+  "enum"
+  "union"
+  "defer"
+  "cast"
+  "transmute"
+  "auto_cast"
+  "map"
+  "bit_set"
+  "matrix"
+  "bit_field"
+  "distinct"
+  "dynamic"
+  "return"
+  "or_return"
+  "proc"
+] @keyword
 
 [
-  (true)
-  (false)
-  (null)
-  (undefined)
+  "if"
+  "else"
+  "when"
+  "switch"
+  "case"
+  "where"
+  "break"
+  "for"
+  "do"
+  "continue"
+
+  "or_else"
+  "in"
+  "not_in"
+
+  (fallthrough_statement)
+] @control.flow
+
+((ternary_expression
+  [
+    "?"
+    ":"
+    "if"
+    "else"
+    "when"
+  ] @conditional.ternary)
+  (#set! "priority" 105))
+
+((type (identifier) @type.builtin)
+  (#any-of? @type.builtin
+    "bool" "byte" "b8" "b16" "b32" "b64"
+    "int" "i8" "i16" "i32" "i64" "i128"
+    "uint" "u8" "u16" "u32" "u64" "u128" "uintptr"
+    "i16le" "i32le" "i64le" "i128le" "u16le" "u32le" "u64le" "u128le"
+    "i16be" "i32be" "i64be" "i128be" "u16be" "u32be" "u64be" "u128be"
+    "float" "double" "f16" "f32" "f64" "f16le" "f32le" "f64le" "f16be" "f32be" "f64be"
+    "complex32" "complex64" "complex128" "complex_float" "complex_double"
+    "quaternion64" "quaternion128" "quaternion256"
+    "rune" "string" "cstring" "rawptr" "typeid" "any"))
+
+"..." @type.builtin
+(number) @number
+(float) @float
+(string) @string
+(character) @character
+(escape_sequence) @string.escape
+(boolean) @boolean
+
+[
+  (uninitialized)
+  (nil)
 ] @constant.builtin
 
-(comment) @comment
+[
+  ":="
+  "="
+  "+"
+  "-"
+  "*"
+  "/"
+  "%"
+  "%%"
+  ">"
+  ">="
+  "<"
+  "<="
+  "=="
+  "!="
+  "~="
+  "|"
+  "~"
+  "&"
+  "&~"
+  "<<"
+  ">>"
+  "||"
+  "&&"
+  "!"
+  "^"
+  ".."
+  "+="
+  "-="
+  "*="
+  "/="
+  "%="
+  "&="
+  "|="
+  "^="
+  "<<="
+  ">>="
+  "||="
+  "&&="
+  "&~="
+  "..="
+  "..<"
+  "?"
+] @operator
 
-(template_string
- (string_fragment) @string)
-
-(template_literal_type
- (string_fragment) @string)
-
-
-(private_property_identifier) @private_field
-
-(formal_parameters (required_parameter (identifier) @parameter))
-
-(string) @string
-
-(regex) @string.special
-(number) @number
+[ "{" "}" ] @punctuation.bracket
+[ "(" ")" ] @punctuation.bracket
+[ "[" "]" ] @punctuation.bracket
 
 [
-  ";"
-  (optional_chain)
+  "::"
+  "->"
   "."
   ","
+  ":"
+  ";"
 ] @punctuation.delimiter
 
 [
-  "-"
-  "--"
-  "-="
-  "+"
-  "++"
-  "+="
-  "*"
-  "*="
-  "**"
-  "**="
-  "/"
-  "/="
-  "%"
-  "%="
-  "<"
-  "<="
-  "<<"
-  "<<="
-  "="
-  "=="
-  "==="
-  "!"
-  "!="
-  "!=="
-  "=>"
-  ">"
-  ">="
-  ">>"
-  ">>="
-  ">>>"
-  ">>>="
-  "~"
-  "^"
-  "&"
-  "|"
-  "^="
-  "&="
-  "|="
-  "&&"
-  "-?:"
-  "?"
-  "||"
-  "??"
-  "&&="
-  "||="
-  "??="
-  ":"
   "@"
-  "..."
-] @operator
+  "$"
+] @punctuation.special
 
 [
-  "("
-  ")"
-  "["
-  "]"
-  "{"
-  "}"
-  "${"
-]  @punctuation.bracket
+  (comment)
+  (block_comment)
+] @comment
 
-[
-  "as"
-  "class"
-  "const"
-  "continue"
-  "debugger"
-  "delete"
-  "export"
-  "extends"
-  "from"
-  "function"
-  "get"
-  "import"
-  "in"
-  "instanceof"
-  "new"
-  "return"
-  "set"
-  "static"
-  "target"
-  "typeof"
-  "void"
-  "yield"
-] @keyword
-
-[
-  "var"
-  "let"
-] @variable.declaration
-
-[
-  "while"
-  "if"
-  "else"
-  "break"
-  "throw"
-  "with"
-  "catch"
-  "finally"
-  "case"
-  "switch"
-  "try"
-  "do"
-  "default"
-  "of"
-  "for"
-] @control.flow
-
-[
-  "async"
-  "await"
-] @async
-
-[
-    "global"
-    "module"
-    "infer"
-    "extends"
-    "keyof"
-    "as"
-    "asserts"
-    "is"
-] @keyword.special
-
-(type_identifier) @type
-(predefined_type) @type.builtin
-
-((identifier) @type
- (#match? @type "^[A-Z]"))
-
-(type_arguments
-  "<" @punctuation.bracket
-  ">" @punctuation.bracket)
-
-(required_parameter (identifier) @variable.parameter)
-(optional_parameter (identifier) @variable.parameter)
-
-[ "abstract"
-  "declare"
-  "enum"
-  "export"
-  "implements"
-  "interface"
-  "keyof"
-  "namespace"
-  "private"
-  "protected"
-  "public"
-  "type"
-  "readonly"
-  "override"
-  "satisfies"
-] @keyword
-
-`, " [\"`\"] @string"}));
+(ERROR) @error
+`, ""}));
 
 odin_lsp_colors := map[string]vec4{
-    "parameter"=LIGHT_ORANGE,
+    "function"=YELLOW,
+
+    "variable"=ORANGE,
+
+    "type"=CYAN,
+    "namespace"=ORANGE,
+
+    "enum"=RED,
+    "enumMember"=LIGHT_RED,
 }
 
 @(private="package")
@@ -321,6 +229,11 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     dir := fp.dir(active_buffer.file_name)
     defer delete(dir)
 
+    // odin specific thing
+    absolute_dir := strings.concatenate({
+        fp.dir(dir),
+    })
+
     desc := os2.Process_Desc{
         command = []string{"ols"},
         env = nil,
@@ -330,13 +243,17 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
         stderr = nil,
     }
 
+    when ODIN_DEBUG {
+        fmt.println("LSP Init: Setting Dir As:", absolute_dir)
+    }
+
     process, start_err := os2.process_start(desc)
     if start_err != os2.ERROR_NONE {
         fmt.println(start_err)
         panic("Failed to start TypeScript language server: ")
     }
     
-    msg := initialize_message(process.pid, dir)
+    msg := initialize_message(process.pid, absolute_dir)
     
     when ODIN_DEBUG {
         fmt.println("LSP REQUEST", msg)
@@ -418,6 +335,10 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
         ts_parser = parser,
         colors=odin_lsp_colors,
         ts_colors=ts_odin_colors,
+
+        set_buffer_tokens=set_buffer_tokens,
+        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
+        override_node_type=override_node_type,
     }
  
     when ODIN_DEBUG{
@@ -427,8 +348,7 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     return server,os2.ERROR_NONE
 }
 
-@(private="package")
-set_buffer_keywords_odin :: proc() {
+set_buffer_tokens :: proc(first_line, last_line: int) {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -459,12 +379,12 @@ set_buffer_keywords_odin :: proc() {
     ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
     
     start_point := ts.Point{
-        row=u32(max(active_buffer.first_drawn_line, 0)),
+        row=u32(max(first_line, 0)),
         col=0, 
     }
   
     end_point := ts.Point{
-        row=u32(max(active_buffer.last_drawn_line, 0)),
+        row=u32(max(last_line, 0)),
         col=0,
     }
     
@@ -493,12 +413,23 @@ set_buffer_keywords_odin :: proc() {
         
         when ODIN_DEBUG {
             assert(row >= line_number)
-            assert(start_point.row == end_point.row)
+            // assert(start_point.row == end_point.row)
+        }
+
+        if start_point.row != end_point.row {
+            fmt.println(name, node_type, start_point)
         }
 
         line := &active_buffer.lines[row]
          
-        override_node_type(&node_type, node, active_buffer.content[:], &start_point, &end_point, &line.tokens)
+        priority : u8 = 0
+
+        active_language_server.override_node_type(
+            &node_type, node,
+            active_buffer.content[:],
+            &start_point, &end_point,
+            &line.tokens, &priority,
+        )
         
         if node_type == "SKIP" {
             continue
@@ -507,7 +438,15 @@ set_buffer_keywords_odin :: proc() {
         color := &active_language_server.ts_colors[node_type]
         
         if color == nil {
-            fmt.println(node_type, string(active_buffer.content[start_byte:end_byte]))
+            when ODIN_DEBUG {
+                fmt.println(
+                    "Warning: Missing TS-Token Colour for Node Type",
+                    node_type, 
+                    "with content",
+                    string(active_buffer.content[start_byte:end_byte])
+                )
+            }
+
             continue
         }
 
@@ -529,36 +468,28 @@ set_buffer_keywords_odin :: proc() {
             char = i32(start_rune),
             length = i32(length),
             color = color^,
-            priority = 0,
+            priority = u8(priority),
         })
     }
         
     active_buffer.previous_tree = tree
 }
 
-
-@(private="package")
-override_node_type_odin :: proc(
+override_node_type :: proc(
     node_type: ^string,
     node: ts.Node, 
     source: []u8,
     start_point,
     end_point: ^ts.Point,
     tokens: ^[dynamic]Token,
+    priority: ^u8,
 ) {
-    if node_type^ == "function.method" || node_type^ == "parameter" {
-        resize(tokens, len(tokens)-1)
-    } else if len(tokens) > 0 {
-        latest_token := tokens[len(tokens)-1]
-
-        if latest_token.char == i32(start_point.col) {
-            node_type^ = "SKIP"
-        }
+    if node_type^ == "field" {
+        priority^ = priority^ +1
     }
 }
 
-@(private="package")
-set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_buffer_tokens_threaded :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {
@@ -569,7 +500,7 @@ set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
         return nil, -1
     }
 
-    for token in lsp_tokens {
+    for &token in lsp_tokens {
         if int(token.line) >= len(buffer.lines) do continue
 
         line := &buffer.lines[token.line]
@@ -580,7 +511,12 @@ set_buffer_tokens_threaded_odin :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
             continue
         }
 
+        if overlapping_token.priority > token.priority {
+            continue
+        }
+
         line.tokens[index] = token
+
     }
 }
 

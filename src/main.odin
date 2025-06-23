@@ -25,7 +25,7 @@ parse_args :: proc() {
     for arg in os.args {
         if arg == "-save_logs" {
             fmt.println("NOTE: All output will be directed to stdout.txt")
-            
+
             file_handle, err := os.open("stdout.txt", os.O_WRONLY | os.O_CREATE, 0o644)
             if err != os.ERROR_NONE {
                 fmt.println("Failed to open file:", os.error_string(err))
@@ -130,16 +130,52 @@ main :: proc() {
     }
 
     clear_fonts()
-    delete_rect_cache(&rect_cache)
-    thread.destroy(update_thread)
-    reset_rect_cache(&rect_cache)
 
-    delete(default_cwd)
+    delete_rect_cache(&rect_cache)
+    delete_rect_cache(&text_rect_cache)
+
+    thread.terminate(update_thread, 9)
+    thread.terminate(message_thread, 9)
+
+    thread.destroy(update_thread)
+    thread.destroy(message_thread)
+
+    reset_rect_cache(&rect_cache)
     
     for buffer in buffers {
         for &line in buffer.lines {
             delete(line.characters)
+            delete(line.tokens)
         }
+
+        delete(buffer.content)
+
+        delete(buffer.lines^)
+        free(buffer.lines)
+
         free(buffer)
     }
+
+    for dir in search_ignored_dirs {
+        delete(dir)
+    }
+
+    for key,server in language_servers {
+        free(server)
+    }
+
+    delete(default_cwd)
+    delete(language_servers)
+    delete(font_list)
+    delete(delimiter_runes)
+    delete(search_ignored_dirs)
+    delete(buffers)
+
+    for request in requests {
+        fmt.println(request)
+
+        fmt.println(request.id)
+    }
+
+    delete(requests)
 }

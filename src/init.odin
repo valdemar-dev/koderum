@@ -28,6 +28,7 @@ init :: proc() {
     fb_size = vec2{f32(fb_width), f32(fb_height)}
 
     home_dir := os.get_env("HOME")
+    defer delete(home_dir)
 
     if home_dir != "" {
         os.set_current_directory(home_dir)
@@ -63,9 +64,20 @@ init_update_thread :: proc() {
 
 @(private="package")
 message_thread : ^thread.Thread
+
+@(private="package")
 init_message_thread :: proc() {
+    if message_thread != nil {
+        thread.terminate(message_thread, 0)
+        thread.destroy(message_thread)
+
+        when ODIN_DEBUG {
+            fmt.println("Destroying existing LSP message thread.")
+        }
+    }
+
     when ODIN_DEBUG {
-        fmt.println("Initializing update thread.")
+        fmt.println("Initializing LSP message thread.")
     }
 
     message_thread = thread.create(message_loop)

@@ -9,15 +9,17 @@ import gl "vendor:OpenGL"
 import "core:encoding/json"
 import "core:os/os2"
 import "core:os"
+import "core:strings"
+import "core:mem"
 
 LSPRequest :: struct {
-    content: string,
     id: string,
     response_proc: proc(response: json.Object, data: rawptr),
     data: rawptr,
 }
 
-requests : [dynamic]LSPRequest = {}
+@(private="package")
+requests : [dynamic]LSPRequest
 
 @(private="package")
 update_state :: proc(current_time: f64) {
@@ -52,11 +54,15 @@ message_loop :: proc(thread: ^thread.Thread) {
             context.allocator,
         )
 
+        defer delete(bytes)
+
         if read_err != os2.ERROR_NONE {
+            fmt.println(read_err)
             panic("Failed to read LSP Message.")
         }
 
         parsed,_ := json.parse(bytes)
+        defer json.destroy_value(parsed)
 
         obj, ok := parsed.(json.Object)
 
@@ -72,13 +78,24 @@ message_loop :: proc(thread: ^thread.Thread) {
             when ODIN_DEBUG {
                 fmt.println("LSP Message Loop: Processing Request Response with ID", id)
             }
-            
-            for request in requests {
+
+            for &request,index in requests {
                 if request.id == id {
+                    delete(request.id)
+
                     request.response_proc(obj, request.data)
+                    
+                    unordered_remove(&requests, index)
+
+                    break
                 }
             }
+
+            continue
         } 
+
+        fmt.println("Received Notification: ",parsed)
+
     }
 }
 
@@ -86,22 +103,37 @@ message_loop :: proc(thread: ^thread.Thread) {
 send_lsp_message :: proc(
     content: string,
     id: string,
-    response_proc: proc(response: json.Object, data: rawptr),
-    data: rawptr,
+    response_proc: proc(response: json.Object, data: rawptr) = nil,
+    data: rawptr = nil,
 ) {
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
-
-    append(&requests, LSPRequest{
-        content,
-        id,
-        response_proc,
-        data,
-    })
+    os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
 
     when ODIN_DEBUG {
-        fmt.println("LSP Message Loop: Sent a message with ID", id)
+        fmt.println("LSP Message: Adding a message with ID", id)
     }
 
+    if id == "" {
+
+        return
+    }
+
+    append(&requests, LSPRequest{
+        data=data,
+        id=strings.clone(id),
+        response_proc=response_proc,
+    })
+}
+
+@(private="package")
+send_lsp_init_message :: proc(
+    content: string,
+    fd: ^os2.File,
+) {
+    _, write_err := os2.write(fd, transmute([]u8)content)
+
+    when ODIN_DEBUG {
+        fmt.println("LSP Message: Sent an initilization request.",)
+    }
 }
 
 @(private="package")
