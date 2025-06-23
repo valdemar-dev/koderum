@@ -2100,7 +2100,7 @@ serialize_buffer :: proc(buffer: ^Buffer) -> string {
 insert_completion :: proc() {
     completion := completion_hits[selected_completion_hit]
 
-    insert_string := strings.trim_left(completion.label, completion_filter_token)
+    insert_string := completion.label
 
     line := &active_buffer.lines[buffer_cursor_line]
     byte_offset := utf8.rune_offset(string(line.characters[:]), buffer_cursor_char_index)
@@ -2109,9 +2109,19 @@ insert_completion :: proc() {
         byte_offset = len(line.characters)
     }
 
+    filter_token_byte_size := len(completion_filter_token)
+    completion_token_byte_size := len(completion.label)
+
+    start_idx := byte_offset - filter_token_byte_size
+
+    remove_range(&line.characters,
+        start_idx, 
+        start_idx + filter_token_byte_size
+    )
+
     inject_at(
         &line.characters,
-        byte_offset,
+        start_idx,
         ..transmute([]u8)insert_string,
     )
 
@@ -2120,15 +2130,15 @@ insert_completion :: proc() {
         buffer_cursor_line,
         buffer_cursor_char_index,
     )
-  
+ 
     notify_server_of_change(
         active_buffer,
 
-        buffer_cursor_accumulated_byte_position,
+        buffer_cursor_accumulated_byte_position - filter_token_byte_size,
         buffer_cursor_accumulated_byte_position,
 
         buffer_cursor_line,
-        buffer_cursor_char_index,
+        start_idx,
 
         buffer_cursor_line,
         buffer_cursor_char_index,

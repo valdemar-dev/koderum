@@ -155,10 +155,8 @@ lsp_handle_file_open :: proc() {
         return
     }
     
-    serialized_buffer := serialize_buffer(active_buffer)
-    escaped := escape_json(serialized_buffer)
+    escaped := escape_json(string(active_buffer.content[:]))
 
-    defer delete(serialized_buffer)
     defer delete(escaped)
     
     msg := did_open_message(
@@ -171,6 +169,9 @@ lsp_handle_file_open :: proc() {
     defer delete(msg)
 
     send_lsp_message(msg, "") 
+
+    active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
+    do_refresh_buffer_tokens = true
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
@@ -836,17 +837,21 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                 a_label := a.(json.Object)["label"].(string)
                 b_label := b.(json.Object)["label"].(string)
 
-                less := a_label < b_label
-
-                if less do return 0
-                return 1
+                if a_label < b_label {
+                    return -1
+                } else if a_label > b_label {
+                    return 1
+                }
+                return 0
             }
 
-            less := a_sort < b_sort
-
-            if less do return 0
-            return 1
+            if a_sort < b_sort {
+                return -1
+            } else {
+                return 1
+            }
         }
+
 
         sort.quick_sort_proc(items[:], sort_proc)
 
@@ -878,7 +883,6 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                 label=strings.clone(label),
             }
 
-            /*
             if len(completion_filter_token) > 0 {
                 if strings.contains(label, completion_filter_token) == false {
                     continue
@@ -890,7 +894,6 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
                     continue
                 }
             }
-            */
 
             append(&new_hits, hit)
         }

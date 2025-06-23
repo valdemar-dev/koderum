@@ -28,7 +28,7 @@ do_highlight_current_line = true
 [general]
 default_cwd = /home/v/prog/projects/koderum
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
-delimiter_runes =  ()[]{}'?!|/+:_~^*`&=*`´§,.-";
+delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";
 
 [style]
 general_line_thickness_px = 1

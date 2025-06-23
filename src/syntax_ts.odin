@@ -435,10 +435,10 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
         return
     }
 
-    sync.lock(&tree_mutex)
-
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
+
+    sync.lock(&tree_mutex)
 
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
