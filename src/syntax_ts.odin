@@ -11,7 +11,7 @@ import "core:encoding/json"
 import "core:text/regex"
 import "core:unicode/utf8"
 import "core:sort"
-import "core:sync"
+
 import "core:time"
 
 import ts "../../odin-tree-sitter"
@@ -19,6 +19,7 @@ import ts "../../odin-tree-sitter"
 import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
 import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
+import "core:sync"
 tree_mutex : sync.Mutex
 
 ts_ts_colors : map[string]vec4 = {

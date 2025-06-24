@@ -382,3 +382,31 @@ semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string
     })
 }
 
+completion_item_resolve_request_message :: proc(
+    id: int,
+    completion_item_json: string,
+) -> (msg: string, id_string: string) {
+    id_buf := make([dynamic]u8, 16)
+    str_id := strconv.itoa(id_buf[:], id)
+    defer delete(id_buf)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": \"", str_id, "\",\n",
+        "  \"method\": \"completionItem/resolve\",\n",
+        "  \"params\": ", completion_item_json, "\n",
+        "}\n",
+    }, context.temp_allocator)
+
+    buf := make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+    defer delete(buf)
+
+    return strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    }), strings.clone(str_id)
+}
+

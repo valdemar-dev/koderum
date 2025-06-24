@@ -19,8 +19,6 @@ generate_highlight_string :: proc(
     start_char: int,
     end_char: int,
 ) -> string {
-    result := make([dynamic]u8)
-
     start_byte_offset := compute_byte_offset(active_buffer, start_line, start_char)
     end_byte_offset := compute_byte_offset(active_buffer, end_line, end_char)
 

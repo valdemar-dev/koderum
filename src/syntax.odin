@@ -13,6 +13,11 @@ import "core:sort"
 import ts "../../odin-tree-sitter"
 import "core:time"
 
+import "core:sync"
+
+@(private="file")
+completion_mutex : sync.Mutex
+
 LanguageServer :: struct {
     lsp_stdin_w : ^os2.File,
     lsp_stdout_r : ^os2.File,
@@ -488,6 +493,48 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
     return body_buf[:], os2.ERROR_NONE
 }
 
+attempt_resolve_request :: proc(idx: int) {
+    if idx >= len(completion_hits) {
+        return
+    }
+
+    lsp_request_id += 1
+
+    hit := &completion_hits[idx]
+
+    msg, id := completion_item_resolve_request_message(
+        lsp_request_id,
+        hit.raw_data,
+    )
+
+    defer delete(msg)
+    defer delete(id)
+
+    send_lsp_message(
+        msg,
+        id,
+        handle_response,
+        hit,
+    )
+
+    handle_response :: proc(response: json.Object, data: rawptr) { 
+        fmt.println("hi")
+
+        hit_ptr := cast(^CompletionHit)data
+
+        if hit_ptr == nil {
+            return
+        }
+
+        result,_ := response["result"].(json.Object)
+        data,_ := result["data"].(json.Object)
+
+        detail,_ := result["detail"].(string)
+
+        hit_ptr^.detail = strings.clone(detail)
+    }
+}
+
 get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
     if active_language_server == nil {
         return
@@ -510,26 +557,23 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
 
     defer delete(msg)
     defer delete(req_id_string)
-    defer delete(trigger_character)
+
+    defer if trigger_character != "" {
+        delete(trigger_character)
+    }    
 
     send_lsp_message(
         msg,
         req_id_string,
         handle_response,
+        nil,
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
-        free(data)
+        sync.lock(&completion_mutex)
 
         result,result_ok := response["result"].(json.Object)
-        if !result_ok {
-            panic("failed to do anythin:?+++++++++")
-        }
         items,ok := result["items"].(json.Array)
-
-        if !ok {
-            panic("Failed")
-        }
 
         new_hits := make([dynamic]CompletionHit)
 
@@ -559,13 +603,14 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             documentation, documentation_ok := item.(json.Object)["documentation"].(string)
 
             buf, marshal_error := json.marshal(item)
+            defer delete(buf)
             if marshal_error != io.Error.None {
                 panic("marshalling error")
             }
 
             hit := CompletionHit{
                 label=strings.clone(label),
-                raw_data=string(buf),
+                raw_data=strings.clone(string(buf)),
             }
 
             if documentation_ok {
@@ -588,16 +633,23 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
         }
 
         for &hit in completion_hits {
-            delete(hit.detail)
+
             delete(hit.documentation)
             delete(hit.insertText)
             delete(hit.label)
             delete(hit.raw_data)
+            delete(hit.detail)
         }
 
         delete(completion_hits)
 
         completion_hits = new_hits
+
+        if len(completion_hits) > 0 {
+            attempt_resolve_request(selected_completion_hit)
+        }
+
+        sync.lock(&completion_mutex)
     }
 
 }

@@ -503,6 +503,27 @@ draw_text_buffer :: proc() {
         )
     }
 
+    draw_autocomplete()
+    
+    draw_rects(&rect_cache)
+    reset_rect_cache(&rect_cache)
+
+    /*
+        TEXT, especially code text (which has unknown variable background colours)
+        must be drawn on a separate pass, otherwise blending is not possible.
+        thanks opengl
+    */
+    draw_rects(&text_rect_cache)
+    reset_rect_cache(&text_rect_cache)
+}
+
+draw_autocomplete :: proc() {
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    assert(error == .Ok)
+
+    ascender := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+
     if len(completion_hits) > 0 && input_mode == .BUFFER_INPUT {
         padding := math.round_f32((buffer_font_size) * .25)
 
@@ -635,17 +656,6 @@ draw_text_buffer :: proc() {
             )
         }
     }
-    
-    draw_rects(&rect_cache)
-    reset_rect_cache(&rect_cache)
-
-    /*
-        TEXT, especially code text (which has unknown variable background colours)
-        must be drawn on a separate pass, otherwise blending is not possible.
-        thanks opengl
-    */
-    draw_rects(&text_rect_cache)
-    reset_rect_cache(&text_rect_cache)
 }
 
 @(private="package")
@@ -1042,6 +1052,8 @@ handle_text_input :: proc() -> bool {
                 0,
                 len(completion_hits) - 1
             )
+
+            attempt_resolve_request(selected_completion_hit)
         }
     } 
 
@@ -1054,6 +1066,8 @@ handle_text_input :: proc() -> bool {
                 0,
                 len(completion_hits) - 1
             )
+
+            attempt_resolve_request(selected_completion_hit)
         }
     }
 
@@ -1794,6 +1808,13 @@ handle_buffer_input :: proc() -> bool {
         input_mode = .BUFFER_INPUT
 
         constrain_scroll_to_cursor()
+
+        get_autocomplete_hits(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+            "1",
+            "",
+        )
 
         return false
     }

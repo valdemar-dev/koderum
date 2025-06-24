@@ -113,7 +113,6 @@ send_lsp_message :: proc(
     }
 
     if id == "" {
-
         return
     }
 
