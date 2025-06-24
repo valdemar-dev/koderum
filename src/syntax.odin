@@ -39,9 +39,10 @@ LanguageServer :: struct {
         tokens: ^[dynamic]Token,  
         priority: ^u8,
     ),
-
-    set_buffer_tokens : proc(first_line, last_line: int),
-    set_buffer_tokens_threaded : proc(buffer: ^Buffer, lsp_tokens: []Token),
+    
+    parse_tree : proc(first_line, last_line: int) -> ts.Tree,
+    set_tokens : proc(first_line, last_line: int, tree_ptr: ^ts.Tree),
+    set_lsp_tokens : proc(buffer: ^Buffer, lsp_tokens: []Token),
 }
 
 Token :: struct {
@@ -170,7 +171,7 @@ lsp_handle_file_open :: proc() {
 
     send_lsp_message(msg, "") 
 
-    active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
+    active_language_server.parse_tree(0, len(active_buffer.lines))
     do_refresh_buffer_tokens = true
 }
 
@@ -252,7 +253,7 @@ set_buffer_tokens :: proc() {
     
     start_version := active_buffer.version 
     
-    set_buffer_keywords()
+    active_language_server.parse_tree(active_buffer.first_drawn_line, active_buffer.last_drawn_line)
 
     {
         when ODIN_DEBUG {
@@ -293,7 +294,10 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
-    active_language_server.set_buffer_tokens(0, len(active_buffer.lines))
+    new_tree := active_language_server.parse_tree(0, len(active_buffer.lines))
+    // active_language_server.set_tokens(0, len(active_buffer.lines), &new_tree)
+
+    ts.tree_delete(new_tree)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
         start_version_ptr := (cast(^int)data)
@@ -327,9 +331,8 @@ set_buffer_tokens_threaded :: proc() {
             active_language_server.token_modifiers,  
         )
        
-
         assert(active_language_server != nil)
-        active_language_server.set_buffer_tokens_threaded(active_buffer, decoded_tokens[:])
+        active_language_server.set_lsp_tokens(active_buffer, decoded_tokens[:])
 
         if start_version != active_buffer.version {
             do_refresh_buffer_tokens = true
@@ -416,10 +419,6 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
     }
 
     return byte_offset
-}
-
-set_buffer_keywords :: proc() {
-    active_language_server.set_buffer_tokens(active_buffer.first_drawn_line, active_buffer.last_drawn_line)
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
@@ -822,7 +821,10 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
     handle_response :: proc(response: json.Object, data: rawptr) {
         free(data)
 
-        result,_ := response["result"].(json.Object)
+        result,result_ok := response["result"].(json.Object)
+        if !result_ok {
+            panic("failed to do anythin:?+++++++++")
+        }
         items,ok := result["items"].(json.Array)
 
         if !ok {

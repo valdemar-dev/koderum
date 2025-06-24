@@ -477,6 +477,10 @@ add_code_text :: proc(
                 if token_idx < len(tokens) {
                     next_token := &tokens[token_idx]
 
+                    if next_token.char < i32(i) {
+                        token_idx += 1
+                    }
+
                     if i32(i + 1) >= next_token.char {
                         token = next_token
                     } else {

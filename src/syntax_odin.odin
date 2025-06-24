@@ -336,8 +336,8 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
         colors=odin_lsp_colors,
         ts_colors=ts_odin_colors,
 
-        set_buffer_tokens=set_buffer_tokens,
-        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
+        set_tokens=set_tokens,
+        set_lsp_tokens=set_lsp_tokens,
         override_node_type=override_node_type,
     }
  
@@ -348,7 +348,7 @@ init_syntax_odin :: proc(ext: string, allocator := context.allocator) -> (server
     return server,os2.ERROR_NONE
 }
 
-set_buffer_tokens :: proc(first_line, last_line: int) {
+set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -489,7 +489,7 @@ override_node_type :: proc(
     }
 }
 
-set_buffer_tokens_threaded :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {

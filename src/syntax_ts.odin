@@ -351,8 +351,11 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
         lsp_stdout_r = stdout_r,
         lsp_server_pid = process.pid,
         override_node_type=override_node_type,
-        set_buffer_tokens=set_buffer_tokens,
-        set_buffer_tokens_threaded=set_buffer_tokens_threaded,
+
+        parse_tree=parse_tree,
+        set_tokens=set_tokens,
+        set_lsp_tokens=set_lsp_tokens,
+
         ts_parser=parser,
         token_types={},
         token_modifiers={},
@@ -423,22 +426,22 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
             fmt.println("TypeScript LSP has been initialized.")
         }
 
-        set_buffer_tokens(0, len(active_buffer.lines))
+        active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
         do_refresh_buffer_tokens = true
     }
 
     return os2.ERROR_NONE
 }
 
-set_buffer_tokens :: proc(first_line, last_line: int) { 
+parse_tree :: proc(first_line, last_line: int) -> ts.Tree { 
     if active_language_server == nil {
-        return
+        return nil
     }
+
+    sync.lock(&tree_mutex)
 
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
-
-    sync.lock(&tree_mutex)
 
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
@@ -446,8 +449,6 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
-
-    sync.unlock(&tree_mutex)
 
     if active_buffer.previous_tree == nil {
         error_offset : u32
@@ -462,18 +463,36 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
         }
 
         if query == nil {
+            fmt.println(string(query_src)[error_offset:])
             fmt.println(error_type)
             
-            return
+            return nil
         }
         
         active_buffer.query = query
     }
-    
+
+    sync.unlock(&tree_mutex)
+
+    set_tokens(first_line, last_line, &tree)
+
+    return tree
+}
+
+set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) { 
+    if tree_ptr == nil {
+        fmt.println("hi")
+        return
+    }
+
+    tree := tree_ptr^
+
     cursor := ts.query_cursor_new()
-    ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
-    defer ts.query_cursor_delete(cursor)
     
+    ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
+
+    defer ts.query_cursor_delete(cursor)
+ 
     start_point := ts.Point{
         row=u32(max(first_line, 0)),
         col=0, 
@@ -483,9 +502,10 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
         row=u32(max(last_line, 0)),
         col=0,
     }
-    
+
     ts.query_cursor_set_point_range(cursor, start_point, end_point)
     
+
     match : ts.Query_Match
     capture_index := new(u32)
 
@@ -559,12 +579,6 @@ set_buffer_tokens :: proc(first_line, last_line: int) {
             priority = 0,
         })
     }
-
-    if active_buffer.previous_tree != nil {
-        ts.tree_delete(active_buffer.previous_tree)
-    }
-
-    active_buffer.previous_tree = tree
 }
 
 override_node_type :: proc(
@@ -587,7 +601,7 @@ override_node_type :: proc(
     }
 }
 
-set_buffer_tokens_threaded :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {

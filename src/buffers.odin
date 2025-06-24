@@ -93,7 +93,6 @@ Buffer :: struct {
     
     // Tree-sitter tree
     previous_tree: ts.Tree,
-    is_tree_locked: bool,
     
     // Raw data that we read from file and modify for tree-sitter so it doesnt die
     content: [dynamic]u8,
@@ -1627,13 +1626,6 @@ inject_line :: proc() {
         
     indent_spaces := determine_line_indent(buffer_cursor_line + 1)
 
-    cur_line_end_char := len(string(active_buffer.lines[buffer_cursor_line].characters[:]))
-    cur_line_end_byte := compute_byte_offset(
-        active_buffer,
-        buffer_cursor_line,
-        cur_line_end_char,
-    ) 
-
     bytes, _ := utf8.encode_rune(' ')
     space_size := utf8.rune_size(' ')
     
@@ -1642,6 +1634,33 @@ inject_line :: proc() {
     }
    
     inject_at(active_buffer.lines, buffer_cursor_line + 1, buffer_line)
+
+    new_text := strings.concatenate({
+        "\n",
+        strings.repeat(" ", indent_spaces)
+    })
+
+    cur_line_end_char := len(string(active_buffer.lines[buffer_cursor_line].characters[:]))
+    cur_line_end_byte := compute_byte_offset(
+        active_buffer,
+        buffer_cursor_line,
+        cur_line_end_char,
+    ) 
+
+    notify_server_of_change(
+        active_buffer,
+
+        cur_line_end_byte,
+        cur_line_end_byte,
+
+        buffer_cursor_line,
+        cur_line_end_char,
+
+        buffer_cursor_line,
+        cur_line_end_char,
+
+        transmute([]u8)new_text
+    )
 
     set_buffer_cursor_pos(
         buffer_cursor_line + 1,
@@ -1658,25 +1677,7 @@ inject_line :: proc() {
     
     input_mode = .BUFFER_INPUT
 
-    new_text := strings.concatenate({
-        "\n",
-        strings.repeat(" ", indent_spaces)
-    })
 
-    notify_server_of_change(
-        active_buffer,
-
-        cur_line_end_byte,
-        cur_line_end_byte,
-
-        buffer_cursor_line,
-        cur_line_end_char,
-
-        buffer_cursor_line,
-        cur_line_end_char,
-
-        transmute([]u8)new_text
-    )
 }
 
 @(private="package")

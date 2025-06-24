@@ -42,6 +42,9 @@ generate_highlight_string :: proc(
 
     start_buffer_line := active_buffer.lines[start_line]
     start_offset := utf8.rune_offset(string(start_buffer_line.characters[:]), start_char)
+    if start_offset == -1 {
+        start_offset = len(start_buffer_line.characters[:])
+    }
 
     append(&result, ..start_buffer_line.characters[:start_offset])
 
@@ -55,54 +58,11 @@ generate_highlight_string :: proc(
     end_buffer_line := active_buffer.lines[end_line]
 
     end_offset := utf8.rune_offset(string(end_buffer_line.characters[:]), end_char)
+    if end_offset == -1 {
+        end_offset = len(end_buffer_line.characters[:])
+    }
 
     append(&result, ..end_buffer_line.characters[:end_char])
-
-    /*
-    for i in start..=end {
-        line := active_buffer.lines[i]
-        str : string
-
-        if i == start && i == end {
-            forward := start_char <= end_char
-
-            clamped_end := min(end_char, len(line.characters))
-            clamped_start := min(start_char, len(line.characters))
-
-            if forward {
-                str = string(line.characters[clamped_start:clamped_end])
-            } else {
-                str = string(line.characters[clamped_end:clamped_start])
-            }
-        } else if i == end {
-            if is_negative_highlight {
-                clamped := min(start_char, len(line.characters))
-                str = string(line.characters[:clamped])
-            } else {
-                clamped := min(end_char, len(line.characters))
-                str = string(line.characters[:clamped])
-            }
-        } else if i == start {
-            if is_negative_highlight {
-                clamped := clamp(end_char, 0, len(line.characters))
-
-                str = string(line.characters[clamped:])
-            } else {
-                clamped := clamp(start_char, 0, len(line.characters))
-
-                str = string(line.characters[clamped:])
-            }
-        } else {
-            str = string(line.characters[:])
-        }
-
-        result = strings.concatenate({
-            result,
-            str,
-            i != end ? "\n" : "",
-        })
-    }
-    */
 
     return string(result[:])
 }
