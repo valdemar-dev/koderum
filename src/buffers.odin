@@ -38,6 +38,8 @@ CompletionHit :: struct {
     documentation: string,
     insertText: string,
     insertTextFormat: int,
+
+    raw_data: string,
 }
 
 @(private="package")
@@ -1676,8 +1678,6 @@ inject_line :: proc() {
     delete(de)
     
     input_mode = .BUFFER_INPUT
-
-
 }
 
 @(private="package")
@@ -1933,7 +1933,7 @@ paste_string :: proc(str: string, line: int, char: int) {
     }
 
     pre := active_buffer.lines[line].characters[:char]
-    post := active_buffer.lines[line].characters[char:]
+    post := strings.clone(string(active_buffer.lines[line].characters[char:]))
 
     for i in 0..<len(split) {
         text_line := split[i]
@@ -1954,7 +1954,7 @@ paste_string :: proc(str: string, line: int, char: int) {
         append(&new_buffer_line.characters, ..transmute([]u8)text_line)
 
         if i == (len(split) - 1) {
-            append(&new_buffer_line.characters, ..post)
+            append(&new_buffer_line.characters, ..transmute([]u8)post)
         }
 
         inject_at(active_buffer.lines, buffer_line_index, new_buffer_line)

@@ -503,8 +503,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
         col=0,
     }
 
-    ts.query_cursor_set_point_range(cursor, start_point, end_point)
-    
+    ts.query_cursor_set_point_range(cursor, start_point, end_point) 
 
     match : ts.Query_Match
     capture_index := new(u32)

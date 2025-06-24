@@ -253,7 +253,13 @@ set_buffer_tokens :: proc() {
     
     start_version := active_buffer.version 
     
-    active_language_server.parse_tree(active_buffer.first_drawn_line, active_buffer.last_drawn_line)
+    new_tree := active_language_server.parse_tree(
+        active_buffer.first_drawn_line,
+        active_buffer.last_drawn_line,
+    )
+
+    ts.tree_delete(active_buffer.previous_tree)
+    active_buffer.previous_tree = new_tree
 
     {
         when ODIN_DEBUG {
@@ -295,8 +301,6 @@ set_buffer_tokens_threaded :: proc() {
     )
 
     new_tree := active_language_server.parse_tree(0, len(active_buffer.lines))
-    // active_language_server.set_tokens(0, len(active_buffer.lines), &new_tree)
-
     ts.tree_delete(new_tree)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
@@ -398,7 +402,6 @@ notify_server_of_change :: proc(
     }
     
     set_buffer_tokens()
-
     do_refresh_buffer_tokens = true
 }
 
@@ -485,309 +488,6 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
     return body_buf[:], os2.ERROR_NONE
 }
 
-text_document_hover_message :: proc(doc_uri: string, line: int, character: int, id: int) -> string {
-    buf := make([dynamic]u8, 32)
-    
-    id_str := strconv.itoa(buf[:], id)
-    
-    line_str := strconv.itoa(buf[:], line)
-    char_str := strconv.itoa(buf[:], character)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": ", id_str, ",\n",
-        "  \"method\": \"textDocument/hover\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", doc_uri, "\"\n",
-        "    },\n",
-        "    \"position\": {\n",
-        "      \"line\": ", line_str, ",\n",
-        "      \"character\": ", char_str, "\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    })
-
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-
-    delete(buf)
-    return header
-}
-
-text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
-    buf := make([dynamic]u8, 32)
-
-    version_str := strings.clone(strconv.itoa(buf[:], version), context.temp_allocator)
-    
-    start_line_str := strings.clone(strconv.itoa(buf[:], start_line), context.temp_allocator)
-    start_char_str := strings.clone(strconv.itoa(buf[:], start_char), context.temp_allocator)
-    end_line_str := strings.clone(strconv.itoa(buf[:], end_line), context.temp_allocator)
-    end_char_str := strings.clone(strconv.itoa(buf[:], end_char), context.temp_allocator)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"method\": \"textDocument/didChange\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", doc_uri, "\",\n",
-        "      \"version\": ", version_str, "\n",
-        "    },\n",
-        "    \"contentChanges\": [\n",
-        "      {\n",
-        "        \"range\": {\n",
-        "          \"start\": { \"line\": ", start_line_str, ", \"character\": ", start_char_str, " },\n",
-        "          \"end\": { \"line\": ", end_line_str, ", \"character\": ", end_char_str, " }\n",
-        "        },\n",
-        "        \"text\": \"", new_text, "\"\n",
-        "      }\n",
-        "    ]\n",
-        "  }\n",
-        "}\n"
-    }, context.temp_allocator)
-
-    delete(buf)
-
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    }, context.temp_allocator)
-
-    defer delete(buf)
-
-    return strings.clone(header)
-}
-
-
-get_project_info_message :: proc(id: int) -> string {
-    buf := make([dynamic]u8, 32)
-    
-    id_str := strconv.itoa(buf[:], id)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": ", id_str, ",\n",
-        "  \"method\": \"textDocument/publishDiagnostics\",\n",
-        "  \"params\": {\n",
-        "  }\n",
-        "}\n",
-    })
-
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-
-    delete(buf)
-    return header
-}
-
-
-did_change_workspace_folders_message :: proc(folder_uri: string, folder_name: string) -> string {
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"method\": \"workspace/didChangeWorkspaceFolders\",\n",
-        "  \"params\": {\n",
-        "    \"event\": {\n",
-        "      \"added\": [\n",
-        "        {\n",
-        "          \"uri\": \"", folder_uri, "\",\n",
-        "          \"name\": \"", folder_name, "\"\n",
-        "        }\n",
-        "      ],\n",
-        "      \"removed\": []\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-
-    delete(buf)
-    return header
-}
-
-text_document_document_symbol_message :: proc(doc_uri: string, id: int) -> string {
-    buf := make([dynamic]u8, 32)
-    id_str := strconv.itoa(buf[:], id)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": ", id_str, ",\n",
-        "  \"method\": \"textDocument/documentSymbol\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", doc_uri, "\"\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    })
-
-    delete(buf)
-    
-    buf = make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-
-    delete(buf)
-    return header
-}
-
-initialize_message :: proc(pid: int, project_dir: string) -> string {
-    buf := make([dynamic]u8, 32)
-    str_pid := strconv.itoa(buf[:], pid)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": \"1\",\n",
-        "  \"method\": \"initialize\",\n",
-        "  \"params\": {\n",
-        "    \"processId\": ", str_pid, ",\n",
-        "    \"rootUri\": \"file://", project_dir, "\",\n",
-        "    \"capabilities\": {}\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    len_buf := make([dynamic]u8, 32)
-
-    length := (strconv.itoa(len_buf[:], len(json)))
-
-    defer delete(buf)
-    defer delete(len_buf)
-
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-}
-
-did_open_message :: proc(uri: string, languageId: string, version: int, text: string) -> string {
-    version_buf := make([dynamic]u8, 16)
-    defer delete(version_buf)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"method\": \"textDocument/didOpen\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", uri, "\",\n",
-        "      \"languageId\": \"", languageId, "\",\n",
-        "      \"version\": ", strconv.itoa(version_buf[:], version), ",\n",
-        "      \"text\": \"", text, "\"\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    buf := make([dynamic]u8, 32)
-    defer delete(buf)
-    length := strconv.itoa(buf[:], len(json))
-
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-}
-
-completion_request_message :: proc(
-    id: int,
-    uri: string,
-    line: int,
-    character: int,
-
-    trigger_kind: string,
-    trigger_character: string,
-) -> (msg, id_str: string) {
-    id_buf := make([dynamic]u8, 16)
-    str_id := strconv.itoa(id_buf[:], id)
-    defer delete(id_buf)
-
-    line_buf := make([dynamic]u8, 16)
-    char_buf := make([dynamic]u8, 16)
-    defer delete(line_buf)
-    defer delete(char_buf)
-
-    line_str := strconv.itoa(line_buf[:], line)
-    char_str := strconv.itoa(char_buf[:], character)
-
-    body := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": \"", str_id, "\",\n",
-        "  \"method\": \"textDocument/completion\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", uri, "\"\n",
-        "    },\n",
-        "    \"position\": {\n",
-        "      \"line\": ", line_str, ",\n",
-        "      \"character\": ", char_str, "\n",
-        "    },\n",
-        "    \"context\": {\n",
-        "      \"triggerKind\": ", trigger_kind
-    }, context.temp_allocator)
-
-    if trigger_kind == "2" {
-        body = strings.concatenate({
-            body,
-            ",\n",
-            "      \"triggerCharacter\": \"", trigger_character, "\""
-        }, context.temp_allocator)
-    }
-
-    body = strings.concatenate({body, "\n    }\n  }\n}\n"}, context.temp_allocator)
-
-    len_buf := make([dynamic]u8, 32)
-    defer delete(len_buf)
-
-    length := strconv.itoa(len_buf[:], len(body))
-
-    final := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        body
-    })
-
-    return (final), strings.clone(str_id)
-}
-
 get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
     if active_language_server == nil {
         return
@@ -833,33 +533,6 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
 
         new_hits := make([dynamic]CompletionHit)
 
-        /*
-        sort_proc :: proc(a: json.Value, b: json.Value) -> int {
-            a_sort := a.(json.Object)["sortText"].(string)
-            b_sort := b.(json.Object)["sortText"].(string)
-
-            if a_sort == b_sort {
-                a_label := a.(json.Object)["label"].(string)
-                b_label := b.(json.Object)["label"].(string)
-
-                if a_label < b_label {
-                    return -1
-                } else if a_label > b_label {
-                    return 1
-                }
-                return 0
-            }
-
-            if a_sort < b_sort {
-                return -1
-            } else {
-                return 1
-            }
-        }
-
-        sort.quick_sort_proc(items[:], sort_proc)
-        */
-
         cur_line := active_buffer.lines[buffer_cursor_line]
         line_string := string(cur_line.characters[:])
 
@@ -885,8 +558,14 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             label, label_ok := item.(json.Object)["label"].(string)
             documentation, documentation_ok := item.(json.Object)["documentation"].(string)
 
+            buf, marshal_error := json.marshal(item)
+            if marshal_error != io.Error.None {
+                panic("marshalling error")
+            }
+
             hit := CompletionHit{
                 label=strings.clone(label),
+                raw_data=string(buf),
             }
 
             if documentation_ok {
@@ -913,6 +592,7 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             delete(hit.documentation)
             delete(hit.insertText)
             delete(hit.label)
+            delete(hit.raw_data)
         }
 
         delete(completion_hits)
@@ -920,71 +600,6 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
         completion_hits = new_hits
     }
 
-}
-
-semantic_tokens_request_message :: proc(
-    id: int,
-    uri: string,
-    line_start: int,
-    line_end: int,
-) -> (msg: string, id_string: string) {
-    id_buf := make([dynamic]u8, 16)
-    str_id := strconv.itoa(id_buf[:], id)
-
-    defer delete(id_buf)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": \"", str_id, "\",\n",
-        "  \"method\": \"textDocument/semanticTokens/full\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", uri, "\"\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    buf := make([dynamic]u8, 32)
-
-    length := strconv.itoa(buf[:], len(json))
-
-    defer delete(buf)
-
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    }), strings.clone(str_id)
-}
-
-semantic_tokens_delta_message :: proc(id: int, uri: string, token_set_id: string) -> string {
-    id_buf := make([dynamic]u8, 16)
-    str_id := strconv.itoa(id_buf[:], id)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": \"", str_id, "\",\n",
-        "  \"method\": \"textDocument/semanticTokens/delta\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", uri, "\"\n",
-        "    },\n",
-        "    \"previousResultId\": \"", token_set_id, "\"\n",
-        "  }\n",
-        "}\n",
-    })
-
-    buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
 }
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {

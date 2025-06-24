@@ -21,24 +21,18 @@ generate_highlight_string :: proc(
 ) -> string {
     result := make([dynamic]u8)
 
-    start_line := start_line
-    start_char := start_char
+    start_byte_offset := compute_byte_offset(active_buffer, start_line, start_char)
+    end_byte_offset := compute_byte_offset(active_buffer, end_line, end_char)
 
-    end_line := end_line
-    end_char := end_char
+    if start_byte_offset > end_byte_offset {
+        temp := start_byte_offset
 
-    is_negative_highlight := start_line >= end_line
-    if is_negative_highlight {
-        temp := start_line
-
-        temp_char := start_char
-
-        start_line = end_line
-        end_char = temp
-
-        start_char = end_char
-        end_char = temp_char
+        start_byte_offset = end_byte_offset
+        end_byte_offset = temp
     }
+
+    return strings.clone(string(active_buffer.content[start_byte_offset:end_byte_offset]))
+    /*
 
     start_buffer_line := active_buffer.lines[start_line]
     start_offset := utf8.rune_offset(string(start_buffer_line.characters[:]), start_char)
@@ -65,6 +59,7 @@ generate_highlight_string :: proc(
     append(&result, ..end_buffer_line.characters[:end_char])
 
     return string(result[:])
+    */
 }
 
 @(private="package")
