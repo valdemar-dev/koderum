@@ -176,7 +176,13 @@ lsp_handle_file_open :: proc() {
 
     send_lsp_message(msg, "") 
 
-    active_language_server.parse_tree(0, len(active_buffer.lines))
+    new_tree := active_language_server.parse_tree(
+        0, len(active_buffer.lines)
+    )
+
+    // ts.tree_delete(active_buffer.previous_tree)
+    active_buffer.previous_tree = new_tree
+
     do_refresh_buffer_tokens = true
 }
 
@@ -365,10 +371,34 @@ notify_server_of_change :: proc(
     end_char: int,
 
     new_text: []u8,
+
+    do_update_buffer_content := true,
 ) {
+    new_end_byte := start_byte + len(new_text)
+
+    defer fmt.println(string(buffer.content[0:500]))
+
+    if do_update_buffer_content {
+        append(&active_buffer.undo_stack, BufferChange{
+            u32(start_byte),
+            u32(end_byte),
+            start_line,
+            start_char,
+            end_line,
+            end_char,
+            transmute([]u8)(strings.clone(string(buffer.content[start_byte:end_byte]))),
+            transmute([]u8)(strings.clone(string(new_text))),
+        })
+
+        clear(&active_buffer.redo_stack)
+
+        remove_range(&buffer.content, start_byte, end_byte)
+        inject_at(&buffer.content, start_byte, ..new_text)        
+    }
+
     if active_language_server == nil {
         return
-    }
+    } 
     
     buffer^.version += 1
     
@@ -387,13 +417,10 @@ notify_server_of_change :: proc(
     defer delete(msg)
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+
+    fmt.println(buffer.previous_tree)
   
     if buffer.previous_tree != nil {        
-        new_end_byte := start_byte + len(new_text)
-
-        remove_range(&buffer.content, start_byte, end_byte)
-        inject_at(&buffer.content, start_byte, ..new_text)        
-
         edit := ts.Input_Edit{
             u32(start_byte),
             u32(end_byte),
@@ -518,8 +545,6 @@ attempt_resolve_request :: proc(idx: int) {
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) { 
-        fmt.println("hi")
-
         hit_ptr := cast(^CompletionHit)data
 
         if hit_ptr == nil {
@@ -535,11 +560,16 @@ attempt_resolve_request :: proc(idx: int) {
     }
 }
 
-get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, trigger_character: string,) {
+get_autocomplete_hits :: proc(
+    line: int,
+    character: int,
+    trigger_kind: string,
+    trigger_character: string,
+) {
     if active_language_server == nil {
         return
     }
-
+    
     lsp_request_id += 1
     selected_completion_hit = 0
 
@@ -633,7 +663,6 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
         }
 
         for &hit in completion_hits {
-
             delete(hit.documentation)
             delete(hit.insertText)
             delete(hit.label)
@@ -641,17 +670,14 @@ get_autocomplete_hits :: proc(line: int, character: int, trigger_kind: string, t
             delete(hit.detail)
         }
 
-        delete(completion_hits)
-
         completion_hits = new_hits
 
         if len(completion_hits) > 0 {
             attempt_resolve_request(selected_completion_hit)
         }
 
-        sync.lock(&completion_mutex)
+        sync.unlock(&completion_mutex)
     }
-
 }
 
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {

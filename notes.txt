@@ -7,18 +7,10 @@ todo:
     - close buffer with Ctrl-q
     literally just move everything to word split
     - Ctrl +DFJK movement for in-buffer movement
-    - add always loaded characters configurable in .conf 
-    - add lerp anim to text hl
-    - should retain clipboard history (not yank)
     - add ctrl + r reload
-    - store where you were pre search, go back with b
-    - dedent indent selection
-    - mkdir to fb
     - reopening filebrowser should uncache all files
-    - put correct advance in glyph alredy
     
-    - store arbitrary line number and ctrl+b to return
-    - literally add INDENTING YOU STUPID IDIOT
+    - 
 bugs:    
     - hl only works for 1 item per line
     

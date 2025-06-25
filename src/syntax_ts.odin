@@ -513,6 +513,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
    
     line_number : int = -1
 
+    /*
     for ts._query_cursor_next_capture(cursor, &match, capture_index) {
         capture := match.captures[capture_index^]
 
@@ -529,13 +530,6 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
 
         row := int(start_point.row)
         
-        when ODIN_DEBUG {
-            /*
-            assert(row >= line_number)
-            assert(start_point.row == end_point.row)
-            */
-        }
-
         line := &active_buffer.lines[row]
          
         priority : u8 = 0
@@ -579,6 +573,74 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
             priority = 0,
         })
     }
+    */
+for ts._query_cursor_next_capture(cursor, &match, capture_index) {
+    capture := match.captures[capture_index^]
+
+    name_len: u32
+    name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+
+    node := capture.node
+    node_type := string(name)
+
+    start_point := ts.node_start_point(node)
+    end_point := ts.node_end_point(node)
+    start_byte := ts.node_start_byte(node)
+    end_byte := ts.node_end_byte(node)
+
+    start_row := int(start_point.row)
+    end_row := int(end_point.row)
+
+    for row in start_row..=end_row {
+        if row >= len(active_buffer.lines) {
+            break
+        }
+
+        line := &active_buffer.lines[row]
+
+        if row > line_number {
+            line_number = row
+            clear(&line.tokens)
+        }
+
+        start_rune := row == start_row ? int(start_point.col) : 0
+        end_rune := row == end_row ? int(end_point.col) : len(line.characters)
+
+        length := end_rune - start_rune
+        if length <= 0 {
+            continue
+        }
+
+        // Re-evaluate node_type and priority per line context
+        current_node_type := node_type
+        current_priority: u8 
+
+        active_language_server.override_node_type(
+            &current_node_type, node,
+            active_buffer.content[:],
+            &start_point, &end_point,
+            &line.tokens, &current_priority,
+        )
+
+        if current_node_type == "SKIP" {
+            continue
+        }
+
+        color := &active_language_server.ts_colors[current_node_type]
+        if color == nil {
+            continue
+        }
+
+        append(&line.tokens, Token{
+            char = i32(start_rune),
+            length = i32(length),
+            color = color^,
+            priority = current_priority,
+        })
+    }
+}
+
+
 }
 
 override_node_type :: proc(

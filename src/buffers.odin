@@ -54,55 +54,54 @@ is_incomplete_completion_list := false
 @(private="package")
 completion_filter_token : string
 
+cached_buffer_cursor_line : int = -1
+cached_buffer_cursor_char_index : int = -1
+
 @(private="package")
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
-    
-    // Used for drawing
     offset_x: f32,
-    
     scroll_x: f32,
     scroll_y: f32,
     
     x_pos: f32,
     y_pos: f32,
-
     width: f32,
     height: f32,
-
     file_name: string,
     ext: string,
-
     info: os.File_Info,
-
     is_saved: bool,
-
     cursor_line: int,
     cursor_char_index: int,
-    
-    // Used for LSP stuff
     version: int,
-
-    // Syntax highlighting
     tokens: [dynamic]Token,
     new_tokens : [dynamic]Token,
     did_tokens_update : bool,
-    
     token_set_id: string,
-    
-    // Raw LSP syntax highlihgting tokens
-    raw_token_data: [dynamic]i32,
-    
-    // Tree-sitter tree
     previous_tree: ts.Tree,
-    
-    // Raw data that we read from file and modify for tree-sitter so it doesnt die
     content: [dynamic]u8,
-    
     query: ts.Query,
-    
     first_drawn_line: int,
     last_drawn_line: int,
+
+    redo_stack: [dynamic]BufferChange,
+    undo_stack: [dynamic]BufferChange,
+}
+
+@(private="package")
+BufferChange :: struct {
+    start_byte: u32,
+    end_byte: u32,
+
+    start_line: int,
+    start_char: int,
+
+    end_line: int,
+    end_char: int,
+
+    original_content: []u8,
+    new_content: []u8,
 }
 
 @(private="package")
@@ -133,13 +132,134 @@ SearchHit :: struct{
     end_char: int,
 }
 
+@(private="package")
 search_hits : [dynamic]SearchHit
 
 @(private="package")
-selected_hit : ^SearchHit = nil
+selected_hit: ^SearchHit
 
 @(private="package")
 buffer_search_term : string
+
+undo_change :: proc() {
+    if len(active_buffer.undo_stack) == 0 {
+        return
+    }
+
+    idx := len(active_buffer.undo_stack)-1
+    change := active_buffer.undo_stack[idx]
+
+    remove_range(
+        &active_buffer.content,
+        change.start_byte,
+        change.start_byte + u32(len(change.new_content)),
+    )
+
+    inject_at(&active_buffer.content, change.start_byte, ..change.original_content) 
+
+    ordered_remove(&active_buffer.undo_stack, idx)
+    append(&active_buffer.redo_stack, change)
+
+    update_buffer_lines_after_change(active_buffer, change, true)
+
+    notify_server_of_change(
+        active_buffer,
+        int(change.start_byte),
+        int(change.start_byte + u32(len(change.new_content))),
+        change.start_line,
+        change.start_char,
+        change.end_line,
+        change.end_char,
+        change.original_content,
+        false
+    )
+
+    set_buffer_cursor_pos(
+        change.start_line,
+        change.end_char,
+    )
+}
+
+redo_change :: proc() {
+    if len(active_buffer.redo_stack) == 0 {
+        return
+    }
+
+    idx := len(active_buffer.redo_stack)-1
+    change := active_buffer.redo_stack[idx]
+
+    remove_range(
+        &active_buffer.content,
+        change.start_byte,
+        change.start_byte + u32(len(change.original_content)),
+    )
+
+    inject_at(&active_buffer.content, change.start_byte, ..change.new_content) 
+
+    ordered_remove(&active_buffer.redo_stack, idx)
+    append(&active_buffer.undo_stack, change)
+
+    update_buffer_lines_after_change(active_buffer, change, false)
+
+    notify_server_of_change(
+        active_buffer,
+        int(change.start_byte),
+        int(change.end_byte),
+        change.start_line,
+        change.start_char,
+        change.end_line,
+        change.end_char,
+        change.new_content,
+        false
+    )
+
+    set_buffer_cursor_pos(
+        change.start_line,
+        change.end_char,
+    )
+}
+
+update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo: bool) {
+    start_byte := change.start_byte
+
+    text := is_undo ? change.original_content : change.new_content
+    size := is_undo ? len(change.new_content) : len(change.original_content)
+
+    end_byte := change.start_byte + u32(size)
+
+    start_line, start_char := byte_to_pos(start_byte)
+    end_line, end_char  := byte_to_pos(end_byte)
+
+    split_change := strings.split(string(text), "\n")
+
+    fmt.println("bytes", start_byte, end_byte, "pos", start_line, start_char, end_line, end_char)
+
+    if start_line == end_line {
+        line := &buffer.lines[start_line]
+
+        remove_range(&line.characters, start_char, end_char)
+        inject_at(&line.characters, start_char, ..transmute([]u8)split_change[0])
+    }
+
+}
+
+byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
+    local_byte: u32 = 0
+    for buf_line, i in active_buffer.lines {
+        line_len := u32(len(buf_line.characters)) + 1
+
+        if local_byte + line_len > byte {
+            line_index = i
+            byte_in_line = byte - local_byte
+            break
+        }
+
+        local_byte += line_len
+    }
+
+    return line_index, byte_in_line
+}
+
 
 next_buffer :: proc() {
     set_next_as_current := false
@@ -524,89 +644,113 @@ draw_autocomplete :: proc() {
     ascender := f32(primary_font.size.metrics.ascender >> 6)
     descender := f32(primary_font.size.metrics.descender >> 6)
 
-    if len(completion_hits) > 0 && input_mode == .BUFFER_INPUT {
-        padding := math.round_f32((buffer_font_size) * .25)
+    if len(completion_hits) < 1 || input_mode != .BUFFER_INPUT {
+        return
+    }
 
-        y_pos := buffer_cursor_pos.y -
-            active_buffer.scroll_y + ascender-descender + (padding * 2)
+    padding := math.round_f32((buffer_font_size) * .25)
 
-        pen := vec2{
-            buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
-            y_pos,
-        }
+    y_pos := buffer_cursor_pos.y -
+        active_buffer.scroll_y + ascender-descender + (padding * 2)
 
-        widest : f32 = 0
+    pen := vec2{
+        buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
+        y_pos,
+    }
 
-        end_idx := min(selected_completion_hit + 5, len(completion_hits))
+    widest : f32 = 0
 
-        if selected_completion_hit >= len(completion_hits) {
-            selected_completion_hit = 0
-        }
+    end_idx := min(selected_completion_hit + 5, len(completion_hits))
 
-        first_hit : ^CompletionHit
-        for i in selected_completion_hit..<end_idx {
-            hit := &completion_hits[i]
+    if selected_completion_hit >= len(completion_hits) {
+        selected_completion_hit = 0
+    }
 
-            if i == selected_completion_hit {
-                first_hit = hit
-            }
+    for i in selected_completion_hit..<end_idx {
+        hit := &completion_hits[i]
 
-            size := add_text_measure(
+        size := add_text_measure(
+            &text_rect_cache,
+            pen,
+            i == selected_completion_hit ? TEXT_MAIN : TEXT_DARKER,
+            buffer_font_size,
+            hit.label,
+            10,
+        )
+
+        if size.x > widest do widest = size.x
+
+        pen.y += ascender - descender
+    }
+
+    border_width := general_line_thickness_px
+
+    base_rect := rect{
+        pen.x - padding,
+        y_pos - padding,
+        widest + padding * 2,
+        pen.y - y_pos + padding * 2,
+    }
+
+    add_rect(
+        &rect_cache,
+        base_rect,
+        no_texture,
+        BG_MAIN_10,
+        vec2{},
+        9,
+    )
+
+    add_rect(
+        &rect_cache,
+        rect{
+            pen.x - padding - border_width,
+            y_pos - padding - border_width,
+            widest + padding * 2 + border_width * 2,
+            pen.y - y_pos + padding * 2 + border_width * 2,
+        },
+        no_texture,
+        BG_MAIN_30,
+        vec2{},
+        9,
+    )
+
+    first_hit := &completion_hits[selected_completion_hit]
+
+    if first_hit == nil {
+        return
+    }
+
+    if first_hit.detail == "" && first_hit.documentation == "" {
+        return
+    }
+
+    start_pen := vec2{
+        base_rect.x + base_rect.width + padding*2,
+        base_rect.y + padding*2,
+    }
+
+    em := ui_smaller_font_size
+
+    {
+        pen := vec2{start_pen.x, start_pen.y}
+
+        if first_hit.detail != "" {
+            pen = add_text(
                 &text_rect_cache,
                 pen,
-                i == selected_completion_hit ? TEXT_MAIN : TEXT_DARKER,
-                buffer_font_size,
-                hit.label,
+                TEXT_MAIN,
+                ui_smaller_font_size,
+                first_hit.detail,
                 10,
+                false,
+                em * 20,
+                true,
+                true
             )
-
-            if size.x > widest do widest = size.x
-
-            pen.y += ascender - descender
         }
-
-        border_width := general_line_thickness_px
-
-        base_rect := rect{
-            pen.x - padding,
-            y_pos - padding,
-            widest + padding * 2,
-            pen.y - y_pos + padding * 2,
-        }
-
-        add_rect(
-            &rect_cache,
-            base_rect,
-            no_texture,
-            BG_MAIN_10,
-            vec2{},
-            9,
-        )
-
-        add_rect(
-            &rect_cache,
-            rect{
-                pen.x - padding - border_width,
-                y_pos - padding - border_width,
-                widest + padding * 2 + border_width * 2,
-                pen.y - y_pos + padding * 2 + border_width * 2,
-            },
-            no_texture,
-            BG_MAIN_30,
-            vec2{},
-            9,
-        )
-
-        if first_hit != nil && len(first_hit.documentation) > 0 {
-            start_pen := vec2{
-                base_rect.x + base_rect.width + padding*2,
-                base_rect.y + padding*2,
-            }
-
-            pen := vec2{start_pen.x, start_pen.y}
-
-            em := ui_smaller_font_size
-
+        
+        if first_hit.documentation != "" {
             pen = add_text(
                 &text_rect_cache,
                 pen,
@@ -619,42 +763,41 @@ draw_autocomplete :: proc() {
                 true,
                 true
             )
-
-            width := pen.x - start_pen.x
-            height := (pen.y - start_pen.y)
-
-            border_width := general_line_thickness_px
-
-            box := rect{
-                start_pen.x - padding,
-                start_pen.y - padding,
-                width + padding * 2,
-                height + padding * 2,
-            }
-
-            add_rect(
-                &rect_cache,
-                box,
-                no_texture,
-                BG_MAIN_10,
-                vec2{},
-                8,
-            )
-
-            add_rect(
-                &rect_cache,
-                rect{
-                    start_pen.x - border_width - padding,
-                    start_pen.y - padding - border_width,
-                    width + padding * 2 + border_width * 2,
-                    height + padding * 2 + border_width * 2,
-                },
-                no_texture,
-                BG_MAIN_30,
-                vec2{},
-                8,
-            )
         }
+        
+
+        width := pen.x - start_pen.x
+        height := (pen.y - start_pen.y)
+
+        box := rect{
+            start_pen.x - padding,
+            start_pen.y - padding,
+            width + padding * 2,
+            height + padding * 2,
+        }
+
+        add_rect(
+            &rect_cache,
+            box,
+            no_texture,
+            BG_MAIN_10,
+            vec2{},
+            8,
+        )
+
+        add_rect(
+            &rect_cache,
+            rect{
+                start_pen.x - border_width - padding,
+                start_pen.y - padding - border_width,
+                width + padding * 2 + border_width * 2,
+                height + padding * 2 + border_width * 2,
+            },
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            8,
+        )
     }
 }
 
@@ -1639,6 +1782,14 @@ delete_line :: proc(line: int) {
 
 inject_line :: proc() {   
     buffer_line := BufferLine{}
+
+    defer {
+        get_autocomplete_hits(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+            "1", "",
+        )
+    }
         
     indent_spaces := determine_line_indent(buffer_cursor_line + 1)
 
@@ -1722,6 +1873,14 @@ handle_buffer_input :: proc() -> bool {
         if key.modifiers == SHIFT {
             delete_line(buffer_cursor_line)
         }
+    }
+
+    if is_key_pressed(glfw.KEY_X) {
+        undo_change()
+    }
+
+    if is_key_pressed(glfw.KEY_C) {
+        redo_change()
     }
     
     if is_key_pressed(glfw.KEY_L) {
@@ -2113,9 +2272,6 @@ buffer_append_to_search_term :: proc(key: rune) {
     buffer_search_term = utf8.runes_to_string(buf[:])
 }
 
-cached_buffer_cursor_line : int = -1
-cached_buffer_cursor_char_index : int = -1
-
 @(private="package")
 handle_search_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) {
@@ -2126,10 +2282,6 @@ handle_search_input :: proc() {
         clear(&search_hits)
 
         input_mode = .COMMAND
-        
-        // trying this out, let's *not* delete it. could be good productivity gains
-        // cached_buffer_cursor_line = -1
-        // cached_buffer_cursor_char_index = -1
 
         return
     }
@@ -2215,22 +2367,6 @@ handle_search_input :: proc() {
         return
     }
 
-}
-
-@(private="package")
-serialize_buffer :: proc(buffer: ^Buffer) -> string {
-    buffer_to_save := make([dynamic]u8)
-    defer delete(buffer_to_save)
-
-    for line, index in active_buffer.lines {
-        if index != 0 {
-            append(&buffer_to_save, '\n');
-        }
-
-        append_elems(&buffer_to_save, ..line.characters[:]);
-    }
-    
-    return strings.clone(string(buffer_to_save[:]))
 }
 
 insert_completion :: proc() {
