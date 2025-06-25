@@ -180,7 +180,7 @@ lsp_handle_file_open :: proc() {
         0, len(active_buffer.lines)
     )
 
-    // ts.tree_delete(active_buffer.previous_tree)
+    ts.tree_delete(active_buffer.previous_tree)
     active_buffer.previous_tree = new_tree
 
     do_refresh_buffer_tokens = true
@@ -376,8 +376,6 @@ notify_server_of_change :: proc(
 ) {
     new_end_byte := start_byte + len(new_text)
 
-    defer fmt.println(string(buffer.content[0:500]))
-
     if do_update_buffer_content {
         append(&active_buffer.undo_stack, BufferChange{
             u32(start_byte),
@@ -418,8 +416,6 @@ notify_server_of_change :: proc(
     
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
 
-    fmt.println(buffer.previous_tree)
-  
     if buffer.previous_tree != nil {        
         edit := ts.Input_Edit{
             u32(start_byte),
