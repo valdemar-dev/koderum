@@ -82,6 +82,22 @@ draw_buffer_info_view :: proc() {
 
     pen.y += ui_smaller_font_size + padding
 
+    size = add_text_measure(&rect_cache,
+        pen,
+        TEXT_MAIN,
+        ui_smaller_font_size,
+        strings.concatenate({"CWD: ", cwd}, context.temp_allocator),
+        start_z + 2
+    )
+
+    if size.x > buffer_info_view_width {
+        buffer_info_view_width = size.x
+    }
+
+    pen.y += ui_smaller_font_size + padding
+
+
+
     strings.write_string(&sb, "Bytes: ")
     strings.write_i64(&sb, active_buffer.info.size)
 

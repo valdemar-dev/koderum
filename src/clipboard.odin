@@ -30,34 +30,6 @@ generate_highlight_string :: proc(
     }
 
     return strings.clone(string(active_buffer.content[start_byte_offset:end_byte_offset]))
-    /*
-
-    start_buffer_line := active_buffer.lines[start_line]
-    start_offset := utf8.rune_offset(string(start_buffer_line.characters[:]), start_char)
-    if start_offset == -1 {
-        start_offset = len(start_buffer_line.characters[:])
-    }
-
-    append(&result, ..start_buffer_line.characters[:start_offset])
-
-    for i in start_line..<end_line {
-        line := active_buffer.lines[i]
-
-        append(&result, ..line.characters[:])
-        append(&result, u8('\n'))
-    }
-
-    end_buffer_line := active_buffer.lines[end_line]
-
-    end_offset := utf8.rune_offset(string(end_buffer_line.characters[:]), end_char)
-    if end_offset == -1 {
-        end_offset = len(end_buffer_line.characters[:])
-    }
-
-    append(&result, ..end_buffer_line.characters[:end_char])
-
-    return string(result[:])
-    */
 }
 
 @(private="package")

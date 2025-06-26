@@ -332,7 +332,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     defer delete(dir)
 
     desc := os2.Process_Desc{
-        command = []string{"typescript-language-server", "--stdio", "--log-level", "1"},
+        command = []string{"typescript-language-server", "--stdio", "--log-level", "4"},
         env = nil,
         working_dir = dir,
         stdin  = stdin_r,
@@ -366,7 +366,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     active_language_server = server
     language_servers[ext] = server
 
-    msg := initialize_message(process.pid, dir)
+    msg := initialize_message(process.pid, cwd)
     defer delete(msg)
 
     id := "1"
@@ -376,7 +376,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     base := fp.base(dir)
 
     msg_2 := did_change_workspace_folders_message(
-        strings.concatenate({"file://",dir}, context.temp_allocator), base
+        strings.concatenate({"file://",dir}, context.temp_allocator), dir,
     )
  
     send_lsp_init_message(msg_2, stdin_w)

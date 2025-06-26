@@ -2125,6 +2125,17 @@ paste_string :: proc(str: string, line: int, char: int) {
 
             transmute([]u8)str,
         )
+
+        line, line_byte := byte_to_pos(
+            u32(absolute_byte_offset+len(str))
+        )
+
+        char := byte_offset_to_rune_index(
+            string(active_buffer.lines[line].characters[:]),
+            int(line_byte),
+        )
+
+        set_buffer_cursor_pos(line, char)
     }
 
     start_line := &active_buffer.lines[line]
@@ -2135,17 +2146,14 @@ paste_string :: proc(str: string, line: int, char: int) {
         char,
     )
 
+    if byte_offset == -1 {
+        byte_offset = len(start_chars)
+    }
+
     if len(split) == 1 {
         first_paste_line := split[0]
 
         inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
-
-        rune_count := utf8.rune_count(first_paste_line)
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            buffer_cursor_char_index + rune_count,
-        )
 
         return
     }
