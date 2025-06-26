@@ -2135,10 +2135,17 @@ paste_string :: proc(str: string, line: int, char: int) {
         char,
     )
 
-    if len(split) == 0 {
+    if len(split) == 1 {
         first_paste_line := split[0]
 
         inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
+
+        rune_count := utf8.rune_count(first_paste_line)
+
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index + rune_count,
+        )
 
         return
     }
