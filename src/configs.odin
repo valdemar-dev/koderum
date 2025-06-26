@@ -41,6 +41,8 @@ search_ignored_dirs : [dynamic]string
 
 ui_scale : f32
 
+do_constrain_cursor_to_scroll : bool = false
+
 load_configs :: proc() {
     exe_path := os.args[0]
 
@@ -195,6 +197,8 @@ set_option :: proc(options: []string) {
         append(&search_ignored_dirs, strings.clone(value))
     case "delimiter_runes":
         delimiter_runes = utf8.string_to_runes(value)
+    case "do_constrain_cursor_to_scroll":
+        do_constrain_cursor_to_scroll = (value == "true")
     case:
         fmt.eprintln("Unknown option,", option_name)
     }

@@ -410,3 +410,44 @@ completion_item_resolve_request_message :: proc(
     }), strings.clone(str_id)
 }
 
+
+goto_definition_request_message :: proc(
+    id: int,
+    uri: string,
+    line: int,
+    character: int,
+) -> (msg: string, id_string: string) {
+    id_buf := make([dynamic]u8, 16)
+    str_id := strconv.itoa(id_buf[:], id)
+    defer delete(id_buf)
+
+    line_buf := make([dynamic]u8, 12)
+    char_buf := make([dynamic]u8, 12)
+    str_line := strconv.itoa(line_buf[:], line)
+    str_char := strconv.itoa(char_buf[:], character)
+    defer delete(line_buf)
+    defer delete(char_buf)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": \"", str_id, "\",\n",
+        "  \"method\": \"textDocument/definition\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": { \"uri\": \"", uri, "\" },\n",
+        "    \"position\": { \"line\": ", str_line, ", \"character\": ", str_char, " }\n",
+        "  }\n",
+        "}\n",
+    }, context.temp_allocator)
+
+    buf := make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+    defer delete(buf)
+
+    return strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    }), strings.clone(str_id)
+}
+

@@ -9,6 +9,7 @@ import "vendor:glfw"
 import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
+import "core:encoding/json"
 import "core:path/filepath"
 import ft "../../alt-odin-freetype" 
 import ts "../../odin-tree-sitter"    
@@ -54,20 +55,30 @@ is_incomplete_completion_list := false
 @(private="package")
 completion_filter_token : string
 
+@(private="package")
 cached_buffer_cursor_line : int = -1
+
+@(private="package")
 cached_buffer_cursor_char_index : int = -1
+
+@(private="package")
+cached_buffer_index : int = -1
 
 @(private="package")
 Buffer :: struct {
     lines: ^[dynamic]BufferLine,
+
     offset_x: f32,
+
     scroll_x: f32,
     scroll_y: f32,
     
     x_pos: f32,
     y_pos: f32,
+
     width: f32,
     height: f32,
+
     file_name: string,
     ext: string,
     info: os.File_Info,
@@ -76,9 +87,6 @@ Buffer :: struct {
     cursor_char_index: int,
     version: int,
     tokens: [dynamic]Token,
-    new_tokens : [dynamic]Token,
-    did_tokens_update : bool,
-    token_set_id: string,
     previous_tree: ts.Tree,
     content: [dynamic]u8,
     query: ts.Query,
@@ -299,6 +307,17 @@ prev_buffer :: proc() {
             set_next_as_current = true
         }
     }
+}
+
+@(private="package")
+get_buffer_index :: proc(buffer: ^Buffer) -> int {
+    for &local_buffer, index in buffers {
+        if local_buffer == buffer {
+            return index
+        }
+    }
+
+    return -1
 }
 
 @(private="package")
@@ -530,10 +549,6 @@ draw_image_buffer :: proc(ext: string) {
 }
 
 draw_text_buffer :: proc() {
-    if active_buffer.did_tokens_update == true {
-        active_buffer.tokens = active_buffer.new_tokens
-    }
-    
     buffer_lines := active_buffer.lines
 
     line_height := buffer_font_size * 1.2
@@ -644,7 +659,7 @@ draw_autocomplete :: proc() {
     ascender := f32(primary_font.size.metrics.ascender >> 6)
     descender := f32(primary_font.size.metrics.descender >> 6)
 
-    if len(completion_hits) < 1 || input_mode != .BUFFER_INPUT {
+    if len(completion_hits) < 1 {
         return
     }
 
@@ -744,7 +759,7 @@ draw_autocomplete :: proc() {
                 first_hit.detail,
                 10,
                 false,
-                em * 20,
+                -1,
                 true,
                 true
             )
@@ -824,7 +839,7 @@ open_file :: proc(file_name: string) {
             existing_file.cursor_line,
             existing_file.cursor_char_index,
         )
-            
+
         return
     }
 
@@ -867,9 +882,7 @@ open_file :: proc(file_name: string) {
 
     new_buffer^.info = file_info
     new_buffer^.ext = filepath.ext(new_buffer^.file_name)
-
-    active_buffer = new_buffer
-    
+ 
     when ODIN_DEBUG {
         fmt.println("Validating buffer lines")
     }
@@ -888,11 +901,13 @@ open_file :: proc(file_name: string) {
         })
     }
 
+    active_buffer = new_buffer
+
     append(&buffers, new_buffer)
     
     set_buffer_cursor_pos(0,0)
-    constrain_scroll_to_cursor()
-    
+    constrain_scroll_to_cursor() 
+
     lsp_handle_file_open()
 }
 
@@ -1352,6 +1367,7 @@ insert_into_buffer :: proc (key: rune) {
     get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
 }
 
+@(private="package")
 constrain_scroll_to_cursor :: proc() {
     amnt_above_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - cursor_edge_padding + cursor_height
 
@@ -1379,6 +1395,10 @@ constrain_scroll_to_cursor :: proc() {
 }
 
 constrain_cursor_to_scroll :: proc() {
+    if do_constrain_cursor_to_scroll == false {
+        return
+    }
+
     error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
     assert(error == .Ok)
 
@@ -1417,6 +1437,7 @@ move_up :: proc() {
     }
 
     constrain_scroll_to_cursor()
+    clear(&completion_hits)
 }
 
 move_left :: proc() {
@@ -1434,6 +1455,7 @@ move_left :: proc() {
     }
 
     constrain_scroll_to_cursor()
+    clear(&completion_hits)
 }
 
 move_right :: proc() {
@@ -1445,6 +1467,7 @@ move_right :: proc() {
     )
 
     constrain_scroll_to_cursor()
+    clear(&completion_hits)
 }
 
 move_down :: proc() {
@@ -1458,9 +1481,11 @@ move_down :: proc() {
     }
 
     constrain_scroll_to_cursor()
+    clear(&completion_hits)
 }
 
 move_back_word :: proc() {
+    defer clear(&completion_hits)
     current_line := active_buffer.lines[buffer_cursor_line]
 
     line_str := string(current_line.characters[:])
@@ -1510,6 +1535,8 @@ move_back_word :: proc() {
 }
 
 move_forward_word :: proc() {
+    defer clear(&completion_hits)
+
     current_line := active_buffer.lines[buffer_cursor_line]
 
     line_str := string(current_line.characters[:])
@@ -1617,9 +1644,7 @@ indent_selection :: proc(start_line: int, end_line: int) {
             text = strings.concatenate({text, "\n"})
             old_bytes += 1
         }
-    }
-
-    
+    } 
 }
 
 array_is_equal :: proc(a, b: []rune) -> bool {
@@ -1861,6 +1886,10 @@ handle_buffer_input :: proc() -> bool {
         // add reload logic
     }
 
+    if is_key_pressed(glfw.KEY_PERIOD) {
+        go_to_definition()
+    }
+
     if is_key_pressed(glfw.KEY_W) {
         if key_store[glfw.KEY_W].modifiers == CTRL_SHIFT {
             close_buffer(active_buffer)
@@ -2052,6 +2081,9 @@ handle_buffer_input :: proc() -> bool {
         clear(&search_hits)
 
         input_mode = .COMMAND
+
+        cached_file := buffers[cached_buffer_index]
+        open_file(cached_file.file_name)
         
         set_buffer_cursor_pos(
             cached_buffer_cursor_line,
@@ -2062,7 +2094,6 @@ handle_buffer_input :: proc() -> bool {
         
         return false
     }
-
  
     return false
 }

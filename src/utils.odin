@@ -187,3 +187,34 @@ byte_offset_to_rune_index :: proc(line: string, byte_offset: int) -> int {
     }
     return rune_index
 }
+
+encode_uri_component :: proc(path: string) -> string {
+    buf := make([dynamic]rune)
+
+    is_unreserved := proc(c: rune) -> bool {
+        return (c >= 'A' && c <= 'Z') ||
+               (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') ||
+               c == '-' || c == '_' || c == '.' || c == '~'
+    }
+
+    hex_digits := "0123456789ABCDEF"
+
+    for c in path {
+        if is_unreserved(c) || c == '/' {
+            append(&buf, c)
+        } else {
+            append(&buf, '%')
+            append(&buf, rune(hex_digits[c >> 4]))
+            append(&buf, rune(hex_digits[c & 0xF]))
+        }
+    }
+
+    
+    defer delete(buf)
+
+    return utf8.runes_to_string(buf[:])
+}
+
+
+

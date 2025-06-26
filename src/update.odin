@@ -44,7 +44,7 @@ message_loop :: proc(thread: ^thread.Thread) {
         }
 
         if active_language_server == nil {
-            continue
+            return
         }
 
         last_time = current_time

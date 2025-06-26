@@ -12,6 +12,8 @@ import "core:encoding/json"
 import "core:sort"
 import ts "../../odin-tree-sitter"
 import "core:time"
+import "core:thread"
+import "core:net"
 
 import "core:sync"
 
@@ -123,7 +125,7 @@ set_active_language_server :: proc(ext: string) {
     defer {
         init_message_thread()
     }
-    
+
     switch ext {
     case ".js",".ts":
         if ext not_in language_servers {
@@ -162,11 +164,17 @@ lsp_handle_file_open :: proc() {
     }
     
     escaped := escape_json(string(active_buffer.content[:]))
-
     defer delete(escaped)
-    
+
+    encoded := encode_uri_component(active_buffer.file_name)
+    defer delete(encoded)
+
+    uri := strings.concatenate(
+        {"file://", encoded}, context.temp_allocator,
+    )
+
     msg := did_open_message(
-        strings.concatenate({"file://",active_buffer.file_name}, context.temp_allocator),
+        uri,
         "typescript",
         1,
         escaped,
@@ -673,6 +681,87 @@ get_autocomplete_hits :: proc(
         }
 
         sync.unlock(&completion_mutex)
+    }
+}
+
+go_to_definition :: proc() {
+    lsp_request_id += 1
+
+    msg,id := goto_definition_request_message(
+        lsp_request_id,
+        strings.concatenate({
+            "file://",
+            active_buffer.file_name,
+        }, context.temp_allocator),
+        buffer_cursor_line,
+        buffer_cursor_char_index,
+    )
+
+    defer delete(msg)
+    defer delete(id)
+
+    send_lsp_message(
+        msg,
+        id,
+        handle_response,
+        nil,
+    )
+
+    handle_response :: proc(response: json.Object, data: rawptr) {
+        results,_ := response["result"].(json.Array)
+
+        fmt.println(results)
+
+        if len(results) == 0 {
+            return
+        }
+
+        result := results[0].(json.Object)
+
+        uri, _ := result["uri"].(string)
+        range, _ := result["range"].(json.Object)
+
+        start := range["start"].(json.Object)
+        line := start["line"].(json.Float)
+        char := start["character"].(json.Float)
+
+        url := uri[7:]
+        decoded,ok := net.percent_decode(url)
+
+        cached_buffer_index = get_buffer_index(active_buffer)
+        cached_buffer_cursor_line = buffer_cursor_line
+        cached_buffer_cursor_char_index = buffer_cursor_char_index
+
+        // below is scuffed.
+        // here is a short explanation.
+        // open_file() kills the update thread
+        // we are in the update thread.
+        // therefore, run a separate thread.
+
+        PolyData :: struct {
+            name: string,
+            line: json.Float,
+            char: json.Float,
+        }
+
+        data := PolyData{
+            decoded,
+            line,
+            char,
+        }
+
+        handle_file_open :: proc(data: PolyData) {
+            open_file(data.name)
+
+            set_buffer_cursor_pos(
+                int(data.line),
+                int(data.char),
+            )
+
+            constrain_scroll_to_cursor()
+        }
+
+        thread.run_with_poly_data(data, handle_file_open) 
     }
 }
 

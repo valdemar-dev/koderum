@@ -13,6 +13,7 @@ buffer_font_size = 16
 [cursor]
 cursor_edge_padding = 200
 do_animate_cursor = true
+do_constrain_cursor_to_scroll = true
 
 [buffer]
 do_highlight_long_lines = true
