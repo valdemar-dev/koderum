@@ -7,6 +7,7 @@ import "core:strconv"
 import "core:fmt"
 import fp "core:path/filepath"
 import "core:unicode/utf8"
+import "core:dynlib"
 
 tab_spaces : int
 long_line_required_characters : int
@@ -43,28 +44,124 @@ ui_scale : f32
 
 do_constrain_cursor_to_scroll : bool = false
 
-load_configs :: proc() {
+config_dir : string
+init_config :: proc() -> []u8 {
+    home := os.get_env("HOME")
+
+    defer delete(home)
+
+    path : string
+    when ODIN_OS == .Linux {
+        path = strings.concatenate({ home, "/.config/koderum" })
+    } else when ODIN_OS == .Windows {
+        path = strings.concatenate({ home, "C:/Users/<user>/AppData/Roaming/koderum" })
+    }
+
+    config_dir = path
+
+    if os.exists(path) == false {
+        fmt.println("WARNING: Creating default directory.", path)
+        error := os.make_directory(path, u32(os.File_Mode(0o700)))
+
+        if error != os.ERROR_NONE {
+            fmt.println(error)
+
+            panic("Failed to create default directory.")
+        }
+    }
+
+    config_location := strings.concatenate({
+        path,
+        "/options.conf",
+    })
+
+    defer delete(config_location)
+
+    if os.exists(config_location) == false {
+        fmt.println("WARNING: options.conf was not found. It will instead be created.")
+        init_default_config(path)
+    }
+
+    bytes, ok := os.read_entire_file_from_filename(
+        config_location,
+    )
+
+    if !ok {
+        fmt.println("Failed to open custom config file.", config_location)
+        panic("Unrecoverable error.")
+    }
+
+    delete(path)
+
+    return bytes
+}
+
+data_dir : string
+init_local :: proc () {
+    home := os.get_env("HOME")
+
+    defer delete(home)
+
+    path : string
+    when ODIN_OS == .Linux {
+        path = strings.concatenate({ home, "/.local/share/koderum" })
+    } else when ODIN_OS == .Windows {
+        path = strings.concatenate({ home, "C:/Users/<user>/AppData/Local/koderum" })
+    }
+
+    data_dir = path
+
+    if os.exists(path) == true {
+        return
+    }
+
+    fmt.println("WARNING: Creating default data directory.", path)
+    error := os.make_directory(path, u32(os.File_Mode(0o700)))
+
+    if error != os.ERROR_NONE {
+        fmt.println(error)
+
+        panic("Failed to create default data directory.")
+    }
+}
+
+init_default_config :: proc(default_config_dir: string) {
     exe_path := os.args[0]
 
     program_dir = fp.dir(exe_path)
 
-    config_file := strings.concatenate({
+    default_config_file := strings.concatenate({
         program_dir,
-        "/config/options.conf",
+        "/config/options.conf.example",
     })
 
-    defer delete(config_file)
+    defer delete(default_config_file)
 
-    bytes, ok := os.read_entire_file_from_filename(config_file)
+    bytes, ok := os.read_entire_file_from_filename(default_config_file)
+    defer delete(bytes)
 
     if !ok {
-        concat := strings.concatenate({
-            "Failed to open config file,",   
-            config_file
-        })
-
-        panic(concat)
+        panic("Failed to open default config file.")
     }
+
+    config_file_path := strings.concatenate({
+        default_config_dir,
+        "/options.conf",
+    })
+
+    success := os.write_entire_file(config_file_path, bytes)
+
+    if !success {
+        fmt.println("Failed to write configs to options.conf")
+    } else {
+        fmt.println("Successfully created new options.conf file.")
+    }
+}
+
+load_configs :: proc() {
+    init_local()
+
+    bytes := init_config()
 
     data_string := string(bytes)
 

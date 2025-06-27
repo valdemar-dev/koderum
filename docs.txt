@@ -29,3 +29,12 @@ Search
 (Ctrl + J) -> Next Hit
 (Ctrl + K) -> Prev Hit
 (V) -> Highlight search term
+
+Configurations
+Configuration location depends on your platform.
+1. Linux
+    Location: $XDG_CONFIG_HOME/koderum/ → default ~/.config/koderum/
+2. Windows
+    Location: C:\Users\<user>\AppData\Roaming\koderum\
+3. macOS
+    Location: ~/Library/Preferences/koderum/

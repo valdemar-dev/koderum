@@ -6,6 +6,7 @@ import "core:math"
 import "core:encoding/json"
 import "core:unicode/utf8"
 import "core:strings"
+import "core:os/os2"
 
 vec2 :: struct {
     x: f32,
@@ -216,5 +217,22 @@ encode_uri_component :: proc(path: string) -> string {
     return utf8.runes_to_string(buf[:])
 }
 
+run_program :: proc(
+    command: []string,
+    env: []string,
+    working_dir: string = "",
+) -> os2.Error {
+    desc := os2.Process_Desc{
+        working_dir,
+        command,
+        env,
+        nil,
+        nil,
+        nil,
+    }
 
+    state, stdout, stderr := os2.process_exec(desc, context.allocator) or_return
+
+    return os2.ERROR_NONE
+}
 

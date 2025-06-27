@@ -16,8 +16,8 @@ import "core:thread"
 import "core:net"
 import fp "core:path/filepath"
 
-import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
-import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
+//import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
+// import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 import "core:sync"
 tree_mutex : sync.Mutex
@@ -28,13 +28,14 @@ completion_mutex : sync.Mutex
 
 Language :: struct {
     ts_query_src: cstring,
-    ts_language: ts.Language,
+    ts_language: ^ts.Language,
     ts_colors: map[string]vec4,
 
     lsp_colors: map[string]vec4,
     lsp_command: []string,
     lsp_working_dir: string,
 
+    // Function to call in case you need to manually set a tokens type.
     override_node_type : proc(
         node_type: ^string,
         node: ts.Node, 
@@ -44,12 +45,22 @@ Language :: struct {
         tokens: ^[dynamic]Token,
         priority: ^u8,
     ),
+
+    // Where the installed parser is located.
+    // Parsers are here: .local/share/koderum/odin-tree-sitter/parsers/<PARSER>.
+    parser_name: string,
+
+    // Used for -path when compiling the parser.
+    parser_path: string,
+
+    // Where to download the parser.
+    parser_link: string,
 }
 
 languages : map[string]Language = {
     ".ts"=Language{
         ts_query_src=ts_ts_query_src,
-        ts_language=ts_ts_bindings.tree_sitter_typescript(),
+
         ts_colors=ts_ts_colors,
         lsp_colors=ts_lsp_colors,
 
@@ -57,7 +68,136 @@ languages : map[string]Language = {
         lsp_working_dir="/usr/bin/ols",
 
         override_node_type=ts_override_node_type,
+
+        parser_name="typescript",
+        parser_path="typescript",
+        parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
+
+        ts_language=nil,
     },
+}
+
+install_tree_sitter :: proc() -> os2.Error {
+    command : []string = {
+        "git",
+        "clone",
+        "https://github.com/laytan/odin-tree-sitter.git",
+    }
+
+    run_program(
+        command, 
+        nil,
+        data_dir,
+    ) or_return
+
+    when ODIN_DEBUG {
+        fmt.println("Tree-sitter downloaded..")
+    }
+
+    tree_sitter_dir := strings.concatenate({
+        data_dir,
+        "/odin-tree-sitter",
+    })
+
+    defer delete(tree_sitter_dir)
+
+    command = {
+        "odin",
+        "run",
+        "build",
+        "--",
+        "install",
+        "-clean",
+    }
+
+    run_program(
+        command, 
+        nil,
+        tree_sitter_dir,
+    ) or_return
+
+    return os2.ERROR_NONE
+}
+
+install_parser :: proc(link: string, path: string) -> os2.Error {
+    link_string := strings.concatenate({
+        "-parser:",
+        link,
+    })
+
+    defer delete(link_string)
+
+    path_string : string
+
+    if path != "" {
+        path_string = strings.concatenate({
+            "-path:",
+            path,
+        }, context.temp_allocator)
+    }
+
+    command : []string = {
+        "odin",
+        "run",
+        "build",
+        "--",
+        "install-parser",
+        "-yes",
+        link_string,
+        path_string, 
+    }
+
+    tree_sitter_dir := strings.concatenate({
+        data_dir,
+        "/odin-tree-sitter",
+    })
+
+    defer delete(tree_sitter_dir)
+
+    error := run_program(
+        command, 
+        nil,
+        tree_sitter_dir,
+    )
+
+    return error 
+}
+
+init_parser :: proc(language: ^Language) {
+    tree_sitter_dir := strings.concatenate({
+       data_dir,
+       "/odin-tree-sitter",
+    })
+
+    defer delete(tree_sitter_dir)
+
+    if os.exists(tree_sitter_dir) == false {
+        fmt.println("Tree-sitter was not installed yet! We shall install it now.")
+
+        error := install_tree_sitter()
+
+        if error != os2.ERROR_NONE {
+            panic("Tree-sitter could not be installed. Check stdout for more information.")
+        }
+    }
+
+    parser_dir := strings.concatenate({
+        tree_sitter_dir,
+        "/parsers/",
+        language.parser_name,
+    })
+
+    defer delete(parser_dir)
+
+    if os.exists(parser_dir) == false {
+        fmt.println("Parser for language:", language.parser_name, "will be installed.")
+
+        error := install_parser(language.parser_link, language.parser_path)
+
+        if error != os2.ERROR_NONE {
+            panic("Tree-sitter could not be installed. Check stdout for more information.")
+        }
+    }
 }
 
 LanguageServer :: struct {
@@ -85,12 +225,6 @@ LanguageServer :: struct {
     ),
 
     language: ^Language,
-
-    /*
-    parse_tree : proc(first_line, last_line: int) -> ts.Tree,
-    set_tokens : proc(first_line, last_line: int, tree_ptr: ^ts.Tree),
-    set_lsp_tokens : proc(buffer: ^Buffer, lsp_tokens: []Token),
-    */
 }
 
 Token :: struct {
@@ -130,8 +264,16 @@ init_language_server :: proc(ext: string) {
     language := &languages[ext]
 
     parser := ts.parser_new()
+
+    init_parser(language)
     
-    if !ts.parser_set_language(parser, language.ts_language) {
+    if language.ts_language == nil {
+        fmt.println("Failed to init parser.")
+
+        return
+    }
+
+    if !ts.parser_set_language(parser, language.ts_language^) {
         panic("Failed to set parser language to.")
     }
     
@@ -869,7 +1011,7 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
         language := languages[active_buffer.ext]
         
         query := ts._query_new(
-            language.ts_language,
+            language.ts_language^,
             language.ts_query_src,
             u32(len(language.ts_query_src)),
             &error_offset,
