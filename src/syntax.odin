@@ -14,13 +14,55 @@ import ts "../../odin-tree-sitter"
 import "core:time"
 import "core:thread"
 import "core:net"
+import fp "core:path/filepath"
+
+import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
+import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 import "core:sync"
+tree_mutex : sync.Mutex
+
 
 @(private="file")
 completion_mutex : sync.Mutex
 
+Language :: struct {
+    ts_query_src: cstring,
+    ts_language: ts.Language,
+    ts_colors: map[string]vec4,
+
+    lsp_colors: map[string]vec4,
+    lsp_command: []string,
+    lsp_working_dir: string,
+
+    override_node_type : proc(
+        node_type: ^string,
+        node: ts.Node, 
+        source: []u8,
+        start_point,
+        end_point: ^ts.Point,
+        tokens: ^[dynamic]Token,
+        priority: ^u8,
+    ),
+}
+
+languages : map[string]Language = {
+    ".ts"=Language{
+        ts_query_src=ts_ts_query_src,
+        ts_language=ts_ts_bindings.tree_sitter_typescript(),
+        ts_colors=ts_ts_colors,
+        lsp_colors=ts_lsp_colors,
+
+        lsp_command=[]string{"typescript-language-server", "--stdio", "--log-level", "1"},
+        lsp_working_dir="/usr/bin/ols",
+
+        override_node_type=ts_override_node_type,
+    },
+}
+
 LanguageServer :: struct {
+    name : string,
+
     lsp_stdin_w : ^os2.File,
     lsp_stdout_r : ^os2.File,
     lsp_server_pid : int,
@@ -30,12 +72,7 @@ LanguageServer :: struct {
 
     completion_trigger_runes : []rune,
     
-    ts_parser: ts.Parser,
-    
-    colors : map[string]vec4,
-    ts_colors : map[string]vec4,
-
-    name : string,
+    ts_parser: ts.Parser, 
 
     override_node_type: proc(
         node_type: ^string,
@@ -46,10 +83,14 @@ LanguageServer :: struct {
         tokens: ^[dynamic]Token,  
         priority: ^u8,
     ),
-    
+
+    language: ^Language,
+
+    /*
     parse_tree : proc(first_line, last_line: int) -> ts.Tree,
     set_tokens : proc(first_line, last_line: int, tree_ptr: ^ts.Tree),
     set_lsp_tokens : proc(buffer: ^Buffer, lsp_tokens: []Token),
+    */
 }
 
 Token :: struct {
@@ -62,62 +103,10 @@ Token :: struct {
 }
 
 log_unhandled_treesitter_cases := false
-
-/*
-NOTE: these are here for reference, just in case we need them.
-
-export enum SemanticTokenTypes {
-	namespace = 'namespace',
-	/**
-	 * Represents a generic type. Acts as a fallback for types which
-	 * can't be mapped to a specific type like class or enum.
-	 */
-	type = 'type',
-	class = 'class',
-	enum = 'enum',
-	interface = 'interface',
-	struct = 'struct',
-	typeParameter = 'typeParameter',
-	parameter = 'parameter',
-	variable = 'variable',
-	property = 'property',
-	enumMember = 'enumMember',
-	event = 'event',
-	function = 'function',
-	method = 'method',
-	macro = 'macro',
-	keyword = 'keyword',
-	modifier = 'modifier',
-	comment = 'comment',
-	string = 'string',
-	number = 'number',
-	regexp = 'regexp',
-	operator = 'operator',
-	/**
-	 * @since 3.17.0
-	 */
-	decorator = 'decorator'
-}
-
-export enum SemanticTokenModifiers {
-	declaration = 'declaration',
-	definition = 'definition',
-	readonly = 'readonly',
-	static = 'static',
-	deprecated = 'deprecated',
-	abstract = 'abstract',
-	async = 'async',
-	modification = 'modification',
-	documentation = 'documentation',
-	defaultLibrary = 'defaultLibrary'
-}
-*/
-
 lsp_request_id := 10
 
 active_language_server : ^LanguageServer
-
-language_servers : map[string]^LanguageServer = {}
+active_language_servers : map[string]^LanguageServer = {}
 
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
@@ -126,35 +115,129 @@ set_active_language_server :: proc(ext: string) {
         init_message_thread()
     }
 
-    switch ext {
-    case ".js",".ts":
-        if ext not_in language_servers {
-            init_syntax_typescript(ext)
-        } else {
-            active_language_server = language_servers[ext]
-        }
-    case ".odin":
-        if ext not_in language_servers {
-            server,err := init_syntax_odin(ext)
-            
-            if err != os2.ERROR_NONE {
-                return
-            }
-            
-            if server == nil {
-                return
-            }
-            
-            language_servers[ext] = server
-            active_language_server = server
+    if ext not_in languages {
+        return
+    }
 
-            return
-        } else {
-            active_language_server = language_servers[ext]
-        }
-
+    if ext not_in active_language_servers {
+        init_language_server(ext)
+    } else {
+        active_language_server = active_language_servers[ext]
     }
 }
+
+init_language_server :: proc(ext: string) {
+    language := &languages[ext]
+
+    parser := ts.parser_new()
+    
+    if !ts.parser_set_language(parser, language.ts_language) {
+        panic("Failed to set parser language to.")
+    }
+    
+    stdin_r, stdin_w, _ := os2.pipe()
+    stdout_r, stdout_w, _ := os2.pipe()
+
+    defer os2.close(stdout_w)
+    defer os2.close(stdin_r)
+    
+    dir := fp.dir(active_buffer.file_name)
+    defer delete(dir)
+
+    desc := os2.Process_Desc{
+        command = language.lsp_command,
+        env = nil,
+        working_dir = language.lsp_working_dir,
+        stdin  = stdin_r,
+        stdout = stdout_w,
+        stderr = nil,
+    }
+
+    process, start_err := os2.process_start(desc)
+    if start_err != os2.ERROR_NONE {
+        fmt.println(start_err)
+        panic("Failed to start language server.")
+    }
+
+    server := new(LanguageServer)
+    server^ = LanguageServer{
+        lsp_stdin_w = stdin_w,
+        lsp_stdout_r = stdout_r,
+        lsp_server_pid = process.pid,
+        override_node_type=language.override_node_type,
+        ts_parser=parser,
+        token_types={},
+        token_modifiers={},
+        language=language,
+        completion_trigger_runes={},
+    }
+
+    active_language_server = server
+    active_language_servers[ext] = server
+
+    msg := initialize_message(process.pid, cwd)
+    defer delete(msg)
+
+    id := "1"
+
+    send_lsp_message(msg, id, set_capabilities, rawptr(server))
+
+    base := fp.base(dir)
+
+    msg_2 := did_change_workspace_folders_message(
+        strings.concatenate({"file://",dir}, context.temp_allocator), dir,
+    )
+ 
+    send_lsp_init_message(msg_2, stdin_w)
+
+    defer delete(msg_2)
+
+    set_capabilities :: proc(response: json.Object, data: rawptr) {
+        result_obj, _ := response["result"].(json.Object)
+
+        capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
+
+        when ODIN_DEBUG {
+            fmt.println("Settings capabilities for LSP..")
+        }
+ 
+        trigger_characters := (
+            capabilities_obj["completionProvider"].(json.Object)
+            ["triggerCharacters"].(json.Array)
+        )
+
+        trigger_runes : [dynamic]rune = {}
+        for trigger_character in trigger_characters {
+            r := utf8.rune_at_pos(trigger_character.(string), 0)
+
+            append(&trigger_runes, r)
+        }
+       
+        provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
+        
+        legend_obj := provider_obj["legend"].(json.Object)
+            
+        modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
+        types_arr := legend_obj["tokenTypes"].(json.Array)
+
+        server := cast(^LanguageServer)data
+        
+        modifiers := value_to_str_array(modifiers_arr)
+        types := value_to_str_array(types_arr)
+
+        server^.token_modifiers = modifiers
+        server^.token_types = types
+        server^.completion_trigger_runes=trigger_runes[:]
+        
+        when ODIN_DEBUG{
+            fmt.println("TypeScript LSP has been initialized.")
+        }
+
+        active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
+        do_refresh_buffer_tokens = true
+    }
+}
+
 
 lsp_handle_file_open :: proc() {
     set_active_language_server(active_buffer.ext)
@@ -184,7 +267,7 @@ lsp_handle_file_open :: proc() {
 
     send_lsp_message(msg, "") 
 
-    new_tree := active_language_server.parse_tree(
+    new_tree := parse_tree(
         0, len(active_buffer.lines)
     )
 
@@ -230,7 +313,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
 
         type := &active_language_server.token_types[token_type_index]
 
-        color := &active_language_server.colors[type^]
+        color := &active_language_server.language.lsp_colors[type^]
 
         if color == nil {
             when ODIN_DEBUG {
@@ -272,7 +355,7 @@ set_buffer_tokens :: proc() {
     
     start_version := active_buffer.version 
     
-    new_tree := active_language_server.parse_tree(
+    new_tree := parse_tree(
         active_buffer.first_drawn_line,
         active_buffer.last_drawn_line,
     )
@@ -319,7 +402,7 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
-    new_tree := active_language_server.parse_tree(0, len(active_buffer.lines))
+    new_tree := parse_tree(0, len(active_buffer.lines))
     ts.tree_delete(new_tree)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
@@ -355,7 +438,8 @@ set_buffer_tokens_threaded :: proc() {
         )
        
         assert(active_language_server != nil)
-        active_language_server.set_lsp_tokens(active_buffer, decoded_tokens[:])
+
+        set_lsp_tokens(active_buffer, decoded_tokens[:])
 
         delete(decoded_tokens)
     }
@@ -758,6 +842,185 @@ go_to_definition :: proc() {
         }
 
         thread.run_with_poly_data(data, handle_file_open) 
+    }
+}
+
+parse_tree :: proc(first_line, last_line: int) -> ts.Tree { 
+    if active_language_server == nil {
+        return nil
+    }
+
+    sync.lock(&tree_mutex)
+
+    active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
+    defer delete(active_buffer_cstring)
+
+    tree := ts._parser_parse_string(
+        active_language_server.ts_parser,
+        active_buffer.previous_tree,
+        active_buffer_cstring,
+        u32(len(active_buffer_cstring))
+    )
+
+    if active_buffer.previous_tree == nil {
+        error_offset : u32
+        error_type : ts.Query_Error
+
+        language := languages[active_buffer.ext]
+        
+        query := ts._query_new(
+            language.ts_language,
+            language.ts_query_src,
+            u32(len(language.ts_query_src)),
+            &error_offset,
+            &error_type,
+        )
+
+        if query == nil {
+            fmt.println(string(language.ts_query_src)[error_offset:])
+            fmt.println(error_type)
+            
+            return nil
+        }
+        
+        active_buffer.query = query
+    }
+
+    sync.unlock(&tree_mutex)
+
+    set_tokens(first_line, last_line, &tree)
+
+    return tree
+}
+
+set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) { 
+    if tree_ptr == nil {
+        fmt.println("hi")
+        return
+    }
+
+    tree := tree_ptr^
+
+    cursor := ts.query_cursor_new()
+    
+    ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
+
+    defer ts.query_cursor_delete(cursor)
+ 
+    start_point := ts.Point{
+        row=u32(max(first_line, 0)),
+        col=0, 
+    }
+  
+    end_point := ts.Point{
+        row=u32(max(last_line, 0)),
+        col=0,
+    }
+
+    ts.query_cursor_set_point_range(cursor, start_point, end_point) 
+
+    match : ts.Query_Match
+    capture_index := new(u32)
+
+    defer free(capture_index)
+   
+    line_number : int = -1
+
+    for ts._query_cursor_next_capture(cursor, &match, capture_index) {
+        capture := match.captures[capture_index^]
+
+        name_len: u32
+        name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+
+        node := capture.node
+        node_type := string(name)
+
+        start_point := ts.node_start_point(node)
+        end_point := ts.node_end_point(node)
+        start_byte := ts.node_start_byte(node)
+        end_byte := ts.node_end_byte(node)
+
+        start_row := int(start_point.row)
+        end_row := int(end_point.row)
+
+        for row in start_row..=end_row {
+            if row >= len(active_buffer.lines) {
+                break
+            }
+
+            line := &active_buffer.lines[row]
+
+            if row > line_number {
+                line_number = row
+                clear(&line.tokens)
+            }
+
+            start_rune := row == start_row ? int(start_point.col) : 0
+            end_rune := row == end_row ? int(end_point.col) : len(line.characters)
+
+            length := end_rune - start_rune
+            if length <= 0 {
+                continue
+            }
+
+            current_node_type := node_type
+            current_priority: u8 
+
+            active_language_server.override_node_type(
+                &current_node_type, node,
+                active_buffer.content[:],
+                &start_point, &end_point,
+                &line.tokens, &current_priority,
+            )
+
+            if current_node_type == "SKIP" {
+                continue
+            }
+
+            color := &active_language_server.language.ts_colors[current_node_type]
+
+            if color == nil {
+                continue
+            }
+
+            append(&line.tokens, Token{
+                char = i32(start_rune),
+                length = i32(length),
+                color = color^,
+                priority = current_priority,
+            })
+        }
+    }
+}
+
+set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+    get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
+        for &token, index in tokens {
+            if token.char == char {
+                return &token, index
+            }
+        }
+
+        return nil, -1
+    }
+
+    for &token in lsp_tokens {
+        if int(token.line) >= len(buffer.lines) do continue
+
+        line := &buffer.lines[token.line]
+
+        overlapping_token, index := get_overlapping_token(line.tokens, token.char)
+
+        if overlapping_token == nil {
+            continue
+        }
+
+        if overlapping_token.priority > token.priority {
+            continue
+        }
+
+        line.tokens[index] = token
+
     }
 }
 

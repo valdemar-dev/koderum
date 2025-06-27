@@ -158,12 +158,12 @@ main :: proc() {
         delete(dir)
     }
 
-    for key,server in language_servers {
+    for key,server in active_language_servers {
         free(server)
     }
 
     delete(default_cwd)
-    delete(language_servers)
+    delete(active_language_servers)
     delete(font_list)
     delete(delimiter_runes)
     delete(search_ignored_dirs)

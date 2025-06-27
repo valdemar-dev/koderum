@@ -1,9 +1,10 @@
 undo-redo history
 
 
-GOOD MORNING GAMER:
+today:
     - consolidate buffer insert changes into one change on ESC
-    - add ST support for undo-redo
+    - think of a way to not have any code per-language. but just syntax files.
+      user can then install. should not be compilation dependent
 
 todo:
     - n/b term search case sensitive within buffer
