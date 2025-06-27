@@ -30,8 +30,8 @@ Language :: struct {
     ts_colors: map[string]vec4,
 
     lsp_colors: map[string]vec4,
-    lsp_command: []string,
     lsp_working_dir: string,
+    lsp_command: []string,
 
     // Function to call in case you need to manually set a tokens type.
     override_node_type : proc(
@@ -72,7 +72,7 @@ languages : map[string]Language = {
         override_node_type=ts_override_node_type,
 
         parser_name="typescript",
-        parser_path="typescript",
+        parser_subpath="typescript",
         parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
 
         language_symbol_name="tree_sitter_typescript",
@@ -190,7 +190,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
     })
 
     command = {
-        "gcc",
+        "cc",
         "-fPIC",
         strings.concatenate({
             "-I",
@@ -236,7 +236,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
     )
 
     command = {
-        "gcc",
+        "cc",
         "-shared",
         "-fPIC",
         "-o",
@@ -305,15 +305,17 @@ init_parser :: proc(language: ^Language) {
     if !ok {
         fmt.eprintln("Failed to load: %s", dynlib.last_error())
 
-        return
+        panic("Unrecoverable error.")
     }
 
     LanguageProc :: proc() -> ts.Language
 
     ptr, found := dynlib.symbol_address(lib, language.language_symbol_name)
+
     if !found || ptr == nil {
         fmt.eprintln("Symbol not found: %s", dynlib.last_error())
-        return;
+
+        panic("Unrecoverable error.")
     }
 
     lang_proc := cast(LanguageProc)ptr
@@ -321,11 +323,9 @@ init_parser :: proc(language: ^Language) {
     ts_lang := new(ts.Language)
     ts_lang^ = lang_proc()
 
-    fmt.println("Loaded tree-sitter language at address: %p", ts_lang^)
+    fmt.println("Tree-sitter for language", language.parser_name)
 
     language.ts_language = ts_lang
-
-    // _ = dynlib.unload_library(lib)
 }
 
 LanguageServer :: struct {
