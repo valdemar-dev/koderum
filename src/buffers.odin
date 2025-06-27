@@ -184,7 +184,7 @@ undo_change :: proc() {
         int(change.start_byte + u32(len(change.new_content))),
         change.start_line,
         change.start_char,
-        change.end_line,
+        end,
         end_rune,
         change.original_content,
         false

@@ -332,7 +332,7 @@ init_syntax_typescript :: proc(ext: string, allocator := context.allocator) -> o
     defer delete(dir)
 
     desc := os2.Process_Desc{
-        command = []string{"typescript-language-server", "--stdio", "--log-level", "4"},
+        command = []string{"typescript-language-server", "--stdio", "--log-level", "1"},
         env = nil,
         working_dir = dir,
         stdin  = stdin_r,
@@ -611,7 +611,6 @@ for ts._query_cursor_next_capture(cursor, &match, capture_index) {
             continue
         }
 
-        // Re-evaluate node_type and priority per line context
         current_node_type := node_type
         current_priority: u8 
 

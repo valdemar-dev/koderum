@@ -323,11 +323,11 @@ set_buffer_tokens_threaded :: proc() {
     ts.tree_delete(new_tree)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        defer free(data)
+
         start_version_ptr := (cast(^int)data)
 
         start_version := (start_version_ptr^)
-
-        defer free(data)
 
         obj,ok := response["result"].(json.Object)
         
@@ -356,10 +356,6 @@ set_buffer_tokens_threaded :: proc() {
        
         assert(active_language_server != nil)
         active_language_server.set_lsp_tokens(active_buffer, decoded_tokens[:])
-
-        if start_version != active_buffer.version {
-            do_refresh_buffer_tokens = true
-        } 
 
         delete(decoded_tokens)
     }
