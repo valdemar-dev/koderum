@@ -13,11 +13,9 @@ import "core:sort"
 import ts "../../odin-tree-sitter"
 import "core:time"
 import "core:thread"
+import "core:dynlib"
 import "core:net"
 import fp "core:path/filepath"
-
-//import ts_js_bindings "../../odin-tree-sitter/parsers/javascript"
-// import ts_ts_bindings "../../odin-tree-sitter/parsers/typescript"
 
 import "core:sync"
 tree_mutex : sync.Mutex
@@ -47,14 +45,18 @@ Language :: struct {
     ),
 
     // Where the installed parser is located.
-    // Parsers are here: .local/share/koderum/odin-tree-sitter/parsers/<PARSER>.
+    // Parsers are here: .local/share/koderum/parsers/<PARSER>.
     parser_name: string,
 
-    // Used for -path when compiling the parser.
-    parser_path: string,
+    // Used for when compiling the parser.
+    // Example: tree-sitter/tree-sitter-typescript/typescript
+    parser_subpath: string,
 
     // Where to download the parser.
     parser_link: string,
+
+    // Eg. tree_sitter_typescript().
+    language_symbol_name: string,
 }
 
 languages : map[string]Language = {
@@ -73,100 +75,191 @@ languages : map[string]Language = {
         parser_path="typescript",
         parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
 
+        language_symbol_name="tree_sitter_typescript",
+
         ts_language=nil,
     },
 }
 
-install_tree_sitter :: proc() -> os2.Error {
+install_tree_sitter :: proc() -> os2.Error { 
     command : []string = {
         "git",
         "clone",
-        "https://github.com/laytan/odin-tree-sitter.git",
-    }
-
-    run_program(
-        command, 
-        nil,
-        data_dir,
-    ) or_return
-
-    when ODIN_DEBUG {
-        fmt.println("Tree-sitter downloaded..")
-    }
-
-    tree_sitter_dir := strings.concatenate({
-        data_dir,
-        "/odin-tree-sitter",
-    })
-
-    defer delete(tree_sitter_dir)
-
-    command = {
-        "odin",
-        "run",
-        "build",
-        "--",
-        "install",
-        "-clean",
-    }
-
-    run_program(
-        command, 
-        nil,
-        tree_sitter_dir,
-    ) or_return
-
-    return os2.ERROR_NONE
-}
-
-install_parser :: proc(link: string, path: string) -> os2.Error {
-    link_string := strings.concatenate({
-        "-parser:",
-        link,
-    })
-
-    defer delete(link_string)
-
-    path_string : string
-
-    if path != "" {
-        path_string = strings.concatenate({
-            "-path:",
-            path,
-        }, context.temp_allocator)
-    }
-
-    command : []string = {
-        "odin",
-        "run",
-        "build",
-        "--",
-        "install-parser",
-        "-yes",
-        link_string,
-        path_string, 
-    }
-
-    tree_sitter_dir := strings.concatenate({
-        data_dir,
-        "/odin-tree-sitter",
-    })
-
-    defer delete(tree_sitter_dir)
+        "--branch=master",
+        "--depth=1",
+        "https://github.com/tree-sitter/tree-sitter.git",
+        "tree-sitter",
+    } 
 
     error := run_program(
         command, 
         nil,
+        data_dir,
+    )
+
+    command = {
+        "make"
+    }
+
+    tree_sitter_dir := strings.concatenate({
+        data_dir,
+        "/tree-sitter",
+    })
+
+    defer delete(tree_sitter_dir)
+
+    error = run_program(
+        command,
+        nil,
         tree_sitter_dir,
     )
 
+    // Patching weirdness.
+    command = {
+        "mkdir",
+        "-p",
+        strings.concatenate({
+            tree_sitter_dir,
+            "/lib/include/tree_sitter",
+        }, context.temp_allocator),
+    }
+
+    error = run_program(
+        command,
+        nil,
+        tree_sitter_dir,
+    )
+
+    command = {
+        "cp",
+        strings.concatenate({
+            tree_sitter_dir,
+            "/lib/src/parser.h",
+        }, context.temp_allocator),
+        strings.concatenate({
+            tree_sitter_dir,
+            "/lib/include/tree_sitter/",
+        }, context.temp_allocator),
+    }
+
+    error = run_program(
+        command,
+        nil,
+        tree_sitter_dir,
+    )
+
+    return os2.ERROR_NONE
+}
+
+install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
+    temp_dir := strings.concatenate({
+        data_dir,
+        "/tmp",
+    })
+
+    defer delete(temp_dir)
+
+    dir_error := os.make_directory(temp_dir, u32(os.File_Mode(0o700)))
+
+    if dir_error != os.ERROR_NONE {
+        panic("Failed to create temp directory.")
+    }
+
+    defer os.remove_directory(temp_dir)
+
+    command : []string = {
+        "git",
+        "clone",
+        "--depth=1",
+        language.parser_link,
+        language.parser_name,
+    } 
+
+    error := run_program(
+        command, 
+        nil,
+        temp_dir,
+    )
+
+    compilation_dir := strings.concatenate({
+        temp_dir,
+        "/",
+        language.parser_name,
+        "/",
+        language.parser_subpath,
+    })
+
+    command = {
+        "gcc",
+        "-fPIC",
+        strings.concatenate({
+            "-I",
+            data_dir,
+            "/tree-sitter/lib/include"
+        }, context.temp_allocator),
+        "-c",
+        "src/parser.c",
+        "src/scanner.c",
+    }
+
+    error = run_program(
+        command,
+        nil,
+        compilation_dir,
+    )
+
+    parsers_dir := strings.concatenate({
+        data_dir, "/parsers",
+    })
+
+    parser_dir := strings.concatenate({
+        parsers_dir, "/", language.parser_name,
+    })
+
+    when ODIN_OS == .Windows {
+        command = {
+            "mkdir",
+            parser_dir,
+        }
+    } else {
+        command = {
+            "mkdir",
+            "-p",
+            parser_dir,
+        }
+    }
+
+    run_program(
+        command,
+        nil,
+        compilation_dir,
+    )
+
+    command = {
+        "gcc",
+        "-shared",
+        "-fPIC",
+        "-o",
+        strings.concatenate({
+            parser_dir, "/parser.o",
+        }, context.temp_allocator),
+        "parser.o",
+        "scanner.o"
+    }
+
+    run_program(
+        command,
+        nil,
+        compilation_dir,
+    )
+    
     return error 
 }
 
 init_parser :: proc(language: ^Language) {
     tree_sitter_dir := strings.concatenate({
        data_dir,
-       "/odin-tree-sitter",
+       "/tree-sitter",
     })
 
     defer delete(tree_sitter_dir)
@@ -178,11 +271,13 @@ init_parser :: proc(language: ^Language) {
 
         if error != os2.ERROR_NONE {
             panic("Tree-sitter could not be installed. Check stdout for more information.")
+        } else {
+            fmt.println("Tree-sitter was installed!")
         }
     }
 
     parser_dir := strings.concatenate({
-        tree_sitter_dir,
+        data_dir,
         "/parsers/",
         language.parser_name,
     })
@@ -192,12 +287,45 @@ init_parser :: proc(language: ^Language) {
     if os.exists(parser_dir) == false {
         fmt.println("Parser for language:", language.parser_name, "will be installed.")
 
-        error := install_parser(language.parser_link, language.parser_path)
+        error := install_parser(language, parser_dir)
 
         if error != os2.ERROR_NONE {
-            panic("Tree-sitter could not be installed. Check stdout for more information.")
+            panic("Parser could not be installed.")
+        } else {
+            fmt.println("Installed parser!")
         }
     }
+
+    parser_path := strings.concatenate({
+        parser_dir,
+        "/parser.o",
+    })
+
+    lib, ok := dynlib.load_library(parser_path)
+    if !ok {
+        fmt.eprintln("Failed to load: %s", dynlib.last_error())
+
+        return
+    }
+
+    LanguageProc :: proc() -> ts.Language
+
+    ptr, found := dynlib.symbol_address(lib, language.language_symbol_name)
+    if !found || ptr == nil {
+        fmt.eprintln("Symbol not found: %s", dynlib.last_error())
+        return;
+    }
+
+    lang_proc := cast(LanguageProc)ptr
+
+    ts_lang := new(ts.Language)
+    ts_lang^ = lang_proc()
+
+    fmt.println("Loaded tree-sitter language at address: %p", ts_lang^)
+
+    language.ts_language = ts_lang
+
+    // _ = dynlib.unload_library(lib)
 }
 
 LanguageServer :: struct {

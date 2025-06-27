@@ -233,6 +233,9 @@ run_program :: proc(
 
     state, stdout, stderr := os2.process_exec(desc, context.allocator) or_return
 
+    fmt.println("Result of", command)
+    fmt.println(state)
+
     return os2.ERROR_NONE
 }
 
