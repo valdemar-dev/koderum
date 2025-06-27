@@ -157,6 +157,14 @@ undo_change :: proc() {
     idx := len(active_buffer.undo_stack)-1
     change := active_buffer.undo_stack[idx]
 
+    // gotta recompute
+    end,end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
+
+    end_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[end].characters[:]),
+        int(end_byte),
+    )
+
     remove_range(
         &active_buffer.content,
         change.start_byte,
@@ -177,7 +185,7 @@ undo_change :: proc() {
         change.start_line,
         change.start_char,
         change.end_line,
-        change.end_char,
+        end_rune,
         change.original_content,
         false
     )
