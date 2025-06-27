@@ -227,29 +227,128 @@ redo_change :: proc() {
     )
 }
 
-update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo: bool) {
+update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo:bool) {
     start_byte := change.start_byte
 
     text := is_undo ? change.original_content : change.new_content
-    size := is_undo ? len(change.new_content) : len(change.original_content)
 
-    end_byte := change.start_byte + u32(size)
+    remove_size := is_undo ? len(change.new_content) : len(change.original_content)
 
-    start_line, start_char := byte_to_pos(start_byte)
-    end_line, end_char  := byte_to_pos(end_byte)
+    end_byte := change.start_byte + u32(remove_size)
 
-    split_change := strings.split(string(text), "\n")
+    a_line, a_char := byte_to_pos(start_byte)
+    b_line, b_char := byte_to_pos(end_byte)
 
-    fmt.println("bytes", start_byte, end_byte, "pos", start_line, start_char, end_line, end_char)
+    if a_line > b_line || (a_line == b_line && a_char > b_char) {
+        a_line, b_line = b_line, a_line
+        a_char, b_char = b_char, a_char
+    }
+
+    start_accumulated := compute_byte_offset(
+        active_buffer, 
+        int(a_line),
+        int(a_char),
+    )
+
+    end_accumulated := compute_byte_offset(
+        active_buffer, 
+        int(b_line),
+        int(b_char),
+    )
+
+    if a_line == b_line {
+        target_line := &active_buffer.lines[a_line]
+        remove_range(&target_line.characters, a_char, b_char)
+    } else {
+        first_line := &active_buffer.lines[a_line]
+        last_line := &active_buffer.lines[b_line]
+
+        remove_range(&last_line.characters, 0, b_char)
+        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char])
+
+        remove_range(active_buffer.lines, a_line, b_line)
+    }
+
+    split := strings.split(string(text), "\n")
+
+    defer delete(split)
+
+    start_line := &active_buffer.lines[a_line]
+    start_chars := start_line.characters[:]
+
+    byte_offset := utf8.rune_offset(
+        string(start_chars),
+        int(a_char),
+    )
+
+    if byte_offset == -1 {
+        byte_offset = len(start_chars)
+    }
+
+    if len(split) == 1 {
+        first_paste_line := split[0]
+
+        inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
+
+        return
+    }
+
+    pre := active_buffer.lines[a_line].characters[:a_char]
+    post := strings.clone(string(active_buffer.lines[a_line].characters[a_char:]))
+
+    for i in 0..<len(split) {
+        text_line := split[i]
+
+        if i == 0 {
+            buffer_line := &active_buffer.lines[a_line]
+
+            inject_at(&buffer_line.characters, byte_offset, ..transmute([]u8)text_line)
+            resize(&buffer_line.characters, byte_offset + len(text_line))
+
+            continue
+        }
+
+        buffer_line_index := a_line + i
+
+        new_buffer_line := BufferLine{}
+
+        append(&new_buffer_line.characters, ..transmute([]u8)text_line)
+
+        if i == (len(split) - 1) {
+            append(&new_buffer_line.characters, ..transmute([]u8)post)
+        }
+
+        inject_at(active_buffer.lines, buffer_line_index, new_buffer_line)
+    }
+
+}
+
+/*
+update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo: bool) {
+    fmt.println(start_line, start_char, end_line, end_char, start_byte, end_byte)
 
     if start_line == end_line {
         line := &buffer.lines[start_line]
 
         remove_range(&line.characters, start_char, end_char)
         inject_at(&line.characters, start_char, ..transmute([]u8)split_change[0])
+
+        return
     }
 
+    first_buffer_line := &buffer.lines[start_line]
+    first_split_line := split_change[0]
+    
+    resize(&first_buffer_line.characters, start_char) 
+    inject_at(&first_buffer_line.characters, start_char, ..transmute([]u8)first_split_line)
+
+    end_buffer_line := &buffer.lines[end_line]
+    end_split_line := split_change[len(split_change) - 1]
+
+    remove_range(&end_buffer_line.characters, 0, end_char) 
+    inject_at(&end_buffer_line.characters, 0, ..transmute([]u8)end_split_line)
 }
+*/
 
 byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
     local_byte: u32 = 0
