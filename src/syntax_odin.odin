@@ -1,6 +1,4 @@
-
 #+feature dynamic-literals
-#+private file
 package main
 
 import "core:strings"
@@ -26,7 +24,7 @@ ts_odin_colors : map[string]vec4 = {
     "field"=LIGHT_ORANGE,
 }
 
-query_src := strings.clone_to_cstring(strings.concatenate({`
+ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
 ;(identifier) @identifier
 
 (member_expression
@@ -200,7 +198,6 @@ odin_lsp_colors := map[string]vec4{
     "enumMember"=LIGHT_RED,
 }
 
-@(private="package")
 odin_override_node_type :: proc(
     node_type: ^string,
     node: ts.Node, 

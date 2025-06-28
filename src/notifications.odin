@@ -35,6 +35,10 @@ notification_should_hide := true
 x_pos : f32 = 0
 
 @(private="package")
+draw_alert :: proc() {}
+tick_alert :: proc() {}
+
+@(private="package")
 draw_notification :: proc() {
     if suppress {
         return
@@ -180,9 +184,6 @@ draw_notification :: proc() {
     draw_rects(&rect_cache)
     draw_rects(&text_rect_cache)
 }
-
-draw_alert :: proc() {}
-tick_alert :: proc() {}
 
 @(private="package")
 tick_notifications :: proc() {

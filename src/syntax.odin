@@ -78,9 +78,24 @@ languages : map[string]Language = {
         parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
 
         language_symbol_name="tree_sitter_typescript",
-
-        ts_language=nil,
     },
+    ".odin"=Language{
+        ts_query_src=ts_odin_query_src,
+
+        ts_colors=ts_odin_colors,
+        lsp_colors=odin_lsp_colors,
+
+        lsp_command=[]string{"ols"},
+        lsp_working_dir="/usr/bin/ols",
+        lsp_install_command="https://github.com/DanielGavin/ols",
+
+        override_node_type=odin_override_node_type,
+        parser_name="odin",
+        parser_subpath="",
+        parser_link="https://github.com/tree-sitter-grammars/tree-sitter-odin",
+
+        language_symbol_name="tree_sitter_odin",
+    }
 }
 
 install_tree_sitter :: proc() -> os2.Error { 
@@ -426,6 +441,20 @@ init_language_server :: proc(ext: string) {
     }
 
     process, start_err := os2.process_start(desc)
+    if start_err == .Not_Exist {
+        notification := Notification{
+            title="Server Missing",
+            content=strings.concatenate({
+                "Please install the LSP Server for ",
+                language.parser_name, ".",
+            }),
+            copy_text=language.lsp_install_command,
+        }
+
+        append(&notification_queue, notification)
+
+        return
+    }
     if start_err != os2.ERROR_NONE {
         fmt.println(start_err)
         panic("Failed to start language server.")
@@ -1237,12 +1266,14 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
             current_node_type := node_type
             current_priority: u8 
 
-            active_language_server.override_node_type(
-                &current_node_type, node,
-                active_buffer.content[:],
-                &start_point, &end_point,
-                &line.tokens, &current_priority,
-            )
+            if active_language_server.override_node_type != nil {
+                active_language_server.override_node_type(
+                    &current_node_type, node,
+                    active_buffer.content[:],
+                    &start_point, &end_point,
+                    &line.tokens, &current_priority,
+                )
+            }
 
             if current_node_type == "SKIP" {
                 continue

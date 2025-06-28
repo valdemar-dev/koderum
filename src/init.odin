@@ -39,18 +39,6 @@ init :: proc() {
     } else {
         cwd = os.get_current_directory()
     }
-
-    notification := Notification{
-        title="Server Missing",
-        content="Please install the LSP Server for the language typescript.",
-        copy_text="npm install -g typescript-language-server typescript"
-    }
-
-    append(&notification_queue, notification)
-    append(&notification_queue, notification)
-    append(&notification_queue, notification)
-    append(&notification_queue, notification)
-    append(&notification_queue, notification)
 }
 
 size_callback :: proc "c" (
