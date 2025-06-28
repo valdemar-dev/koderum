@@ -15,6 +15,7 @@ BG_MAIN_50 := hex_string_to_vec4("43506BFF")
 TEXT_MAIN := hex_string_to_vec4("FFFFFFFF")
 
 TEXT_DARKER := hex_string_to_vec4("AAAAAAFF")
+TEXT_DARKEST := hex_string_to_vec4("888888FF")
 
 TEXT_ERROR := RED
 

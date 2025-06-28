@@ -45,6 +45,8 @@ render :: proc() {
 
     draw_buffer()
 
+    draw_notification()
+
     draw_buffer_info_view()
     draw_browser_view()
 
@@ -174,7 +176,8 @@ measure_text :: proc (
     for r,i in text {
         if r == '\n' {
             pen.x = 0
-            pen.y = pen.y + font_height * line_height
+
+            highest.y += line_height
 
             continue
         }
@@ -186,18 +189,13 @@ measure_text :: proc (
         }
 
         pen.x = pen.x + (character.advance.x)
-        pen.y = pen.y + character.advance.y
 
         if pen.x > highest.x {
             highest.x = pen.x
         }
-
-        if pen.y > highest.y {
-            highest.y = pen.y
-        }
     }
 
-    return pen
+    return highest
 }
 
 
@@ -209,6 +207,9 @@ add_text_measure :: proc(
     text: string,
     z_index : f32 = 0,
     draw_missing_glyphs : bool = true,
+    max_width: f32 = -1,
+    do_wrap: bool = false,
+    split_new_lines : bool = false,
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -222,6 +223,10 @@ add_text_measure :: proc(
         font_height,
         text,
         z_index,
+        draw_missing_glyphs,
+        max_width,
+        do_wrap,
+        split_new_lines,
     )
 
     return vec2{

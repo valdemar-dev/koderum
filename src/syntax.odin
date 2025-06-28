@@ -32,6 +32,7 @@ Language :: struct {
     lsp_colors: map[string]vec4,
     lsp_working_dir: string,
     lsp_command: []string,
+    lsp_install_command: string,
 
     // Function to call in case you need to manually set a tokens type.
     override_node_type : proc(
@@ -67,7 +68,8 @@ languages : map[string]Language = {
         lsp_colors=ts_lsp_colors,
 
         lsp_command=[]string{"typescript-language-server", "--stdio", "--log-level", "1"},
-        lsp_working_dir="/usr/bin/ols",
+        lsp_working_dir="", 
+        lsp_install_command="npm install -g typescript-language-server typescript",
 
         override_node_type=ts_override_node_type,
 
@@ -507,7 +509,6 @@ init_language_server :: proc(ext: string) {
         do_refresh_buffer_tokens = true
     }
 }
-
 
 lsp_handle_file_open :: proc() {
     set_active_language_server(active_buffer.ext)

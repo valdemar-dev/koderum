@@ -174,6 +174,23 @@ handle_command_input :: proc() -> bool {
         return false
     }
 
+    if is_key_pressed(glfw.KEY_C) {
+        key := key_store[glfw.KEY_C]
+
+        if key.modifiers == CTRL_SHIFT {
+            copy_notification_command()
+        }
+    }
+
+    if is_key_pressed(glfw.KEY_ESCAPE) {
+        key := key_store[glfw.KEY_ESCAPE]
+
+        if key.modifiers == CTRL {
+            dismiss_notification()
+        }
+    }
+
+
     if active_buffer != nil {
         handle_buffer_input() or_return
     }

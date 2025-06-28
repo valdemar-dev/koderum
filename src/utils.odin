@@ -239,3 +239,10 @@ run_program :: proc(
     return os2.ERROR_NONE
 }
 
+is_point_in_rect :: proc(p: vec2, r: rect) -> bool {
+	return p.x >= r.x &&
+	       p.y >= r.y &&
+	       p.x <= r.x + r.width &&
+	       p.y <= r.y + r.height
+}
+

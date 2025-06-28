@@ -102,6 +102,7 @@ main :: proc() {
         tick_buffer_cursor()
         tick_buffer_info_view()
         tick_browser_view()
+        tick_notifications()
 
         update_camera()
 

@@ -15,6 +15,7 @@ import ft "../../alt-odin-freetype"
 import ts "../../odin-tree-sitter"    
 import "core:time"
 import "core:math"
+import "core:thread"
 
 @(private="package")
 BufferLine :: struct {
@@ -1015,7 +1016,8 @@ open_file :: proc(file_name: string) {
     set_buffer_cursor_pos(0,0)
     constrain_scroll_to_cursor() 
 
-    lsp_handle_file_open()
+    thread.run(lsp_handle_file_open)
+
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
