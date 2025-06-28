@@ -480,16 +480,29 @@ add_code_text :: proc(
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
     for r, i in text {
         if len(errors) > 0 {
-            if error != nil && (error.char <= i) && ((error_idx + 1) < len(errors)) && (errors[error_idx].char + error.width <= i) {
+            if error != nil && (error.char + error.width <= i) {
                 error_idx += 1
-                error = &errors[error_idx]
-            }
+                if error_idx < len(errors) {
+                    next_error := &errors[error_idx]
 
-            if error == nil && error_idx < len(errors) && i >= errors[error_idx].char {
-                error = &errors[error_idx]
+                    if next_error.char < i {
+                        error_idx += 1
+                    }
+
+                    if error_idx < len(errors) && i >= errors[error_idx].char {
+                        error = &errors[error_idx]
+                    } else {
+                        error = nil
+                    }
+                } else {
+                    error = nil
+                }
+            } else if error == nil && error_idx < len(errors) {
+                if i >= errors[error_idx].char {
+                    error = &errors[error_idx]
+                }
             }
         }
-
 
         defer if len(tokens) > 0 {
             if token != nil && (token.char + token.length <= i32(i + 1)) {
@@ -612,7 +625,18 @@ add_code_text :: proc(
             uvs_index := char_uv_map[u64('_')]
             uvs := char_rects[uvs_index]
 
-            color := RED
+            color : vec4
+
+            switch error.severity {
+            case 1:
+                color = ERROR
+            case 2:
+                color = WARN
+            case 3:
+                color = INFORMATION
+            case 4:
+                color = HINT
+            }
 
             add_rect(&text_rect_cache, rect{
                 pen.x + character.offset.x + 0.1,

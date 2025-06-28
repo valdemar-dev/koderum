@@ -51,3 +51,8 @@ LIGHT_GREEN := hex_string_to_vec4("D9FF87ff")
 DARK_GRAY := hex_string_to_vec4("394357ff")
 
 TEST := hex_string_to_vec4("ff008cff")
+
+ERROR := RED
+WARN := YELLOW
+INFORMATION := BLUE
+HINT := GRAY
