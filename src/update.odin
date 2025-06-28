@@ -11,6 +11,8 @@ import "core:os/os2"
 import "core:os"
 import "core:strings"
 import "core:mem"
+import "core:sort"
+import "core:net"
 
 LSPRequest :: struct {
     id: string,
@@ -94,8 +96,182 @@ message_loop :: proc(thread: ^thread.Thread) {
             continue
         } 
 
-        fmt.println("Received Notification: ",parsed)
+        when ODIN_DEBUG {
+            fmt.println("Received Notification: ",parsed)
+        }
 
+        process_lsp_notification(obj)
+    }
+}
+
+process_lsp_notification :: proc (parsed: json.Object) {
+    method, ok := parsed["method"].(json.String)
+
+    if !ok {
+        return
+    }
+
+    if method == "textDocument/publishDiagnostics" {
+        params := parsed["params"].(json.Object)
+
+        errors, ok := params["diagnostics"].(json.Array)
+        uri, _ := params["uri"].(json.String)
+
+        url := uri[7:]
+        decoded, decoded_ok := net.percent_decode(url)
+
+        buffer := get_buffer_by_name(decoded)
+
+        if !ok {
+            panic("Malformed diagnostics array in textDocumentation/publishDiagnostics.")
+        }
+
+        set_lsp_diagnostics(errors, buffer)
+    }
+}
+
+set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
+    /*
+        message=Type 'number' is not assignable to type 'string'.,
+        code=2322,
+        source=typescript,
+        range=map[start=map[line=2, character=0],
+        end=map[character=19, line=2]],
+        severity=1,
+    */
+
+    sort_proc :: proc(error_a, error_b: json.Value) -> int {
+        error_obj, ok := error_a.(json.Object)
+
+        if !ok {
+            panic("Cannot sort invalid JSON object in set_lsp_diagnostics.")
+        }
+
+        range_a := error_obj["range"].(json.Object)
+        range_b := error_obj["range"].(json.Object)
+
+        start_a := range_a["start"].(json.Object)
+        start_line_a := start_a["line"].(json.Float)
+        start_char_a := start_a["character"].(json.Float)
+
+        start_b := range_b["start"].(json.Object)
+        start_line_b := start_b["line"].(json.Float)
+        start_char_b := start_b["character"].(json.Float)
+
+        if start_line_a == start_line_b {
+            if start_char_a == start_char_b {
+                end_a := range_a["end"].(json.Object)
+                end_line_a := end_a["line"].(json.Float)
+                end_char_a := end_a["character"].(json.Float)
+
+                end_b := range_b["end"].(json.Object)
+                end_line_b := end_b["line"].(json.Float)
+                end_char_b := end_b["character"].(json.Float)
+
+                if end_line_a == end_line_b {
+                    return int(end_char_a - end_char_b)
+                }
+
+                return int(end_line_a - end_char_b)
+            }
+
+            return int(start_char_a - start_char_b)
+        }
+
+        return int(start_line_a - start_line_b)
+    }
+
+    sort.quick_sort_proc(errors[:], sort_proc)
+
+    for &line in buffer.lines {
+        for error in line.errors {
+            delete(error.source)
+            delete(error.message)
+        }
+
+        clear(&line.errors)
+    }
+
+    for error in errors {
+        error_obj, ok := error.(json.Object)
+
+        if !ok {
+            fmt.eprintln("ERROR: Badly formed error in LSP diagnostics.", error)
+
+            continue
+        }
+
+        range := error_obj["range"].(json.Object)
+
+        start := range["start"].(json.Object)
+        start_line := start["line"].(json.Float)
+        start_char := start["character"].(json.Float)
+
+        end := range["end"].(json.Object)
+        end_line := end["line"].(json.Float)
+        end_char := end["character"].(json.Float)
+
+        message := error_obj["message"].(json.String)
+
+        source, source_ok := error_obj["source"].(json.String)
+
+        severity := error_obj["severity"].(json.Float)
+
+        if start_line == end_line {
+            buf_line := &buffer.lines[int(start_line)]
+
+            error := BufferError{
+                severity=int(severity),
+                message=strings.clone(message),
+            }
+
+            if source_ok do error.source=strings.clone(source)
+
+            error.char = int(start_char)
+            error.width = int(end_char - start_char)
+
+            append(&buf_line.errors, error)
+
+            continue
+        }
+
+        for cur_line in start_line..=end_line {
+            buf_line := &buffer.lines[int(cur_line)]
+
+            error := BufferError{
+                message=strings.clone(message),
+                severity=int(severity),
+            }
+
+            if source_ok do error.source=strings.clone(source)
+
+            if cur_line == start_line { 
+                error.char = int(start_char)
+
+                count := strings.rune_count(
+                    string(buf_line.characters[:]),
+                )
+
+                error.width = count - error.char
+            } else if cur_line == end_line {
+                error.char = 0
+                error.width = error.char
+            } else {
+                count := strings.rune_count(
+                    string(buf_line.characters[:]),
+                )
+
+                error.width = count
+            }
+
+            /*
+               WARNING: Design impl flaw.
+               Idk how to do multi line tokens in a goodly way.
+               So, we're doing this.
+            */
+            clear(&buf_line.errors)
+            append(&buf_line.errors, error)
+        }
     }
 }
 

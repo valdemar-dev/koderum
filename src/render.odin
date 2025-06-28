@@ -449,8 +449,11 @@ add_code_text :: proc(
     line_height := font_height * 1.2
     is_start_of_line := true
 
-    tokens := buffer_line.tokens
+    errors := buffer_line.errors
+    error : ^BufferError
+    error_idx : int = 0
 
+    tokens := buffer_line.tokens
     token : ^Token
     token_idx : int = 0
     
@@ -476,6 +479,18 @@ add_code_text :: proc(
 
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
     for r, i in text {
+        if len(errors) > 0 {
+            if error != nil && (error.char <= i) && ((error_idx + 1) < len(errors)) && (errors[error_idx].char + error.width <= i) {
+                error_idx += 1
+                error = &errors[error_idx]
+            }
+
+            if error == nil && error_idx < len(errors) && i >= errors[error_idx].char {
+                error = &errors[error_idx]
+            }
+        }
+
+
         defer if len(tokens) > 0 {
             if token != nil && (token.char + token.length <= i32(i + 1)) {
                 token_idx += 1
@@ -580,6 +595,33 @@ add_code_text :: proc(
         }, rect{
             f32(uvs.x), f32(uvs.y), f32(uvs.w) - rect_pack_glyp_padding, f32(uvs.h) - rect_pack_glyp_padding
         }, color, char_uv_map_size, z_index)
+
+        if error != nil {
+            character := get_char_with_char_map(char_map, font_height, u64('_'))
+
+            if character == nil {
+                continue
+            }
+
+            if font_height in char_uv_maps == false {
+                continue
+            }
+
+            index := char_uv_maps[font_height]
+            char_uv_map := char_uv_maps_array[index]
+            uvs_index := char_uv_map[u64('_')]
+            uvs := char_rects[uvs_index]
+
+            color := RED
+
+            add_rect(&text_rect_cache, rect{
+                pen.x + character.offset.x + 0.1,
+                pen.y - character.offset.y + ascender + f32(character.rows),
+                f32(character.width), f32(character.rows)
+            }, rect{
+                f32(uvs.x), f32(uvs.y), f32(uvs.w) - rect_pack_glyp_padding, f32(uvs.h) - rect_pack_glyp_padding
+            }, color, char_uv_map_size, z_index - .1)
+        }
 
         pen.x += character.advance.x
         pen.y += character.advance.y

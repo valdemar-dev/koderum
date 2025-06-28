@@ -21,16 +21,19 @@ import "core:thread"
 BufferLine :: struct {
     characters: [dynamic]u8,
     tokens : [dynamic]Token,
+
+    errors : [dynamic]BufferError,
 }
 
 @(private="package")
 BufferError :: struct {
-    line: int,
-    error_string: string,
-}
+    source: string,
+    message: string,
+    severity: int,
 
-@(private="package")
-buffer_errors : [dynamic]BufferError = {}
+    char: int,
+    width: int,
+}
 
 @(private="package")
 CompletionHit :: struct {
@@ -790,6 +793,10 @@ draw_autocomplete :: proc() {
     }
 
     for i in selected_completion_hit..<end_idx {
+        if i >= len(completion_hits) {
+            break
+        }
+
         hit := &completion_hits[i]
 
         size := add_text_measure(
@@ -1769,6 +1776,17 @@ array_is_equal :: proc(a, b: []rune) -> bool {
 }
 
 @(private="package")
+get_buffer_by_name :: proc(file_name: string) -> ^Buffer {
+    for &buffer in buffers {
+        if buffer.file_name == file_name {
+            return buffer
+        }
+    }
+
+    return nil
+}
+
+@(private="package")
 unindent_selection :: proc(start_line: int, end_line: int) {
     start_line : int = start_line
     end_line : int = end_line
@@ -2525,6 +2543,10 @@ handle_search_input :: proc() {
 }
 
 insert_completion :: proc() {
+    if selected_completion_hit >= len(completion_hits) {
+        return
+    }
+
     completion := completion_hits[selected_completion_hit]
 
     insert_string := completion.label

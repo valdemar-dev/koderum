@@ -194,6 +194,7 @@ text_document_document_symbol_message :: proc(doc_uri: string, id: int) -> strin
     return header
 }
 
+/*
 initialize_message :: proc(pid: int, project_dir: string) -> string {
     buf := make([dynamic]u8, 32)
     str_pid := strconv.itoa(buf[:], pid)
@@ -224,6 +225,42 @@ initialize_message :: proc(pid: int, project_dir: string) -> string {
         json,
     })
 }
+*/
+
+initialize_message :: proc(pid: int, project_dir: string) -> string {
+    buf := make([dynamic]u8, 32)
+    str_pid := strconv.itoa(buf[:], pid)
+
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"id\": \"1\",\n",
+        "  \"method\": \"initialize\",\n",
+        "  \"params\": {\n",
+        "    \"processId\": ", str_pid, ",\n",
+        "    \"rootUri\": \"file://", project_dir, "\",\n",
+        "    \"capabilities\": {\n",
+        "      \"textDocument\": {\n",
+        "        \"publishDiagnostics\": {}\n",
+        "      }\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    }, context.temp_allocator)
+
+    len_buf := make([dynamic]u8, 32)
+    length := strconv.itoa(len_buf[:], len(json))
+
+    defer delete(buf)
+    defer delete(len_buf)
+
+    return strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+}
+
 
 did_open_message :: proc(uri: string, languageId: string, version: int, text: string) -> string {
     version_buf := make([dynamic]u8, 16)
