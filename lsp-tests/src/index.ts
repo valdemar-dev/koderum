@@ -1,5 +1,3 @@
-
-
 // 1. Directives and Pragmas
 'use strict';
 /// <reference path="types/global.d.ts" />

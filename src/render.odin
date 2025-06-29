@@ -601,15 +601,29 @@ add_code_text :: proc(
             color = ORANGE
         }
 
-        add_rect(&text_rect_cache, rect{
-            pen.x + character.offset.x + 0.1,
-            pen.y - character.offset.y + ascender,
-            f32(character.width), f32(character.rows)
-        }, rect{
-            f32(uvs.x), f32(uvs.y), f32(uvs.w) - rect_pack_glyp_padding, f32(uvs.h) - rect_pack_glyp_padding
-        }, color, char_uv_map_size, z_index)
+        if error != nil && (error.severity == 4) {
+            color = vec4{color.x, color.y, color.z, 0.6}
+        }
 
-        if error != nil {
+        add_rect(
+            &text_rect_cache,
+            rect{
+                pen.x + character.offset.x + 0.1,
+                pen.y - character.offset.y + ascender,
+                f32(character.width), f32(character.rows)
+            },
+            rect{
+                f32(uvs.x),
+                f32(uvs.y),
+                f32(uvs.w) - rect_pack_glyp_padding,
+                f32(uvs.h) - rect_pack_glyp_padding,
+            },
+            color,
+            char_uv_map_size,
+            z_index,
+        )
+
+        if error != nil && (error.severity == 1 || error.severity == 2) {
             character := get_char_with_char_map(char_map, font_height, u64('_'))
 
             if character == nil {
@@ -632,10 +646,6 @@ add_code_text :: proc(
                 color = ERROR
             case 2:
                 color = WARN
-            case 3:
-                color = INFORMATION
-            case 4:
-                color = HINT
             }
 
             add_rect(&text_rect_cache, rect{
