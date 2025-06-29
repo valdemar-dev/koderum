@@ -28,6 +28,12 @@ update_state :: proc(current_time: f64) {
     if do_refresh_buffer_tokens {
         set_buffer_tokens_threaded()
     }
+
+    if has_cursor_moved {
+        get_info_under_cursor()
+
+        has_cursor_moved = false
+    }
 }
 
 @(private="package")
@@ -312,8 +318,13 @@ send_lsp_init_message :: proc(
 }
 
 @(private="package")
+update_thread_allocator : mem.Allocator
+
+@(private="package")
 update :: proc(thread: ^thread.Thread) {
     last_time := glfw.GetTime()
+
+    context.allocator = update_thread_allocator
 
     for !glfw.WindowShouldClose(window) {
         current_time := glfw.GetTime()

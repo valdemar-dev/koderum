@@ -46,6 +46,7 @@ render :: proc() {
     draw_buffer()
 
     draw_notification()
+    draw_alert()
 
     draw_buffer_info_view()
     draw_browser_view()
@@ -162,6 +163,7 @@ add_rect :: proc(cache: ^RectCache, input_rect: rect, texture: rect, color: vec4
 measure_text :: proc (
     font_height: f32,
     text: string,
+    max_width : f32 = -1,
 ) -> vec2 {
     max_ascent : f32 = font_height
 
@@ -192,6 +194,11 @@ measure_text :: proc (
 
         if pen.x > highest.x {
             highest.x = pen.x
+        }
+
+        if math.round_f32(pen.x) > max_width && max_width > -1 {
+            highest.y += line_height
+            pen.x = 0
         }
     }
 
@@ -326,7 +333,7 @@ add_text :: proc(
 
         add_rect(rect_cache,
             rect{
-                pen.x + character.offset.x + 0.1,
+                math.round_f32(pen.x + character.offset.x + 0.1),
                 ((pen.y - character.offset.y + f32(ascend))),
                 (width),
                 (height),

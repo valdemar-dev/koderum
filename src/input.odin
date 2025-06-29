@@ -33,6 +33,8 @@ InputMode :: enum {
     FILE_CREATE,
     SEARCH,
     HIGHLIGHT,
+
+    DEBUG,
 }
 
 @(private="package")
@@ -68,7 +70,8 @@ check_inputs :: proc() -> bool {
         handle_search_input()
     case .HIGHLIGHT:
         handle_highlight_input()
-
+    case .DEBUG:
+        handle_debug_input()
     }
 
     return false
@@ -188,6 +191,10 @@ handle_command_input :: proc() -> bool {
         if key.modifiers == CTRL {
             dismiss_notification()
         }
+    }
+
+    if is_key_pressed(glfw.KEY_F2) {
+        input_mode = .DEBUG
     }
 
 

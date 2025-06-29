@@ -2,6 +2,7 @@ package main
 
 import "core:strconv"
 import "core:strings"
+import "vendor:glfw"
 
 buf : [8]byte = {}
 
@@ -35,4 +36,19 @@ draw_debug :: proc() {
     draw_rects(&rect_cache)
 
     reset_rect_cache(&rect_cache)
+}
+
+handle_debug_input :: proc() {
+    if is_key_pressed(glfw.KEY_1) {
+        alert := new(Alert)
+        alert^ = Alert{
+            title="Installing Tree-Sitter",
+            content="This may take a while..",
+            show_seconds=5,
+            remaining_seconds=5,
+        }
+
+        append(&alert_queue, alert)
+    }
+   
 }

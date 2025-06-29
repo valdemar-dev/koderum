@@ -21,7 +21,10 @@ init :: proc() {
     init_opengl()
     init_fonts()
 
+    update_thread_allocator = context.allocator
+
     init_update_thread()
+
     init_message_thread()
 
     fb_width, fb_height := glfw.GetFramebufferSize(window)

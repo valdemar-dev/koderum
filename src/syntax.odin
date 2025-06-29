@@ -442,7 +442,9 @@ init_language_server :: proc(ext: string) {
 
     process, start_err := os2.process_start(desc)
     if start_err == .Not_Exist {
-        notification := Notification{
+        notification := new(Notification)
+
+        notification^ = Notification{
             title="Server Missing",
             content=strings.concatenate({
                 "Please install the LSP Server for ",

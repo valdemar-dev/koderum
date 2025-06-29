@@ -102,6 +102,8 @@ draw_ui :: proc() {
         mode_string = "Highlighting"
     case .SEARCH:
         mode_string = "Search"
+    case .DEBUG:
+        mode_string = "Debug"
     }
 
     add_text(&rect_cache,

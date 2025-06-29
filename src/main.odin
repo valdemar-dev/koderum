@@ -14,7 +14,7 @@ import "core:time"
 import "core:thread"
 import "core:os"
 
-target_fps :: 120.0
+target_fps :: 144.0
 target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
@@ -73,7 +73,7 @@ main :: proc() {
     last_time := glfw.GetTime()
 
     glfw.SwapBuffers(window)
-    
+
     for !glfw.WindowShouldClose(window) {
         glfw.PollEvents()
 
@@ -102,7 +102,9 @@ main :: proc() {
         tick_buffer_cursor()
         tick_buffer_info_view()
         tick_browser_view()
+
         tick_notifications()
+        tick_alert()
 
         update_camera()
 

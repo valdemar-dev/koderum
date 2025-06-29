@@ -7,13 +7,13 @@ buffer_cursor_pos := vec2{}
 buffer_cursor_target_pos := vec2{}
 
 buffer_cursor_line : int
-
 buffer_cursor_char_index : int
-
 buffer_cursor_desired_char_index : int = -1
 
 cursor_width : f32
 cursor_height : f32
+
+has_cursor_moved : bool = false
 
 draw_cursor :: proc() {
     if active_buffer == nil {
@@ -66,6 +66,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     if active_buffer == nil {
         return
     }
+
+    has_cursor_moved = true
 
     buffer_lines := active_buffer.lines
     
@@ -132,12 +134,68 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     buffer_cursor_target_pos.y = f32(line) * line_height
 }
 
-move_buffer_cursor_x :: proc(amount: int) {
-    line := active_buffer.lines[buffer_cursor_line]
-}
-
 @(private="package")
 tick_buffer_cursor :: proc() {
     buffer_cursor_pos.x = smooth_lerp(buffer_cursor_pos.x, buffer_cursor_target_pos.x, 30, frame_time)
     buffer_cursor_pos.y = smooth_lerp(buffer_cursor_pos.y, buffer_cursor_target_pos.y, 30, frame_time)
 }
+
+@(private="package")
+highlighted_error : ^BufferError = nil
+
+error_alert : ^Alert
+
+@(private="package")
+get_info_under_cursor :: proc() {
+    if active_buffer == nil {
+        return
+    } 
+
+    line := active_buffer.lines[buffer_cursor_line]
+
+    highlighted_error = nil
+
+    for &error in line.errors {
+        start := error.char
+        end := error.char + error.width
+
+        if start <= buffer_cursor_char_index && end >= buffer_cursor_char_index {
+            highlighted_error = &error
+
+            break
+        }
+    }
+
+    if highlighted_error == nil {
+        dismiss_alert()
+
+        error_alert = nil
+
+        return
+    }
+
+    if error_alert == nil {
+        error_alert = new(Alert)
+        fmt.println("Alloc with", context.allocator)
+
+        error_alert^.show_seconds = -1
+
+        append(&alert_queue, error_alert)
+    }
+
+    switch highlighted_error.severity {
+    case 1:
+        error_alert^.title = "Error:"
+    case 2:
+        error_alert^.title = "Warning:"
+    case 3:
+        error_alert^.title = "Info:"
+    case 4:
+        error_alert^.title = "Hint:"
+    }
+
+    error_alert^.content = highlighted_error.message
+}
+
+
+

@@ -21,7 +21,6 @@ import "core:thread"
 BufferLine :: struct {
     characters: [dynamic]u8,
     tokens : [dynamic]Token,
-
     errors : [dynamic]BufferError,
 }
 
@@ -750,6 +749,7 @@ draw_text_buffer :: proc() {
     }
 
     draw_autocomplete()
+    draw_highlighted_error()
     
     draw_rects(&rect_cache)
     reset_rect_cache(&rect_cache)
@@ -761,6 +761,15 @@ draw_text_buffer :: proc() {
     */
     draw_rects(&text_rect_cache)
     reset_rect_cache(&text_rect_cache)
+}
+
+draw_highlighted_error :: proc() {
+    if highlighted_error == nil {
+        return
+    }
+
+
+
 }
 
 draw_autocomplete :: proc() {

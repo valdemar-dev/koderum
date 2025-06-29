@@ -6,6 +6,7 @@ today:
     - think of a way to not have any code per-language. but just syntax files.
       user can then install. should not be compilation dependent
     - we can probably just do JSON for this
+    - maybe have two trees for parsing, threaded and single-threaded
 
 high priority todo:
     - add a notif system. (good for long slow tasks)
