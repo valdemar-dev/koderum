@@ -169,7 +169,7 @@ get_info_under_cursor :: proc() {
 
     if highlighted_error == nil {
         if error_alert != nil {
-            dismiss_alert()
+            dismiss_alert(error_alert)
     
             error_alert = nil
         }

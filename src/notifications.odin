@@ -17,6 +17,9 @@ Alert :: struct {
     remaining_seconds: f32,
 
     allocator: mem.Allocator,
+
+    should_hide: bool,
+    x_pos: f32,
 }
 
 @(private="package")
@@ -34,16 +37,143 @@ alert_queue : [dynamic]^Alert = {}
 notification_queue : [dynamic]^Notification = {}
 
 suppress := true
-suppress_alert := true
 
 notification_should_hide := true
-alert_should_hide := true
 
 x_pos : f32 = 0
-alert_x_pos : f32 = 0
 
 @(private="package")
-draw_alert :: proc() {
+draw_alerts :: proc() {
+    if len(alert_queue) == 0 {
+        return
+    }
+
+    em := ui_general_font_size
+    margin := em
+
+    reset_rect_cache(&rect_cache)
+    reset_rect_cache(&text_rect_cache)
+
+    pen_y := fb_size.y - margin
+
+    for alert in alert_queue {
+        content_size := measure_text(ui_smaller_font_size, alert.content, 500)
+        title_size := measure_text(ui_smaller_font_size, alert.title)
+
+        time_bar_height := alert.show_seconds != -1 ? general_line_thickness_px : 0
+        gap : f32 = 5
+
+        alert_height := content_size.y + title_size.y + time_bar_height + gap + (em * 2)
+
+        alert_width := max(
+            max(content_size.x, title_size.x) + (em * 2),
+            300,
+        )
+
+        pen_y -= alert_height
+        defer pen_y -= em
+
+        start_pen := vec2{
+            alert.x_pos,
+            pen_y,
+        }
+
+        bg_rect := rect{
+            start_pen.x,
+            start_pen.y,
+            alert_width,
+            alert_height,
+        }
+
+        // Draw Background
+        add_rect(
+            &rect_cache,
+            bg_rect,
+            no_texture,
+            BG_MAIN_10,
+            vec2{},
+            12,
+        )
+
+        border_rect := rect{
+            bg_rect.x - general_line_thickness_px,
+            bg_rect.y - general_line_thickness_px,
+            bg_rect.width + (general_line_thickness_px * 2),
+            bg_rect.height + (general_line_thickness_px * 2),
+        }
+
+        add_rect(
+            &rect_cache,
+            border_rect,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            12,
+        )
+
+        // Draw Content
+        pen := vec2{
+            start_pen.x + em,
+            start_pen.y + em,
+        }
+
+        add_text(&text_rect_cache,
+            pen,
+            TEXT_MAIN,
+            ui_smaller_font_size,
+            alert.title,
+            13,
+        )
+
+        error := ft.set_pixel_sizes(primary_font, 0, u32(ui_smaller_font_size))
+        assert(error == .Ok)
+
+        ascend := primary_font.size.metrics.ascender >> 6
+        descend := primary_font.size.metrics.descender >> 6
+        line_height := f32(ascend - descend)
+
+        pen.y += line_height + gap
+
+        add_text(&text_rect_cache,
+            pen,
+            TEXT_DARKER,
+            ui_smaller_font_size,
+            alert.content,
+            13,
+            false,
+            500,
+            true,
+            true,
+        )
+
+        // Draw time remaining
+        if alert.show_seconds != -1 {
+            bar_rect := rect{
+                bg_rect.x,
+                bg_rect.y + bg_rect.height - time_bar_height,
+                bg_rect.width * (alert.remaining_seconds / alert.show_seconds),
+                time_bar_height,
+            }
+
+            add_rect(
+                &rect_cache,
+                bar_rect,
+                no_texture,
+                BLUE,
+                vec2{},
+                13,
+            )
+        }
+    }
+
+    draw_rects(&rect_cache)
+    draw_rects(&text_rect_cache)
+}
+
+
+/*
+@(private="package")
+draw_alerts :: proc() {
     if suppress_alert {
         return
     }
@@ -72,7 +202,7 @@ draw_alert :: proc() {
     )
 
     start_pen := vec2{
-        alert_x_pos,
+        alert.x_pos,
         fb_size.y - alert_height - margin,
     }
 
@@ -171,18 +301,17 @@ draw_alert :: proc() {
     draw_rects(&rect_cache)
     draw_rects(&text_rect_cache)
 }
+*/
 
 @(private="package")
-tick_alert :: proc() {
-    if len(alert_queue) == 0 {
-        suppress_alert = true
-
-        return
+tick_alerts :: proc() {
+    for alert, index in alert_queue {
+        tick_alert(alert, index)
     }
+}
 
+tick_alert :: proc(alert: ^Alert, index: int) {
     em := ui_general_font_size
-
-    alert := alert_queue[0]
 
     alert^.remaining_seconds -= frame_time
 
@@ -195,32 +324,24 @@ tick_alert :: proc() {
         300,
     )
 
-    if suppress_alert == true {
-        suppress_alert = false
-        alert_should_hide = false
-
-        alert_x_pos := 0 - alert_width
-    }
-
     if alert.remaining_seconds < 0 && alert.show_seconds != -1 {
-        alert_should_hide = true
+        alert.should_hide = true
     }
 
-    if alert_should_hide {
-        alert_x_pos = smooth_lerp(alert_x_pos, 0 - alert_width, 20, frame_time)
+    if alert.should_hide {
+        alert.x_pos = smooth_lerp(alert.x_pos, 0 - alert_width, 20, frame_time)
 
-        if int(alert_x_pos) <= int(0 - alert_width + 5) {
-            suppress_alert = true
+        if int(alert.x_pos) <= int(0 - alert_width + 5) {
 
             delete(alert.content)
             delete(alert.title)
 
-            free(alert_queue[0], alert.allocator)
+            free(alert, alert.allocator)
 
-            ordered_remove(&alert_queue, 0)
+            unordered_remove(&alert_queue, index)
         }
     } else {
-        alert_x_pos = smooth_lerp(alert_x_pos, em, 20, frame_time)
+        alert.x_pos = smooth_lerp(alert.x_pos, em, 20, frame_time)
     }
 }
 
@@ -436,8 +557,8 @@ dismiss_notification :: proc() {
 }
 
 @(private="package")
-dismiss_alert :: proc() {
-    alert_should_hide = true
+dismiss_alert :: proc(alert: ^Alert) {
+    alert^.should_hide = true
 }
 
 @(private="package")

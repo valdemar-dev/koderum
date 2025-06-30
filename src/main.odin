@@ -104,7 +104,8 @@ main :: proc() {
         tick_browser_view()
 
         tick_notifications()
-        tick_alert()
+
+        tick_alerts()
 
         update_camera()
 

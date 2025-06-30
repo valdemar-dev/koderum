@@ -46,7 +46,7 @@ render :: proc() {
     draw_buffer()
 
     draw_notification()
-    draw_alert()
+    draw_alerts()
 
     draw_buffer_info_view()
     draw_browser_view()
