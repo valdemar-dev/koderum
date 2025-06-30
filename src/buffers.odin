@@ -2027,6 +2027,8 @@ paste_string :: proc(str: string, line: int, char: int) {
         )
 
         set_buffer_cursor_pos(line, char)
+        
+        constrain_scroll_to_cursor();
     }
 
     start_line := &active_buffer.lines[line]

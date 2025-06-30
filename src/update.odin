@@ -137,15 +137,6 @@ process_lsp_notification :: proc (parsed: json.Object) {
 }
 
 set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
-    /*
-        message=Type 'number' is not assignable to type 'string'.,
-        code=2322,
-        source=typescript,
-        range=map[start=map[line=2, character=0],
-        end=map[character=19, line=2]],
-        severity=1,
-    */
-
     sort_proc :: proc(error_a, error_b: json.Value) -> int {
         error_obj, ok := error_a.(json.Object)
 
@@ -225,7 +216,9 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
         if start_line == end_line {
             if int(start_line) >= len(buffer.lines) {
-                fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
+                // used to print, safer to just ignore.
+                // can be due to poor LSP handling.
+                // fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
 
                 continue
             }
