@@ -334,33 +334,6 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
 
 }
 
-/*
-update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo: bool) {
-    fmt.println(start_line, start_char, end_line, end_char, start_byte, end_byte)
-
-    if start_line == end_line {
-        line := &buffer.lines[start_line]
-
-        remove_range(&line.characters, start_char, end_char)
-        inject_at(&line.characters, start_char, ..transmute([]u8)split_change[0])
-
-        return
-    }
-
-    first_buffer_line := &buffer.lines[start_line]
-    first_split_line := split_change[0]
-    
-    resize(&first_buffer_line.characters, start_char) 
-    inject_at(&first_buffer_line.characters, start_char, ..transmute([]u8)first_split_line)
-
-    end_buffer_line := &buffer.lines[end_line]
-    end_split_line := split_change[len(split_change) - 1]
-
-    remove_range(&end_buffer_line.characters, 0, end_char) 
-    inject_at(&end_buffer_line.characters, 0, ..transmute([]u8)end_split_line)
-}
-*/
-
 byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
     local_byte: u32 = 0
     for buf_line, i in active_buffer.lines {
@@ -749,27 +722,17 @@ draw_text_buffer :: proc() {
     }
 
     draw_autocomplete()
-    draw_highlighted_error()
     
     draw_rects(&rect_cache)
     reset_rect_cache(&rect_cache)
 
     /*
-        TEXT, especially code text (which has unknown variable background colours)
+        TEXT, especially code text (which has unknown varying background colours)
         must be drawn on a separate pass, otherwise blending is not possible.
         thanks opengl
     */
     draw_rects(&text_rect_cache)
     reset_rect_cache(&text_rect_cache)
-}
-
-draw_highlighted_error :: proc() {
-    if highlighted_error == nil {
-        return
-    }
-
-
-
 }
 
 draw_autocomplete :: proc() {
@@ -1751,6 +1714,9 @@ indent_selection :: proc(start_line: int, end_line: int) {
     chars := []rune{' ', ' ', ' ', ' '}
     chars_string := utf8.runes_to_string(chars)
     defer delete(chars_string)
+
+    start_byte := compute_byte_offset(active_buffer, start_line, 0)
+    old_rune_count := utf8.rune_count(active_buffer.lines[end_line].characters[:])
         
     text := ""
     old_bytes := 0
@@ -1770,6 +1736,73 @@ indent_selection :: proc(start_line: int, end_line: int) {
             old_bytes += 1
         }
     } 
+
+    notify_server_of_change(
+        active_buffer,
+        start_byte,
+        start_byte + old_bytes,
+        start_line,
+        0,
+        end_line,
+        old_rune_count,
+        transmute([]u8)text,
+    )
+}
+
+@(private="package")
+unindent_selection :: proc(start_line: int, end_line: int) {
+    start_line : int = start_line
+    end_line : int = end_line
+
+    if end_line < start_line {
+        temp := end_line
+        end_line = start_line
+        start_line = temp
+    }
+
+    start_byte := compute_byte_offset(active_buffer, start_line, 0)
+    old_rune_count := utf8.rune_count(active_buffer.lines[end_line].characters[:])
+
+    text := ""
+    old_bytes := 0
+
+    for i in start_line..=end_line {
+        line := &active_buffer.lines[i]
+        old_line_str := string(line.characters[:])
+        old_bytes += len(old_line_str)
+
+        count := 0
+        for c in line.characters {
+            if c == ' ' && count < 4 {
+                count += 1
+            } else {
+                break
+            }
+        }
+
+        if count > 0 {
+            remove_range(&line.characters, 0, count)
+        }
+
+        new_line_str := string(line.characters[:])
+
+        text = strings.concatenate({text, new_line_str})
+        if i < end_line {
+            text = strings.concatenate({text, "\n"})
+            old_bytes += 1
+        }
+    }
+
+    notify_server_of_change(
+        active_buffer,
+        start_byte,
+        start_byte + old_bytes,
+        start_line,
+        0,
+        end_line,
+        old_rune_count,
+        transmute([]u8)text,
+    )
 }
 
 array_is_equal :: proc(a, b: []rune) -> bool {
@@ -1794,69 +1827,6 @@ get_buffer_by_name :: proc(file_name: string) -> ^Buffer {
 
     return nil
 }
-
-@(private="package")
-unindent_selection :: proc(start_line: int, end_line: int) {
-    start_line : int = start_line
-    end_line : int = end_line
-    
-    if end_line < start_line {
-        temp := end_line
-        end_line = start_line
-        start_line = temp
-    }
-    
-    chars := []rune{' ', ' ', ' ', ' '}
-    lines := active_buffer.lines
-
-    old_lines := make([dynamic][]u8)
-    old_bytes := 0
-    for i in start_line..=end_line {
-        old := lines[i].characters[:]
-        append(&old_lines, old)
-        old_str := string(old)
-        old_bytes += len(old_str)
-        if i < end_line {
-            old_bytes += 1
-        }
-    }
-
-    text := ""
-    for idx in 0..<len(old_lines) {
-        old := old_lines[idx]
-        count := 0
-        for count < len(chars) && count < len(old) && old[count] == ' ' {
-            count += 1
-        }
-        
-        new_chars := make([dynamic]u8)
-        
-        append_elems(&new_chars, ..old[count:])
-        
-        lines[start_line + idx].characters = new_chars
-
-        new_str := string(lines[start_line + idx].characters[:])
-        if text == "" {
-            text = new_str
-        } else {
-            text = strings.concatenate({text, "\n", new_str})
-        }
-    }
-
-    old_last_len := len(old_lines[end_line - start_line])
-    new_last_len := len(lines[end_line].characters)
-
-    
-    
-    cursor_line := lines[buffer_cursor_line]
-    if buffer_cursor_char_index > len(cursor_line.characters) {
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            len(cursor_line.characters),
-        )
-    }
-}
-
 
 @(private="package")
 remove_selection :: proc(
@@ -1916,8 +1886,21 @@ remove_selection :: proc(
 }
 
 delete_line :: proc(line: int) {
+    byte_offset := compute_byte_offset(active_buffer, line, 0)
+
+    notify_server_of_change(
+        active_buffer,
+        byte_offset,
+        byte_offset + len(active_buffer.lines[line].characters)+1,
+        line,
+        0,
+        line+1,
+        0,
+        {},
+    )
+
     ordered_remove(active_buffer.lines, line)
-    
+ 
     if len(active_buffer.lines) == 0 {
         append(active_buffer.lines, BufferLine{})
     }
@@ -2006,6 +1989,103 @@ inject_line :: proc() {
     input_mode = .BUFFER_INPUT
 }
 
+@(private="package")
+close_buffer :: proc(buf: ^Buffer) {
+}
+
+@(private="package")
+paste_string :: proc(str: string, line: int, char: int) {
+    split := strings.split(str, "\n")
+
+    defer delete(split)
+
+    absolute_byte_offset := compute_byte_offset(active_buffer, line, char)
+
+    defer {
+        notify_server_of_change(
+            active_buffer,
+
+            absolute_byte_offset,
+            absolute_byte_offset,
+
+            line,
+            char,
+
+            line,
+            char,
+
+            transmute([]u8)str,
+        )
+
+        line, line_byte := byte_to_pos(
+            u32(absolute_byte_offset+len(str))
+        )
+
+        char := byte_offset_to_rune_index(
+            string(active_buffer.lines[line].characters[:]),
+            int(line_byte),
+        )
+
+        set_buffer_cursor_pos(line, char)
+    }
+
+    start_line := &active_buffer.lines[line]
+    start_chars := start_line.characters[:]
+
+    byte_offset := utf8.rune_offset(
+        string(start_chars),
+        char,
+    )
+
+    if byte_offset == -1 {
+        byte_offset = len(start_chars)
+    }
+
+    if len(split) == 1 {
+        first_paste_line := split[0]
+
+        inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
+
+        return
+    }
+
+    pre := active_buffer.lines[line].characters[:char]
+    post := strings.clone(string(active_buffer.lines[line].characters[char:]))
+
+    for i in 0..<len(split) {
+        text_line := split[i]
+
+        if i == 0 {
+            buffer_line := &active_buffer.lines[line]
+
+            inject_at(&buffer_line.characters, byte_offset, ..transmute([]u8)text_line)
+            resize(&buffer_line.characters, byte_offset + len(text_line))
+
+            continue
+        }
+
+        buffer_line_index := line + i
+
+        new_buffer_line := BufferLine{}
+
+        append(&new_buffer_line.characters, ..transmute([]u8)text_line)
+
+        if i == (len(split) - 1) {
+            append(&new_buffer_line.characters, ..transmute([]u8)post)
+        }
+
+        inject_at(active_buffer.lines, buffer_line_index, new_buffer_line)
+    }
+}
+
+
+/*
+
+
+INPUT
+
+
+*/
 @(private="package")
 handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_S) {
@@ -2233,96 +2313,6 @@ handle_buffer_input :: proc() -> bool {
  
     return false
 }
-
-@(private="package")
-close_buffer :: proc(buf: ^Buffer) {
-}
-
-@(private="package")
-paste_string :: proc(str: string, line: int, char: int) {
-    split := strings.split(str, "\n")
-
-    defer delete(split)
-
-    absolute_byte_offset := compute_byte_offset(active_buffer, line, char)
-
-    defer {
-        notify_server_of_change(
-            active_buffer,
-
-            absolute_byte_offset,
-            absolute_byte_offset,
-
-            line,
-            char,
-
-            line,
-            char,
-
-            transmute([]u8)str,
-        )
-
-        line, line_byte := byte_to_pos(
-            u32(absolute_byte_offset+len(str))
-        )
-
-        char := byte_offset_to_rune_index(
-            string(active_buffer.lines[line].characters[:]),
-            int(line_byte),
-        )
-
-        set_buffer_cursor_pos(line, char)
-    }
-
-    start_line := &active_buffer.lines[line]
-    start_chars := start_line.characters[:]
-
-    byte_offset := utf8.rune_offset(
-        string(start_chars),
-        char,
-    )
-
-    if byte_offset == -1 {
-        byte_offset = len(start_chars)
-    }
-
-    if len(split) == 1 {
-        first_paste_line := split[0]
-
-        inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
-
-        return
-    }
-
-    pre := active_buffer.lines[line].characters[:char]
-    post := strings.clone(string(active_buffer.lines[line].characters[char:]))
-
-    for i in 0..<len(split) {
-        text_line := split[i]
-
-        if i == 0 {
-            buffer_line := &active_buffer.lines[line]
-
-            inject_at(&buffer_line.characters, byte_offset, ..transmute([]u8)text_line)
-            resize(&buffer_line.characters, byte_offset + len(text_line))
-
-            continue
-        }
-
-        buffer_line_index := line + i
-
-        new_buffer_line := BufferLine{}
-
-        append(&new_buffer_line.characters, ..transmute([]u8)text_line)
-
-        if i == (len(split) - 1) {
-            append(&new_buffer_line.characters, ..transmute([]u8)post)
-        }
-
-        inject_at(active_buffer.lines, buffer_line_index, new_buffer_line)
-    }
-}
-
 @(private="package")
 handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_J) {

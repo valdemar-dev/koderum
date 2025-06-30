@@ -6,6 +6,7 @@ import ft "../../alt-odin-freetype"
 import "core:fmt"
 import "core:strings"
 import "vendor:glfw/bindings"
+import "core:mem"
 
 @(private="package")
 Alert :: struct {
@@ -14,6 +15,8 @@ Alert :: struct {
 
     show_seconds: f32,
     remaining_seconds: f32,
+
+    allocator: mem.Allocator,
 }
 
 @(private="package")
@@ -209,7 +212,10 @@ tick_alert :: proc() {
         if int(alert_x_pos) <= int(0 - alert_width + 5) {
             suppress_alert = true
 
-            free(alert_queue[0])
+            delete(alert.content)
+            delete(alert.title)
+
+            free(alert_queue[0], alert.allocator)
 
             ordered_remove(&alert_queue, 0)
         }
@@ -434,6 +440,39 @@ dismiss_alert :: proc() {
     alert_should_hide = true
 }
 
+@(private="package")
+create_alert :: proc(
+    title, content: string,
+    show_seconds: f32,
+    allocator: mem.Allocator,
+) -> ^Alert {
+    alert := new(Alert, allocator)
+
+    alert^ = Alert{
+        content = strings.clone(content),
+        title = strings.clone(title),
+
+        show_seconds = show_seconds,
+        remaining_seconds = show_seconds,
+    }
+
+    append(&alert_queue, alert)
+
+    return alert
+}
+
+@(private="package")
+edit_alert :: proc(
+    alert: ^Alert,
+    title: string,
+    content: string,
+) {
+    delete(alert.title)
+    delete(alert.content)
+
+    alert^.title = strings.clone(title)
+    alert^.content = strings.clone(content)
+}
 
 
 

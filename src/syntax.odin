@@ -24,6 +24,9 @@ tree_mutex : sync.Mutex
 @(private="file")
 completion_mutex : sync.Mutex
 
+@(private="package")
+parser_alert : ^Alert
+
 Language :: struct {
     ts_query_src: cstring,
     ts_language: ^ts.Language,
@@ -274,6 +277,24 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
 }
 
 init_parser :: proc(language: ^Language) {
+    parser_alert = create_alert(
+        "Loading parser..",
+        strings.concatenate({
+            "The parser for the language ",
+            language.parser_name,
+            " is initializing.."
+        }, context.temp_allocator),
+        -1,
+        context.allocator,
+    )
+ 
+    defer {
+        parser_alert^.show_seconds = 5
+        parser_alert^.remaining_seconds = 5
+
+        parser_alert = nil
+    }
+    
     tree_sitter_dir := strings.concatenate({
        data_dir,
        "/tree-sitter",
@@ -282,14 +303,31 @@ init_parser :: proc(language: ^Language) {
     defer delete(tree_sitter_dir)
 
     if os.exists(tree_sitter_dir) == false {
-        fmt.println("Tree-sitter was not installed yet! We shall install it now.")
+        edit_alert(
+            parser_alert,
+            "Loading parser..",
+            "Installing tree-sitter..",
+        )
 
         error := install_tree_sitter()
 
         if error != os2.ERROR_NONE {
-            panic("Tree-sitter could not be installed. Check stdout for more information.")
+            edit_alert(
+                parser_alert,
+                "Error!",
+                "Failed to install tree-sitter!",
+            )
+
+            parser_alert^.show_seconds = 10
+            parser_alert^.remaining_seconds = 10
+
+            return
         } else {
-            fmt.println("Tree-sitter was installed!")
+            edit_alert(
+                parser_alert,
+                "Success!",
+                "Tree-sitter was installed!",
+            )
         }
     }
 
@@ -302,14 +340,34 @@ init_parser :: proc(language: ^Language) {
     defer delete(parser_dir)
 
     if os.exists(parser_dir) == false {
-        fmt.println("Parser for language:", language.parser_name, "will be installed.")
+        edit_alert(
+            parser_alert,
+            "Installing parser..",
+            strings.concatenate({
+                "Installing parser for language ", language.parser_name
+            }, context.temp_allocator),
+        )
 
         error := install_parser(language, parser_dir)
 
         if error != os2.ERROR_NONE {
+            edit_alert(
+                parser_alert,
+                "Failed to install parser!",
+                strings.concatenate({
+                    "Failed to install parser for language ", language.parser_name
+                }, context.temp_allocator),
+            )
+
             panic("Parser could not be installed.")
         } else {
-            fmt.println("Installed parser!")
+            edit_alert(
+                parser_alert,
+                "Installed parser!",
+                strings.concatenate({
+                    "Successfully installed parser for language ", language.parser_name
+                }, context.temp_allocator),
+            )
         }
     }
 
@@ -340,7 +398,13 @@ init_parser :: proc(language: ^Language) {
     ts_lang := new(ts.Language)
     ts_lang^ = lang_proc()
 
-    fmt.println("Tree-sitter for language", language.parser_name)
+    edit_alert(
+        parser_alert,
+        "Success!",
+        strings.concatenate({
+            "Parser for language ", language.parser_name, " has been initialized."
+        }, context.temp_allocator),
+    )
 
     language.ts_language = ts_lang
 }

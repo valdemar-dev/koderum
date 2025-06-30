@@ -224,6 +224,12 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
         severity := error_obj["severity"].(json.Float)
 
         if start_line == end_line {
+            if int(start_line) >= len(buffer.lines) {
+                fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
+
+                continue
+            }
+
             buf_line := &buffer.lines[int(start_line)]
 
             error := BufferError{
@@ -242,6 +248,12 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
         }
 
         for cur_line in start_line..=end_line {
+            if int(cur_line) >= len(buffer.lines) {
+                fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
+
+                continue
+            }
+
             buf_line := &buffer.lines[int(cur_line)]
 
             error := BufferError{

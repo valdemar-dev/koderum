@@ -15,6 +15,7 @@ export type { Utils } from './utils';
 declare module 'custom-module' { interface Custom {} }
 export = main;
 export as namespace MyLib;
+
 // 3. Ambient Declarations
 declare function alert(message: string): void;
 declare global { interface Window { custom: any; } }

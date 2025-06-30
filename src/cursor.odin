@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:strings"
 import ft "../../alt-odin-freetype"
 
 buffer_cursor_pos := vec2{}
@@ -167,34 +168,39 @@ get_info_under_cursor :: proc() {
     }
 
     if highlighted_error == nil {
-        dismiss_alert()
-
-        error_alert = nil
-
+        if error_alert != nil {
+            dismiss_alert()
+    
+            error_alert = nil
+        }
+        
         return
     }
 
     if error_alert == nil {
         error_alert = new(Alert)
-        fmt.println("Alloc with", context.allocator)
 
         error_alert^.show_seconds = -1
+        error_alert^.allocator = context.allocator
 
         append(&alert_queue, error_alert)
+    } else {
+        delete(error_alert.title)
+        delete(error_alert.content)
     }
 
     switch highlighted_error.severity {
     case 1:
-        error_alert^.title = "Error:"
+        error_alert^.title = strings.clone("Error:")
     case 2:
-        error_alert^.title = "Warning:"
+        error_alert^.title = strings.clone("Warning:")
     case 3:
-        error_alert^.title = "Info:"
+        error_alert^.title = strings.clone("Info:")
     case 4:
-        error_alert^.title = "Hint:"
+        error_alert^.title = strings.clone("Hint:")
     }
 
-    error_alert^.content = highlighted_error.message
+    error_alert^.content = strings.clone(highlighted_error.message)
 }
 
 
