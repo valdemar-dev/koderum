@@ -61,6 +61,9 @@ Language :: struct {
 
     // Eg. tree_sitter_typescript().
     language_symbol_name: string,
+    
+    // This colour is used when no token is present.
+    filler_color: vec4,
 }
 
 languages : map[string]Language = {
@@ -568,10 +571,7 @@ init_language_server :: proc(ext: string) {
             fmt.println("Settings capabilities for LSP..")
         }
  
-        trigger_characters := (
-            capabilities_obj["completionProvider"].(json.Object)
-            ["triggerCharacters"].(json.Array)
-        )
+        trigger_characters := (capabilities_obj["completionProvider"].(json.Object)["triggerCharacters"].(json.Array))
 
         trigger_runes : [dynamic]rune = {}
         for trigger_character in trigger_characters {
@@ -683,12 +683,10 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
 
         if color == nil {
             when ODIN_DEBUG {
-                /*
                 fmt.println(
                     "Warning: Missing LSP-Token Colour for Node Type",
                     type^, 
                 )
-                */
             }
 
             continue
@@ -1291,7 +1289,123 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
     defer free(capture_index)
    
     line_number : int = -1
+    outer: for ts._query_cursor_next_capture(cursor, &match, capture_index) {
+        capture := match.captures[capture_index^]
+        /*
+        predicate_steps_count : u32
+        
+        predicate_steps := ts._query_predicates_for_pattern(
+            active_buffer.query, 
+            u32(match.pattern_index), 
+            &predicate_steps_count
+        )
+        
+        for step_index in 0..<predicate_steps_count {
+            step := predicate_steps[step_index]
+            
+            if step.type == .String {
+                value_len : u32
+                
+                step_value := ts._query_string_value_for_id(
+                    active_buffer.query, 
+                    step.value_id, 
+                    &value_len
+                )
+                
+                if step_value == "match?" {                
+                    name_len: u32
+                    name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+                    
+                    next_step := predicate_steps[step_index+1]
+                    
+                    match_string := ts._query_string_value_for_id(
+                        active_buffer.query, 
+                        next_step.value_id, 
+                        &value_len
+                    )
+                    
+                    fmt.println(match_string, name)
+                    
+                    if match_string != name {
+                        continue outer
+                    }
+                }
+            }
+        }*/
 
+        name_len: u32
+        name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+
+        node := capture.node
+        node_type := string(name)
+
+        start_point := ts.node_start_point(node)
+        end_point := ts.node_end_point(node)
+        start_byte := ts.node_start_byte(node)
+        end_byte := ts.node_end_byte(node)
+
+        start_row := int(start_point.row)
+        end_row := int(end_point.row)
+
+        for row in start_row..=end_row {
+            if row >= len(active_buffer.lines) {
+                break
+            }
+
+            line := &active_buffer.lines[row]
+
+            if row > line_number {
+                line_number = row
+                clear(&line.tokens)
+            }
+
+            start_rune := row == start_row ? int(start_point.col) : 0
+            end_rune := row == end_row ? int(end_point.col) : len(line.characters)
+            
+            length := end_rune - start_rune
+            if length <= 0 {
+                continue
+            }
+
+            current_node_type := node_type
+            current_priority: u8 
+
+            if active_language_server.override_node_type != nil {
+                active_language_server.override_node_type(
+                    &current_node_type, node,
+                    active_buffer.content[:],
+                    &start_point, &end_point,
+                    &line.tokens, &current_priority,
+                )
+            }
+
+            if current_node_type == "SKIP" {
+                continue
+            }
+
+            color := &active_language_server.language.ts_colors[current_node_type]
+
+            if color == nil {
+                continue
+            }
+            
+            if len(line.tokens) > 0 {
+                if line.tokens[len(line.tokens)-1].char == i32(start_rune) {
+                    resize(&line.tokens, len(line.tokens)-1)
+                }
+            }
+
+            append(&line.tokens, Token{
+                char = i32(start_rune),
+                length = i32(length),
+                color = color^,
+                priority = current_priority,
+            })
+        }
+    }
+    
+    
+    /*
     for ts._query_cursor_next_capture(cursor, &match, capture_index) {
         capture := match.captures[capture_index^]
 
@@ -1359,6 +1473,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
             })
         }
     }
+    */
 }
 
 set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
@@ -1371,6 +1486,10 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
 
         return nil, -1
     }
+    
+    sort_proc :: proc(token_a, token_b: Token) -> int {
+        return int(token_a.char - token_b.char)
+    }
 
     for &token in lsp_tokens {
         if int(token.line) >= len(buffer.lines) do continue
@@ -1379,16 +1498,19 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
 
         overlapping_token, index := get_overlapping_token(line.tokens, token.char)
 
-        if overlapping_token == nil {
+        if overlapping_token != nil {
+            if overlapping_token.priority > token.priority {
+                continue
+            }
+    
+            line.tokens[index] = token
+        
             continue
         }
-
-        if overlapping_token.priority > token.priority {
-            continue
-        }
-
-        line.tokens[index] = token
-
+        
+        append(&line.tokens, token)
+        
+        sort.quick_sort_proc(line.tokens[:], sort_proc)
     }
 }
 

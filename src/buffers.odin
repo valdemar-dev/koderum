@@ -816,7 +816,11 @@ draw_autocomplete :: proc() {
         vec2{},
         9,
     )
-
+    
+    if selected_completion_hit >= len(completion_hits) {
+        return
+    }
+    
     first_hit := &completion_hits[selected_completion_hit]
 
     if first_hit == nil {
@@ -1858,6 +1862,8 @@ remove_selection :: proc(
     )
 
     defer {
+        defer constrain_scroll_to_cursor()
+        
         notify_server_of_change(
             active_buffer,
 
@@ -2006,6 +2012,8 @@ paste_string :: proc(str: string, line: int, char: int) {
 
     absolute_byte_offset := compute_byte_offset(active_buffer, line, char)
 
+    defer constrain_scroll_to_cursor()
+        
     defer {
         notify_server_of_change(
             active_buffer,

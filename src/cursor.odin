@@ -184,9 +184,6 @@ get_info_under_cursor :: proc() {
         error_alert^.allocator = context.allocator
 
         append(&alert_queue, error_alert)
-    } else {
-        delete(error_alert.title)
-        delete(error_alert.content)
     }
 
     switch highlighted_error.severity {

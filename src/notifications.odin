@@ -332,9 +332,8 @@ tick_alert :: proc(alert: ^Alert, index: int) {
         alert.x_pos = smooth_lerp(alert.x_pos, 0 - alert_width, 20, frame_time)
 
         if int(alert.x_pos) <= int(0 - alert_width + 5) {
-
-            delete(alert.content)
-            delete(alert.title)
+            delete(alert.content, alert.allocator)
+            delete(alert.title, alert.allocator)
 
             free(alert, alert.allocator)
 

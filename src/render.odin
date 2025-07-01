@@ -605,7 +605,9 @@ add_code_text :: proc(
         } else if token != nil {
             color = token.color
         } else if active_language_server != nil {
-            color = ORANGE
+            color = active_language_server.language.filler_color
+        } else if active_language_server == nil {
+            color = TEXT_MAIN //ORANGE
         }
 
         if error != nil && (error.severity == 4) {

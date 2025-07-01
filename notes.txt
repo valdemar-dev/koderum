@@ -9,6 +9,8 @@ todo:
     - reopening filebrowser should uncache all files
     - consolidate buffer insert changes into one change on ESC
     - we can probably just do JSON for this
+        - add "do overwrite token if found" to lsp options
+    
     - maybe have two trees for parsing, threaded and single-threaded
     
     - implement ui-scaling. values should be math.rounded,
@@ -17,3 +19,4 @@ todo:
 
 bugs:    
     - hl only works for 1 item per line
+    - swapping between files does not change the active language server

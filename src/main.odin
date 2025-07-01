@@ -167,12 +167,12 @@ main :: proc() {
     }
 
     delete(default_cwd)
-    delete(active_language_servers)
     delete(font_list)
     delete(delimiter_runes)
     delete(search_ignored_dirs)
     delete(buffers)
-
+    delete(active_language_servers)
+    
     for request in requests {
         fmt.println(request)
 

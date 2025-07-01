@@ -19,25 +19,59 @@ ts_odin_colors : map[string]vec4 = {
     "float"=LIGHT_GREEN,
     "string.escape"=YELLOW,
     "error"=RED,
-    "identifier"=ORANGE,
     "function"=YELLOW,
-    "field"=LIGHT_ORANGE,
+    "variable.usage"=PINK,    
+    
+    "field"=LIGHT_ORANGE,    
+    
+    "package.name"=ORANGE,
+    "build.tag"=CYAN,
+    
+    //"variable.builtin"=PINK,
+    
+    "variable"=ORANGE,
+}
+
+odin_lsp_colors := map[string]vec4{
+    "function"=YELLOW,
+    "variable"=ORANGE,
+    "type"=CYAN,
+    "namespace"=DARK_GREEN,
+    "enum"=RED,
+    "enumMember"=LIGHT_RED,
+    "struct"=PINK,
+    "parameter"=ORANGE,
+    "property"=LIGHT_ORANGE,
 }
 
 ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
 ;(identifier) @identifier
+
+;(call_expression
+;  function: (identifier) @function)
+
+(identifier) @variable
+(#eq? @variable "context")
+
+(unary_expression
+  (identifier) @variable)
+
+(build_tag) @build.tag
 
 (member_expression
   (_)
   (identifier) @field)
 
 (call_expression
-  function: (identifier) @function)
+  function: (identifier) @function
+  (#prec 2))
 
-;[
-;  (calling_convention)
-;  (tag)
-;] @preproc
+(package_declaration
+  (identifier) @package.name)
+
+(attribute
+  (identifier) @keyword)
+
 [
   "import"
   "package"
@@ -159,7 +193,6 @@ ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
   "..<"
   "?"
 ] @operator
-
 [ "{" "}" ] @punctuation.bracket
 [ "(" ")" ] @punctuation.bracket
 [ "[" "]" ] @punctuation.bracket
@@ -182,21 +215,7 @@ ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
   (comment)
   (block_comment)
 ] @comment
-
-(ERROR) @error
 `, ""}));
-
-odin_lsp_colors := map[string]vec4{
-    "function"=YELLOW,
-
-    "variable"=ORANGE,
-
-    "type"=CYAN,
-    "namespace"=ORANGE,
-
-    "enum"=RED,
-    "enumMember"=LIGHT_RED,
-}
 
 odin_override_node_type :: proc(
     node_type: ^string,
