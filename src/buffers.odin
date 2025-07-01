@@ -1326,7 +1326,12 @@ handle_text_input :: proc() -> bool {
             get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
         }
 
-        index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+        rune_index := clamp(buffer_cursor_char_index, 0, len(line.characters))
+        index := utf8.rune_offset(string(line.characters[:]), rune_index)
+
+        if index == -1 {
+            index = len(line.characters)
+        }
         
         after_cursor := line.characters[index:]
         before_cursor := line.characters[:index] 
