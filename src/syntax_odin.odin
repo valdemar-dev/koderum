@@ -47,8 +47,8 @@ odin_lsp_colors := map[string]vec4{
 ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
 ;(identifier) @identifier
 
-;(call_expression
-;  function: (identifier) @function)
+(call_expression
+  function: (identifier) @function)
 
 (identifier) @variable
 (#eq? @variable "context")
