@@ -1,4 +1,5 @@
 today:
+    - add priority checking :D
 
 high priority todo:
 

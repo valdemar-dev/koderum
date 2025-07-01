@@ -84,6 +84,8 @@ languages : map[string]Language = {
         parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
 
         language_symbol_name="tree_sitter_typescript",
+        
+        filler_color=ORANGE,
     },
     ".odin"=Language{
         ts_query_src=ts_odin_query_src,
@@ -101,6 +103,8 @@ languages : map[string]Language = {
         parser_link="https://github.com/tree-sitter-grammars/tree-sitter-odin",
 
         language_symbol_name="tree_sitter_odin",
+        
+        filler_color=ORANGE,
     }
 }
 
@@ -1291,7 +1295,6 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
     line_number : int = -1
     outer: for ts._query_cursor_next_capture(cursor, &match, capture_index) {
         capture := match.captures[capture_index^]
-        /*
         predicate_steps_count : u32
         
         predicate_steps := ts._query_predicates_for_pattern(
@@ -1331,7 +1334,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
                     }
                 }
             }
-        }*/
+        }
 
         name_len: u32
         name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
