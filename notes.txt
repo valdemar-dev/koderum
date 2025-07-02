@@ -15,8 +15,6 @@ todo:
     - maybe have two trees for parsing, threaded and single-threaded
     - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.
     
-    - implement ui-scaling. values should be math.rounded,
-      however, fractional values should be allowed.
     - ui-rework, need some fancy shmancier boxes and stuff.
 
 bugs:    

@@ -66,7 +66,7 @@ draw_ui :: proc() {
     one_width_percentage := fb_size.x / 100
     one_height_percentage := fb_size.y / 100
 
-    margin := one_width_percentage * 20
+    margin := one_width_percentage * 10
 
     status_bar_rect = rect{
         margin,
@@ -81,13 +81,32 @@ draw_ui :: proc() {
         status_bar_rect.width + 30,
         status_bar_rect.height + 20,
     }
+    
+    line_thickness := math.round_f32(font_base_px * line_thickness_em)
+    
+    {
+        border_rect := rect{
+            status_bar_bg_rect.x - line_thickness,
+            status_bar_bg_rect.y - line_thickness,
+            status_bar_bg_rect.width + line_thickness * 2,
+            status_bar_bg_rect.height + line_thickness * 2,
+        }
+        
+        add_rect(&rect_cache,
+            border_rect,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            ui_z_index,
+        )
+    }
 
     add_rect(&rect_cache,
         status_bar_bg_rect,
         no_texture,
-        BG_MAIN_20,
+        BG_MAIN_10,
         vec2{},
-        ui_z_index,
+        ui_z_index + .1,
     )
 
     text_pos := vec2{
@@ -161,7 +180,7 @@ draw_ui :: proc() {
                 status_bar_bg_rect.height,
             },
             no_texture,
-            BG_MAIN_30,
+            BG_MAIN_20,
             vec2{},
             ui_z_index + 2,
         )

@@ -942,6 +942,8 @@ open_file :: proc(file_name: string) {
             existing_file.cursor_line,
             existing_file.cursor_char_index,
         )
+        
+        lsp_handle_file_open()
 
         return
     }
@@ -1014,7 +1016,6 @@ open_file :: proc(file_name: string) {
     constrain_scroll_to_cursor() 
 
     thread.run(lsp_handle_file_open)
-
 }
 
 close_file :: proc(file_name: string) -> (ok: bool) {
@@ -2218,14 +2219,14 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_text_scale = clamp(buffer_text_scale + .1, buffer_text_scale, 100)
 
-        update_fonts()
-
-        constrain_scroll_to_cursor()
-
         set_buffer_cursor_pos(
             buffer_cursor_line,
             buffer_cursor_char_index,
         )
+        
+        update_fonts()
+
+        constrain_scroll_to_cursor()
 
         return false
     }
@@ -2233,14 +2234,14 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_SLASH) {
         buffer_text_scale = clamp(buffer_text_scale - .1, .1, buffer_text_scale)
 
-        update_fonts()
-
-        constrain_scroll_to_cursor()
-
         set_buffer_cursor_pos(
             buffer_cursor_line,
             buffer_cursor_char_index,
         )
+        
+        update_fonts()
+        
+        constrain_scroll_to_cursor()
 
         return false
     }

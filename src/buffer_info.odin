@@ -40,10 +40,11 @@ draw_buffer_info_view :: proc() {
     }
 
     reset_rect_cache(&rect_cache)
-
+    
+    
     pos_rect := rect{
         buffer_info_view_x,
-        50,
+        font_base_px * 5,
         0,
         0,
     }
@@ -69,8 +70,7 @@ draw_buffer_info_view :: proc() {
     if size.x > buffer_info_view_width {
         buffer_info_view_width = size.x
     }
-    
-    
+        
     pen.y += normal_text + padding
 
     size = add_text_measure(&rect_cache,

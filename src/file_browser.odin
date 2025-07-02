@@ -65,6 +65,10 @@ handle_browser_input :: proc() {
             target := item_offset
 
             file := found_files[target]
+            
+            if os.exists(file) == false {
+                return
+            }
 
             if os.is_dir(file) {
                 err := os.remove_directory(file)
@@ -76,6 +80,13 @@ handle_browser_input :: proc() {
                 err := os.remove(file)
 
                 if err != os.General_Error.None {
+                    create_alert(
+                        "Failed to delete file.",
+                        "This is most likely due to missing permissions.",
+                        5,
+                        context.allocator,
+                    )
+                    
                     return
                 }
             }
@@ -86,8 +97,6 @@ handle_browser_input :: proc() {
             attempting_file_deletion = false
 
             set_found_files()
-
-            delete(dir)
 
             return
         }
@@ -180,7 +189,7 @@ handle_browser_input :: proc() {
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
 
-        set_found_files()
+        // set_found_files()
 
         return
     }
@@ -188,7 +197,7 @@ handle_browser_input :: proc() {
     if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset - 1, 0, len(found_files)-1)
 
-        set_found_files()
+        // set_found_files()
 
         return
     }
@@ -286,6 +295,7 @@ toggle_browser_view :: proc() {
 }
 
 set_found_files :: proc() {
+    clear(&cached_dirs)
     clear(&found_files)
 
     dirs_searched := 0
@@ -333,11 +343,6 @@ set_found_files :: proc() {
                 }
             }
 
-            file_index += 1
-            if file_index >= 50 {
-                break
-            }
-
             if hit.is_dir {
                 skip := false
                 for ign in search_ignored_dirs {
@@ -350,6 +355,14 @@ set_found_files :: proc() {
                     append_elem(&queue, hit.fullpath)
                 }
             }
+        }
+        
+        // if after reading a directory,
+        // check if we exceeded the maximum limit of files.
+        // this lets big folders get ever hit in.
+        file_index += 1
+        if file_index >= 50 {
+            break
         }
     }
 }
