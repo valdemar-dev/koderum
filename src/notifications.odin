@@ -7,6 +7,7 @@ import "core:fmt"
 import "core:strings"
 import "vendor:glfw/bindings"
 import "core:mem"
+import "core:math"
 
 @(private="package")
 Alert :: struct {
@@ -48,19 +49,22 @@ draw_alerts :: proc() {
         return
     }
 
-    em := ui_general_font_size
+    em := font_base_px
     margin := em
 
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
 
     pen_y := fb_size.y - margin
+    
+    small_text := font_base_px * small_text_scale
+    line_thickness := font_base_px * line_thickness_em
 
     for alert in alert_queue {
-        content_size := measure_text(ui_smaller_font_size, alert.content, 500)
-        title_size := measure_text(ui_smaller_font_size, alert.title)
+        content_size := measure_text(small_text, alert.content, 500)
+        title_size := measure_text(small_text, alert.title)
 
-        time_bar_height := alert.show_seconds != -1 ? general_line_thickness_px : 0
+        time_bar_height := alert.show_seconds != -1 ? small_text * line_thickness_em : 0
         gap : f32 = 5
 
         alert_height := content_size.y + title_size.y + time_bar_height + gap + (em * 2)
@@ -96,10 +100,10 @@ draw_alerts :: proc() {
         )
 
         border_rect := rect{
-            bg_rect.x - general_line_thickness_px,
-            bg_rect.y - general_line_thickness_px,
-            bg_rect.width + (general_line_thickness_px * 2),
-            bg_rect.height + (general_line_thickness_px * 2),
+            bg_rect.x - line_thickness,
+            bg_rect.y - line_thickness,
+            bg_rect.width + (line_thickness * 2),
+            bg_rect.height + (line_thickness * 2),
         }
 
         add_rect(
@@ -120,12 +124,12 @@ draw_alerts :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_MAIN,
-            ui_smaller_font_size,
+            small_text,
             alert.title,
             13,
         )
 
-        error := ft.set_pixel_sizes(primary_font, 0, u32(ui_smaller_font_size))
+        error := ft.set_pixel_sizes(primary_font, 0, u32(small_text))
         assert(error == .Ok)
 
         ascend := primary_font.size.metrics.ascender >> 6
@@ -137,7 +141,7 @@ draw_alerts :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_DARKER,
-            ui_smaller_font_size,
+            small_text,
             alert.content,
             13,
             false,
@@ -170,139 +174,6 @@ draw_alerts :: proc() {
     draw_rects(&text_rect_cache)
 }
 
-
-/*
-@(private="package")
-draw_alerts :: proc() {
-    if suppress_alert {
-        return
-    }
-
-    em := ui_general_font_size
-    margin := em
-
-    reset_rect_cache(&rect_cache)
-    reset_rect_cache(&text_rect_cache)
-
-    alert := alert_queue[0]
-
-    content_size := measure_text(ui_smaller_font_size, alert.content, 500)
-
-    title_size := measure_text(ui_smaller_font_size, alert.title)
-
-    time_bar_height := alert.show_seconds != -1 ? general_line_thickness_px : 0
-
-    gap : f32 = 5
-
-    alert_height := content_size.y + title_size.y + time_bar_height + gap + (em * 2)
-
-    alert_width := max(
-        max(content_size.x, title_size.x) + (em * 2),
-        300,
-    )
-
-    start_pen := vec2{
-        alert.x_pos,
-        fb_size.y - alert_height - margin,
-    }
-
-    bg_rect := rect{
-        start_pen.x,
-        start_pen.y,
-        alert_width,
-        alert_height,
-    }
-
-    // Draw Background,
-    {
-        add_rect(
-            &rect_cache,
-            bg_rect,
-            no_texture,
-            BG_MAIN_10,
-            vec2{},
-            12,
-        )
-
-        border_rect := rect{
-            bg_rect.x - general_line_thickness_px,
-            bg_rect.y - general_line_thickness_px,
-            bg_rect.width + (general_line_thickness_px * 2),
-            bg_rect.height + (general_line_thickness_px * 2),
-        }
-
-        add_rect(
-            &rect_cache,
-            border_rect,
-            no_texture,
-            BG_MAIN_30,
-            vec2{},
-            12,
-        )
-    }
-
-    // Draw Content
-    {
-        pen := vec2{
-            start_pen.x + em,
-            start_pen.y + em,
-        }
-
-        add_text(&text_rect_cache,
-            pen,
-            TEXT_MAIN,
-            ui_smaller_font_size,
-            alert.title,
-            13,
-        )
-
-        error := ft.set_pixel_sizes(primary_font, 0, u32(ui_smaller_font_size))
-        assert(error == .Ok)
-
-        ascend := primary_font.size.metrics.ascender >> 6
-        descend := primary_font.size.metrics.descender >> 6
-
-        line_height := f32(ascend - descend)
-
-        pen.y += line_height + gap 
-
-        add_text(&text_rect_cache,
-            pen,
-            TEXT_DARKER,
-            ui_smaller_font_size,
-            alert.content,
-            13,
-            false,
-            500,
-            true,
-            true,
-        )
-    }
-
-    // Draw time remaining
-    if alert.show_seconds != -1 {
-        bar_rect := rect{
-            bg_rect.x,
-            bg_rect.y + bg_rect.height - time_bar_height,
-            bg_rect.width * (alert.remaining_seconds / alert.show_seconds),
-            time_bar_height,
-        }
-
-        add_rect(
-            &rect_cache,
-            bar_rect,
-            no_texture,
-            BLUE,
-            vec2{},
-            13,
-        )
-    }
-
-    draw_rects(&rect_cache)
-    draw_rects(&text_rect_cache)
-}
-*/
-
 @(private="package")
 tick_alerts :: proc() {
     for alert, index in alert_queue {
@@ -311,13 +182,14 @@ tick_alerts :: proc() {
 }
 
 tick_alert :: proc(alert: ^Alert, index: int) {
-    em := ui_general_font_size
+    em := font_base_px * normal_text_scale
+    small_text := font_base_px * small_text_scale
 
     alert^.remaining_seconds -= frame_time
 
-    content_size := measure_text(ui_smaller_font_size, alert.content, 500)
+    content_size := measure_text(small_text, alert.content, 500)
 
-    title_size := measure_text(ui_smaller_font_size, alert.title)
+    title_size := measure_text(small_text, alert.title)
 
     alert_width := max(
         max(content_size.x, title_size.x) + (em * 2),
@@ -350,23 +222,27 @@ draw_notification :: proc() {
         return
     }
 
-    em := ui_general_font_size
+    em := math.round_f32(font_base_px * normal_text_scale)
+    normal_text := em
     margin := em
+    small_text := math.round_f32(font_base_px * small_text_scale)
 
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
 
     notification := notification_queue[0]
 
-    content_size := measure_text(ui_smaller_font_size, notification.content)
+    line_thickness := math.round_f32(font_base_px * line_thickness_em)
+        
+    content_size := measure_text(small_text, notification.content)
 
     copy_text_size := notification.copy_text == "" ? vec2{0,0} :
-        measure_text(ui_smaller_font_size, notification.content)
+        measure_text(small_text, notification.content)
 
-    title_size := measure_text(ui_general_font_size, notification.title)
+    title_size := measure_text(em, notification.title)
 
     dismiss_size := measure_text(
-        ui_smaller_font_size,
+        small_text,
         "Dismiss: Ctrl + Esc\nCopy Command: Ctrl + Shift + C",
     )
 
@@ -401,10 +277,10 @@ draw_notification :: proc() {
         )
 
         border_rect := rect{
-            bg_rect.x - general_line_thickness_px,
-            bg_rect.y - general_line_thickness_px,
-            bg_rect.width + (general_line_thickness_px * 2),
-            bg_rect.height + (general_line_thickness_px * 2),
+            bg_rect.x - line_thickness,
+            bg_rect.y - line_thickness,
+            bg_rect.width + (line_thickness * 2),
+            bg_rect.height + (line_thickness * 2),
         }
 
         add_rect(
@@ -427,12 +303,12 @@ draw_notification :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_MAIN,
-            ui_general_font_size,
+            normal_text,
             notification.title,
             13,
         )
 
-        error := ft.set_pixel_sizes(primary_font, 0, u32(ui_general_font_size))
+        error := ft.set_pixel_sizes(primary_font, 0, u32(normal_text))
         assert(error == .Ok)
 
         ascend := primary_font.size.metrics.ascender >> 6
@@ -445,7 +321,7 @@ draw_notification :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_DARKER,
-            ui_smaller_font_size,
+            small_text,
             notification.content,
             13,
             false,
@@ -459,7 +335,7 @@ draw_notification :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_DARKER,
-            ui_smaller_font_size,
+            small_text,
             notification.copy_text,
             13,
             false,
@@ -477,7 +353,7 @@ draw_notification :: proc() {
                 bg_rect.y + bg_rect.height - dismiss_size.y - margin,
             },
             TEXT_DARKEST,
-            ui_smaller_font_size,
+            small_text,
             "Dismiss: Ctrl + Esc\nCopy Command: Ctrl + Shift + C",
             14,
             false,
@@ -506,12 +382,15 @@ tick_notifications :: proc() {
         x_pos := fb_size.x
     }
 
-    em := ui_general_font_size
+    normal_text := math.round_f32(font_base_px * normal_text_scale)
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    
+    em := normal_text
 
     notification := notification_queue[0]
 
-    content_size := measure_text(ui_smaller_font_size, notification.content)
-    title_size := measure_text(ui_general_font_size, notification.title)
+    content_size := measure_text(small_text, notification.content)
+    title_size := measure_text(normal_text, notification.title)
 
     notification_width := max(
         max(content_size.x, title_size.x) + (em * 2),

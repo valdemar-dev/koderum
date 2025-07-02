@@ -4,14 +4,21 @@ font = /usr/share/fonts/noto/NotoSansMono-Regular.ttf
 font = /usr/share/fonts/liberation/LiberationMono-Regular.ttf
 font = /usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf
 
-ui_general_font_size = 16
-ui_smaller_font_size = 14
-ui_bigger_font_size = 24
+[user interface]
+font_base_px = 20
 
-buffer_font_size = 16
+small_text_scale = .7
+normal_text_scale = .8
+large_text_scale = 1
+buffer_text_scale = .8
+line_thickness_em = 0.05
+line_count_padding_em = .5
+cursor_edge_padding_em = 5
+
+ui_scale = 1
 
 [cursor]
-cursor_edge_padding = 200
+
 do_animate_cursor = true
 do_constrain_cursor_to_scroll = true
 
@@ -30,10 +37,6 @@ do_highlight_current_line = true
 default_cwd = /home/v/prog/projects/koderum
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
 delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";
-
-[style]
-general_line_thickness_px = 1
-line_count_padding_px = 4
 
 [search]
 search_ignored_dir = node_modules

@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:strings"
 import "core:os"
 import "core:time"
+import "core:math"
 
 show_buffer_info_view := false
 
@@ -53,11 +54,14 @@ draw_buffer_info_view :: proc() {
         pos_rect.x + padding,
         pos_rect.y + padding,
     }
-
+    
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    normal_text := math.round_f32(font_base_px * normal_text_scale)
+    
     size := add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_general_font_size,
+        normal_text,
         "File Info",
         start_z + 2,
     )
@@ -65,13 +69,14 @@ draw_buffer_info_view :: proc() {
     if size.x > buffer_info_view_width {
         buffer_info_view_width = size.x
     }
-
-    pen.y += ui_general_font_size + padding
+    
+    
+    pen.y += normal_text + padding
 
     size = add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         active_buffer.info.fullpath,
         start_z + 2
     )
@@ -80,12 +85,12 @@ draw_buffer_info_view :: proc() {
         buffer_info_view_width = size.x
     }
 
-    pen.y += ui_smaller_font_size + padding
+    pen.y += small_text + padding
 
     size = add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         strings.concatenate({"CWD: ", cwd}, context.temp_allocator),
         start_z + 2
     )
@@ -94,9 +99,7 @@ draw_buffer_info_view :: proc() {
         buffer_info_view_width = size.x
     }
 
-    pen.y += ui_smaller_font_size + padding
-
-
+    pen.y += small_text + padding
 
     strings.write_string(&sb, "Bytes: ")
     strings.write_i64(&sb, active_buffer.info.size)
@@ -107,7 +110,7 @@ draw_buffer_info_view :: proc() {
     size = add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         size_string,
         start_z + 2
     )
@@ -116,7 +119,7 @@ draw_buffer_info_view :: proc() {
         buffer_info_view_width = size.x
     }
 
-    pen.y += ui_smaller_font_size + padding
+    pen.y += small_text + padding
 
     strings.write_string(&sb, "Created: ")
 
@@ -141,7 +144,7 @@ draw_buffer_info_view :: proc() {
     size = add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         created_string,
         start_z + 2
     )
@@ -150,7 +153,7 @@ draw_buffer_info_view :: proc() {
         buffer_info_view_width = size.x
     }
 
-    pen.y += ui_smaller_font_size + padding
+    pen.y += small_text + padding
 
     strings.write_string(&sb, "Modified: ")
 
@@ -175,7 +178,7 @@ draw_buffer_info_view :: proc() {
     size = add_text_measure(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         edited_string,
         start_z + 2
     )
@@ -184,7 +187,7 @@ draw_buffer_info_view :: proc() {
         buffer_info_view_width = size.x
     }
 
-    pen.y += ui_smaller_font_size + padding
+    pen.y += small_text + padding
 
 
     add_rect(&rect_cache,

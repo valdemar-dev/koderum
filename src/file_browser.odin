@@ -5,6 +5,7 @@ import "core:os"
 import fp "core:path/filepath"
 import "core:strings"
 import "core:fmt"
+import "core:math"
 import "core:unicode/utf8"
 import "vendor:glfw"
 
@@ -360,87 +361,6 @@ initial_dir :: proc() -> string {
     return fp.dir(search_term)
 }
 
-
-/*
-set_found_files :: proc() {
-    clear(&found_files)
-
-    dirs_searched := 0
-    file_index := 0
-
-    get_dir_files :: proc(
-        dir: string,
-        glob: string, 
-        dirs_searched: ^int, 
-        file_index: ^int
-    ) {
-        fd, err := os.open(dir)
-        defer os.close(fd)
-
-        hits : []os.File_Info
-
-        if dir in cached_dirs {
-            hits = cached_dirs[dir]
-        } else {
-            if dirs_searched^ >= 20 {
-                return
-            }
-
-            dirs_searched^ += 1
-
-            hits, err = os.read_dir(fd,-1)
-
-            cached_dirs[dir] = hits
-        }
-
-        hit_loop: for hit in hits {
-            if strings.contains(hit.name, glob) {
-                if hit.name == glob {
-                    inject_at(&found_files, 0, hit.fullpath)
-                } else {
-                    append_elem(&found_files, hit.fullpath)
-                }
-            }
-
-            file_index^ += 1
-
-            if hit.is_dir == false {
-                continue
-            }
-
-            if file_index^ >= 50 {
-                break
-            }
-            
-            for dir in search_ignored_dirs {
-                fmt.println(dir)
-                if hit.name == dir {
-                    continue hit_loop
-                }
-            }
-
-            get_dir_files(hit.fullpath, glob, dirs_searched, file_index) 
-        } 
-    }
-
-    dir : string
-
-    base := fp.base(search_term)
-
-    if os.is_dir(search_term) {
-        base = "."
-
-        dir = strings.clone(search_term)
-    } else {
-        dir = fp.dir(search_term)
-    }
-
-    defer delete(dir)
-
-    get_dir_files(dir, base, &dirs_searched, &file_index)
-}
-*/
-
 @(private="package")
 browser_append_to_search_term :: proc(key: rune) {
     if attempting_file_deletion {
@@ -478,6 +398,10 @@ draw_browser_view :: proc() {
     if suppress {
         return
     }
+    
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    normal_text := math.round_f32(font_base_px * normal_text_scale)
+    large_text := math.round_f32(font_base_px * large_text_scale)
 
     one_width_percentage := fb_size.x / 100
     one_height_percentage := fb_size.y / 100
@@ -520,47 +444,47 @@ draw_browser_view :: proc() {
             bg_rect.x,
             bg_rect.y,
             bg_rect.width,
-            (ui_general_font_size) + padding * (is_cwd ? 3 : 2),
+            (normal_text) + padding * (is_cwd ? 3 : 2),
         },
         no_texture,
         BG_MAIN_30,
         vec2{},
         start_z + 1,
     )
-
+    
     add_text(&rect_cache,
         pen,
         TEXT_MAIN,
-        ui_smaller_font_size,
+        small_text,
         search_term,
         start_z + 2,
         true,
         bg_rect.width - padding * 2,
     )
 
-    pen.y += (ui_general_font_size + 5)
+    pen.y += (normal_text + 5)
 
     if is_cwd {
         add_text(&rect_cache,
             pen,
             TEXT_DARKER,
-            ui_smaller_font_size,
+            normal_text,
             "CWD",
             start_z + 2,
             true,
             bg_rect.width - padding * 2,
         )
 
-        pen.y += ui_smaller_font_size + (padding * 2)
+        pen.y += small_text + (padding * 2)
     } else {
-        pen.y += ui_smaller_font_size + (padding)
+        pen.y += small_text + (padding)
     }
 
     if len(search_term) == 0 {
         add_text(&rect_cache,
             pen,
             TEXT_DARKER,
-            ui_general_font_size,
+            normal_text,
             "Enter a drive or directory.",
             start_z + 1,
         )
@@ -574,7 +498,7 @@ draw_browser_view :: proc() {
         add_text(&rect_cache,
             pen,
             TEXT_MAIN,
-            ui_general_font_size,
+            normal_text,
             "Are you sure you want to delete this file?\nCtrl+Enter to confirm, ESC to cancel.",
             start_z + 1,
             false,
@@ -592,7 +516,7 @@ draw_browser_view :: proc() {
         add_text(&rect_cache,
             pen,
             TEXT_MAIN,
-            ui_general_font_size,
+            normal_text,
             "Enter the new path for this file.\nPress Enter to confirm, ESC to cancel.",
             start_z + 1,
             false,
@@ -613,14 +537,14 @@ draw_browser_view :: proc() {
             continue
         }
 
-        font_size : f32 = (index == start_idx) ? ui_bigger_font_size : ui_smaller_font_size
+        font_size : f32 = (index == start_idx) ? large_text : small_text
 
         gap := font_size * .5
 
         add_text(&rect_cache,
             pen,
             TEXT_MAIN,
-            ui_general_font_size,
+            normal_text,
             found_file[len(dir):],
             start_z + 1,
             true,

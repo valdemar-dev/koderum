@@ -83,16 +83,23 @@ Buffer :: struct {
     height: f32,
 
     file_name: string,
+
     ext: string,
+
     info: os.File_Info,
+
     is_saved: bool,
+
     cursor_line: int,
     cursor_char_index: int,
+    //LSP
     version: int,
-    tokens: [dynamic]Token,
-    previous_tree: ts.Tree,
-    content: [dynamic]u8,
+
     query: ts.Query,
+    previous_tree: ts.Tree,
+
+    content: [dynamic]u8,
+
     first_drawn_line: int,
     last_drawn_line: int,
 
@@ -476,7 +483,7 @@ draw_buffer_line :: proc(
 ) -> vec2 {
     pen := input_pen
 
-    true_font_height := ascender - descender
+    true_font_height := (ascender - descender)
 
     line_height := true_font_height
 
@@ -503,9 +510,7 @@ draw_buffer_line :: proc(
         buffer,
     )
 
-    if (
-        input_mode == .HIGHLIGHT
-    ) {
+    if (input_mode == .HIGHLIGHT) {
         add_rect(&rect_cache,
             rect{
                 line_pos.x + highlight_offset,
@@ -535,9 +540,9 @@ draw_buffer_line :: proc(
         add_rect(&rect_cache,
             rect{
                 0,
-                line_pos.y + true_font_height - general_line_thickness_px,
+                line_pos.y + true_font_height - (font_base_px * line_thickness_em),
                 fb_size.x,
-                general_line_thickness_px,
+                font_base_px * line_thickness_em,
             },
             no_texture,
             BG_MAIN_30,
@@ -550,7 +555,7 @@ draw_buffer_line :: proc(
                 0,
                 line_pos.y,
                 fb_size.x,
-                general_line_thickness_px,
+                font_base_px * line_thickness_em,
             },
             no_texture,
             BG_MAIN_30,
@@ -561,7 +566,7 @@ draw_buffer_line :: proc(
 
     if do_draw_line_count {
         line_pos := vec2{
-            pen.x + line_count_padding_px,
+            pen.x + font_base_px * line_count_padding_em,
             pen.y - active_buffer.scroll_y
         }
 
@@ -594,8 +599,10 @@ draw_no_buffer :: proc() {
         vec2{},
         -2,
     )
-
-    size := measure_text(ui_bigger_font_size, "Press O to open a file.")
+    
+    big_text := math.round_f32(font_base_px * large_text_scale)
+    
+    size := measure_text(big_text, "Press O to open a file.")
 
     add_text(&text_rect_cache,
         vec2{
@@ -603,7 +610,7 @@ draw_no_buffer :: proc() {
             fb_size.y / 2 - size.y / 2,
         },
         TEXT_MAIN,
-        ui_bigger_font_size,
+        big_text,
         "Press O to open a file.",
     )
 
@@ -633,18 +640,26 @@ draw_image_buffer :: proc(ext: string) {
 
 draw_text_buffer :: proc() {
     buffer_lines := active_buffer.lines
+    
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_size))
+    assert(error == .Ok)
 
-    line_height := buffer_font_size * 1.2
+    ascender := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+    
+    line_height := (ascender - descender)
 
     strings.builder_reset(&sb)
     strings.write_int(&sb, len(buffer_lines))
 
     highest_line_string := strings.to_string(sb)
 
-    max_line_size := measure_text(buffer_font_size, highest_line_string)
-    max_line_size.x += line_count_padding_px * 2
+    max_line_size := measure_text(font_size, highest_line_string)
+    max_line_size.x += font_base_px * line_count_padding_em * 2
 
-    active_buffer^.offset_x = (max_line_size.x) + (buffer_font_size * .5)
+    active_buffer^.offset_x = (max_line_size.x) + (font_size * .5)
 
     add_rect(&rect_cache,
         rect{
@@ -676,13 +691,7 @@ draw_text_buffer :: proc() {
     
     pen := vec2{0,0}
 
-    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
-    assert(error == .Ok)
-
-    ascender := f32(primary_font.size.metrics.ascender >> 6)
-    descender := f32(primary_font.size.metrics.descender >> 6)
-
-    char_map := get_char_map(buffer_font_size)
+    char_map := get_char_map(font_size)
 
     active_buffer.first_drawn_line = -1
     active_buffer.last_drawn_line = -1
@@ -699,7 +708,7 @@ draw_text_buffer :: proc() {
         }
         
         if line_pos.y < 0 {
-            pen.y += ascender - descender
+            pen.y += line_height
             continue
         }
         
@@ -717,7 +726,7 @@ draw_text_buffer :: proc() {
             ascender,
             descender,
             char_map,
-            buffer_font_size,
+            font_size,
         )
     }
 
@@ -736,7 +745,9 @@ draw_text_buffer :: proc() {
 }
 
 draw_autocomplete :: proc() {
-    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_size))
     assert(error == .Ok)
 
     ascender := f32(primary_font.size.metrics.ascender >> 6)
@@ -746,7 +757,7 @@ draw_autocomplete :: proc() {
         return
     }
 
-    padding := math.round_f32((buffer_font_size) * .25)
+    padding := math.round_f32((font_size) * .25)
 
     y_pos := buffer_cursor_pos.y -
         active_buffer.scroll_y + ascender-descender + (padding * 2)
@@ -775,7 +786,7 @@ draw_autocomplete :: proc() {
             &text_rect_cache,
             pen,
             i == selected_completion_hit ? TEXT_MAIN : TEXT_DARKER,
-            buffer_font_size,
+            font_size,
             hit.label,
             10,
         )
@@ -785,7 +796,7 @@ draw_autocomplete :: proc() {
         pen.y += ascender - descender
     }
 
-    border_width := general_line_thickness_px
+    border_width := font_base_px * line_thickness_em
 
     base_rect := rect{
         pen.x - padding,
@@ -836,7 +847,8 @@ draw_autocomplete :: proc() {
         base_rect.y + padding*2,
     }
 
-    em := ui_smaller_font_size
+    small_text := font_base_px * small_text_scale
+    em := small_text
 
     {
         pen := vec2{start_pen.x, start_pen.y}
@@ -846,7 +858,7 @@ draw_autocomplete :: proc() {
                 &text_rect_cache,
                 pen,
                 TEXT_MAIN,
-                ui_smaller_font_size,
+                small_text,
                 first_hit.detail,
                 10,
                 false,
@@ -861,7 +873,7 @@ draw_autocomplete :: proc() {
                 &text_rect_cache,
                 pen,
                 TEXT_MAIN,
-                ui_smaller_font_size,
+                small_text,
                 first_hit.documentation,
                 10,
                 false,
@@ -978,13 +990,15 @@ open_file :: proc(file_name: string) {
         fmt.println("Validating buffer lines")
     }
     
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
     for line in lines { 
         chars := make([dynamic]u8)
         
         append_elems(&chars, ..transmute([]u8)line)
 
         for r in line {
-            get_char(buffer_font_size, u64(r))
+            get_char(font_size, u64(r))
         }
 
         append_elem(buffer_lines, BufferLine{
@@ -1427,7 +1441,9 @@ insert_into_buffer :: proc (key: rune) {
 
     inject_at(&line.characters, buffer_cursor_byte_position, ..bytes[0:size])
     
-    get_char(buffer_font_size, u64(key))
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    get_char(font_size, u64(key))
     add_missing_characters()
 
     constrain_scroll_to_cursor()
@@ -1466,13 +1482,15 @@ insert_into_buffer :: proc (key: rune) {
 
 @(private="package")
 constrain_scroll_to_cursor :: proc() {
-    amnt_above_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - cursor_edge_padding + cursor_height
+    edge_padding := math.round_f32(font_base_px * cursor_edge_padding_em)
+    
+    amnt_above_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - edge_padding + cursor_height
 
     if amnt_above_offscreen < 0 {
         active_buffer.scroll_y -= -amnt_above_offscreen 
     }
 
-    amnt_below_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - (fb_size.y - cursor_edge_padding)
+    amnt_below_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - (fb_size.y - edge_padding)
 
     if amnt_below_offscreen >= 0 {
         active_buffer.scroll_y += amnt_below_offscreen 
@@ -1484,7 +1502,7 @@ constrain_scroll_to_cursor :: proc() {
         active_buffer.scroll_x -= -amnt_left_offscreen 
     }
 
-    amnt_right_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x) - (fb_size.x - cursor_edge_padding)
+    amnt_right_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x) - (fb_size.x - edge_padding)
 
     if amnt_right_offscreen >= 0 {
         active_buffer.scroll_x += amnt_right_offscreen 
@@ -1495,16 +1513,20 @@ constrain_cursor_to_scroll :: proc() {
     if do_constrain_cursor_to_scroll == false {
         return
     }
+    
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
 
-    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_size))
     assert(error == .Ok)
 
     ascender  := f32(primary_font.size.metrics.ascender >> 6)
     descender := f32(primary_font.size.metrics.descender >> 6)
-    line_height := ascender - descender
+    line_height := (ascender - descender)
+    
+    edge_padding := math.round_f32(font_base_px * cursor_edge_padding_em)
 
-    top_visible_y := active_buffer.scroll_y + cursor_edge_padding
-    bottom_visible_y := active_buffer.scroll_y + fb_size.y - cursor_edge_padding
+    top_visible_y := active_buffer.scroll_y + edge_padding
+    bottom_visible_y := active_buffer.scroll_y + fb_size.y - edge_padding
 
     top_visible_line := int(top_visible_y / line_height)
     bottom_visible_line := int(bottom_visible_y / line_height) - 1
@@ -1676,26 +1698,34 @@ move_forward_word :: proc() {
 }
 
 scroll_down :: proc() {
-    active_buffer.scroll_y += ((buffer_font_size * 1.2) * 80) * frame_time
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    active_buffer.scroll_y += ((font_size * 1.2) * 80) * frame_time
 
     constrain_cursor_to_scroll()
 }
 
 scroll_up :: proc() {
-    active_buffer.scroll_y -= ((buffer_font_size * 1.2) * 80) * frame_time
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    active_buffer.scroll_y -= ((font_size * 1.2) * 80) * frame_time
 
     constrain_cursor_to_scroll()
 }
 
 scroll_left :: proc() {
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
     active_buffer.scroll_x = max(
-        active_buffer.scroll_x - ((buffer_font_size * 1.2) * 80) * frame_time,
+        active_buffer.scroll_x - ((font_size * 1.2) * 80) * frame_time,
         0
     )
 }
 
 scroll_right :: proc() {
-    active_buffer.scroll_x += ((buffer_font_size * 1.2) * 80) * frame_time
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    active_buffer.scroll_x += ((font_size * 1.2) * 80) * frame_time
 }
 
 append_to_line :: proc() {
@@ -2186,7 +2216,7 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_MINUS) {
-        buffer_font_size = clamp(buffer_font_size+1, buffer_font_size, 100)
+        buffer_text_scale = clamp(buffer_text_scale + .1, buffer_text_scale, 100)
 
         update_fonts()
 
@@ -2201,7 +2231,7 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_SLASH) {
-        buffer_font_size = clamp(buffer_font_size-1, 8, buffer_font_size)
+        buffer_text_scale = clamp(buffer_text_scale - .1, .1, buffer_text_scale)
 
         update_fonts()
 

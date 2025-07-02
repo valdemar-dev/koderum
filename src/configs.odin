@@ -5,42 +5,41 @@ import "core:os"
 import "core:strings"
 import "core:strconv"
 import "core:fmt"
+import "core:math"
 import fp "core:path/filepath"
 import "core:unicode/utf8"
 import "core:dynlib"
 
-tab_spaces : int
-long_line_required_characters : int
+font_base_px : f32
 
-do_draw_line_count : bool
+small_text_scale : f32
+normal_text_scale : f32
+large_text_scale : f32
+buffer_text_scale : f32
+line_thickness_em : f32
+line_count_padding_em : f32
+cursor_edge_padding_em : f32
+
+ui_scale : f32
+
 do_highlight_long_lines : bool
-do_highlight_indents : bool
-differentiate_tab_and_spaces : bool
+long_line_required_characters : int
+do_draw_line_count : bool
 do_highlight_current_line : bool
+differentiate_tab_and_spaces : bool
+do_highlight_indents : bool
+
+tab_spaces : int
 
 default_cwd : string
-
-cursor_edge_padding : f32
-buffer_font_size : f32
-ui_bigger_font_size : f32
-ui_general_font_size : f32
-ui_smaller_font_size : f32
 
 program_dir : string
 
 text_highlight_color : vec4 = TEXT_MAIN
-
 text_highlight_bg : vec4 = BG_MAIN_40
-//text_highlight_bg : vec4 = vec4{1,1,1,1}
-
 delimiter_runes : []rune = {}
 
-general_line_thickness_px : f32
-line_count_padding_px : f32
-
 search_ignored_dirs : [dynamic]string
-
-ui_scale : f32
 
 do_constrain_cursor_to_scroll : bool = false
 
@@ -243,22 +242,25 @@ set_option :: proc(options: []string) {
         differentiate_tab_and_spaces = value == "true"
     case "tab_spaces":
         tab_spaces = strconv.atoi(value)
-    case "cursor_edge_padding":
-        cursor_edge_padding = f32(strconv.atof(value))
+    case "cursor_edge_padding_em":
+        cursor_edge_padding_em = f32(strconv.atof(value))
     case "font":
         append(&font_list, strings.clone(value))
-    case "ui_general_font_size":
+    case "font_base_px":
         font_size := strconv.atof(value)
-        ui_general_font_size = f32(font_size)
-    case "ui_smaller_font_size":
+        font_base_px = f32(font_size)
+    case "small_text_scale":
         font_size := strconv.atof(value)
-        ui_smaller_font_size = f32(font_size)
-    case "ui_bigger_font_size":
+        small_text_scale = f32(font_size)
+    case "large_text_scale":
         font_size := strconv.atof(value)
-        ui_bigger_font_size = f32(font_size)
-    case "buffer_font_size":
+        large_text_scale = f32(font_size)
+    case "normal_text_scale":
         font_size := strconv.atof(value)
-        buffer_font_size = f32(font_size)
+        normal_text_scale = f32(font_size)
+    case "buffer_text_scale":
+        font_size := strconv.atof(value)
+        buffer_text_scale = f32(font_size)
     case "do_highlight_indents":
         do_highlight_indents = value == "true"
     case "default_cwd":
@@ -269,10 +271,11 @@ set_option :: proc(options: []string) {
         text_highlight_bg = hex_string_to_vec4(value)
     case "do_highlight_current_line":
         do_highlight_current_line = value == "true" 
-    case "general_line_thickness_px":
-        general_line_thickness_px = f32(strconv.atoi(value))
-    case "line_count_padding_px":
-        line_count_padding_px = f32(strconv.atoi(value))
+    case "line_thickness_em":
+        line_thickness_em = f32(strconv.atof(value))
+        fmt.println(value, line_thickness_em, font_base_px, line_thickness_em * font_base_px)
+    case "line_count_padding_em":
+        line_count_padding_em = f32(strconv.atof(value))
     case "ui_scale":
         ui_scale = f32(strconv.atoi(value))
     case "always_loaded_characters":
@@ -280,11 +283,16 @@ set_option :: proc(options: []string) {
 
         for char in chars {
             r := utf8.string_to_runes(char)
-
-            get_char(buffer_font_size, u64(r[0]))
-            get_char(ui_general_font_size, u64(r[0]))
-            get_char(ui_smaller_font_size, u64(r[0]))
-            get_char(ui_bigger_font_size, u64(r[0]))
+            
+            big_text := math.round_f32(font_base_px * large_text_scale)
+            small_text := math.round_f32(font_base_px * small_text_scale)
+            normal_text := math.round_f32(font_base_px * normal_text_scale)
+            buffer_text := math.round_f32(font_base_px * buffer_text_scale)
+            
+            get_char(buffer_text, u64(r[0]))
+            get_char(big_text, u64(r[0]))
+            get_char(small_text, u64(r[0]))
+            get_char(normal_text, u64(r[0]))
 
             delete(r)
         }

@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:strings"
 import ft "../../alt-odin-freetype"
+import "core:math"
 
 buffer_cursor_pos := vec2{}
 buffer_cursor_target_pos := vec2{}
@@ -20,8 +21,10 @@ draw_cursor :: proc() {
     if active_buffer == nil {
         return
     }
+    
+    buffer_text := math.round_f32(font_base_px * buffer_text_scale)
 
-    index := character_maps[buffer_font_size]
+    index := character_maps[buffer_text]
     char_map := character_maps_array[index]
 
     if char_map == nil {
@@ -30,7 +33,7 @@ draw_cursor :: proc() {
 
     reset_rect_cache(&rect_cache)
 
-    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_text))
     if error != .Ok do return
 
     asc := primary_font.size.metrics.ascender >> 6
@@ -42,7 +45,7 @@ draw_cursor :: proc() {
         rect{
             buffer_cursor_pos.x - active_buffer.scroll_x + active_buffer.offset_x,
             buffer_cursor_pos.y - active_buffer.scroll_y,
-            3,
+            cursor_width,
             cursor_height,
         },
         no_texture,
@@ -68,6 +71,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
         return
     }
 
+    buffer_text := math.round_f32(font_base_px * buffer_text_scale)
     has_cursor_moved = true
 
     buffer_lines := active_buffer.lines
@@ -76,9 +80,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     characters := string(new_line.characters[:])
     new_x : f32 = 0
 
-    last_width : f32 = cursor_width
 
-    char_map := get_char_map(buffer_font_size)
+    char_map := get_char_map(buffer_text)
 
     // looping through a string gives index as byte_index
     rune_index := 0
@@ -89,10 +92,10 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
         rune_index += 1
 
-        char := get_char_with_char_map(char_map, buffer_font_size, u64(r))
+        char := get_char_with_char_map(char_map, buffer_text, u64(r))
 
         if r == '\t' {
-            character := get_char_with_char_map(char_map, buffer_font_size, u64(' '))
+            character := get_char_with_char_map(char_map, buffer_text, u64(' '))
 
             if character == nil {
                 continue
@@ -101,8 +104,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
             advance_amount := (character.advance.x) * f32(tab_spaces)
 
             new_x += advance_amount
-            last_width = advance_amount
-
+            
             continue
         }
 
@@ -111,7 +113,6 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
         }
 
         new_x += (char.advance.x) 
-        last_width = (char.advance.x)
     }
 
     if rune_index < char_index && line != buffer_cursor_line {
@@ -121,9 +122,9 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     buffer_cursor_line = line
     buffer_cursor_char_index = rune_index
 
-    cursor_width = last_width
+    cursor_width = math.round_f32(buffer_text * .1)
 
-    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_font_size))
+    error := ft.set_pixel_sizes(primary_font, 0, u32(buffer_text))
     if error != .Ok do return
 
     asc := primary_font.size.metrics.ascender >> 6

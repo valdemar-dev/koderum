@@ -568,7 +568,7 @@ add_code_text :: proc(
                 }, no_texture, text_highlight_color, vec2{}, z_index)
             } else if do_highlight_indents && i % tab_spaces == 0 {
                 add_rect(&rect_cache, rect{
-                    pen.x, pen.y, general_line_thickness_px, highlight_height
+                    pen.x, pen.y, font_base_px * line_thickness_em, highlight_height
                 }, no_texture, BG_MAIN_30, vec2{}, z_index)
             }
 
