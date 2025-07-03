@@ -115,17 +115,10 @@ handle_browser_input :: proc() {
 
         end_idx := len(runes)-1
 
-        when ODIN_OS == .Windows {
-            if end_idx == -1 {
-                return
-            }
-        } else {
-            if end_idx == 0 {
-                return
-            }
+        if end_idx == -1 {
+            return
         }
         
-
         runes = runes[:end_idx]
 
         search_term = utf8.runes_to_string(runes)
@@ -185,6 +178,25 @@ handle_browser_input :: proc() {
 
         return
     }
+    
+    if is_key_pressed(glfw.KEY_U) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if strings.ends_with(search_term, "/") {
+            search_term = search_term[:len(search_term) - 1]
+        }
+        
+        dir := fp.dir(search_term, context.temp_allocator)
+        
+        if dir == "." {
+            return
+        } else {
+            search_term = strings.concatenate({
+                dir,
+                dir != "/" ? "/" : "",
+            })
+        }
+        
+        return
+    }
 
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
@@ -242,9 +254,13 @@ handle_browser_input :: proc() {
 
         target := item_offset
 
-        if os.is_dir(found_files[target]) {
-            change_dir(found_files[target])
-
+        if os.is_dir(found_files[target]) {        
+            search_term = strings.concatenate({
+                found_files[target], "/",
+            })
+        
+            set_found_files()
+    
             return
         }
 
@@ -305,7 +321,7 @@ set_found_files :: proc() {
 
     glob := fp.base(search_term)
 
-    if os.is_dir(search_term) {
+    if strings.ends_with(search_term, "/") /*os.is_dir(search_term)*/ {
         glob = "."
 
         search_dir = strings.clone(search_term)
@@ -336,7 +352,7 @@ set_found_files :: proc() {
         
         for hit in hits {
             if strings.contains(hit.name, glob) || glob == "" {
-                if hit.name == glob {
+                if hit.fullpath == search_term /*hit.name == glob*/ {
                     inject_at(&found_files, 0, hit.fullpath)
                 } else {
                     append_elem(&found_files, hit.fullpath)
@@ -388,7 +404,9 @@ browser_append_to_search_term :: proc(key: rune) {
     append_elem(&buf, key)
 
     search_term = utf8.runes_to_string(buf[:])
-
+    
+    // NOTE: disabled because annoying. pls no renable
+    /*
     if os.is_dir(search_term) {
         last_char := search_term[len(search_term)-1:]
 
@@ -398,6 +416,7 @@ browser_append_to_search_term :: proc(key: rune) {
             })
         }
     }
+    */
     
     set_found_files()
 
@@ -557,8 +576,11 @@ draw_browser_view :: proc() {
         add_text(&rect_cache,
             pen,
             TEXT_MAIN,
-            normal_text,
-            found_file[len(dir):],
+            font_size,
+            strings.concatenate({
+                index == start_idx ? "> " : "",
+                found_file[len(dir):]
+            }, context.temp_allocator),
             start_z + 1,
             true,
             bg_rect.width - padding * 2,
