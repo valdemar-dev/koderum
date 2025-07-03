@@ -19,6 +19,8 @@ target_frame_time :: 1.0 / target_fps
 
 second := time.Duration(1_000_000_000)
 
+do_print_frame_time : bool
+
 // NOTE:
 // this is very silly, but it's fine - val 10th of June 2025.
 parse_args :: proc() {
@@ -37,6 +39,9 @@ parse_args :: proc() {
             fmt.println("-- START OF LOG --")
         } else if arg == "-log_unhandled_ts" {
             log_unhandled_treesitter_cases = true
+        } else if arg == "-print_frame_time" {
+            do_print_frame_time = true
+
         }
     }
 }
@@ -88,11 +93,8 @@ main :: proc() {
 
             continue
         }
-        
-        fps := 1 / frame_time
-        if int(fps) < 100 {
-            fmt.println("WARNING Low FPS: ", fps)
-        }
+
+        if do_print_frame_time do fmt.println(frame_time)
 
         last_time = current_time
 
@@ -100,18 +102,17 @@ main :: proc() {
 
         set_camera_ui()
         set_view_ui()
-        
+
         tick_buffer_cursor()
         tick_buffer_info_view()
+
         tick_browser_view()
 
         tick_notifications()
-
         tick_alerts()
-
-        update_camera()
-
+        
         update_fonts()
+        update_camera()
  
         render()
 

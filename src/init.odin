@@ -151,7 +151,7 @@ init_window :: proc() {
 
     glfw.MakeContextCurrent(window)
 
-    glfw.SwapInterval(0)
+    glfw.SwapInterval(1)
 
     glfw.SetWindowSize(window, width, height)
 

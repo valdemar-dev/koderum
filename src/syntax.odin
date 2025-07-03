@@ -569,37 +569,46 @@ init_language_server :: proc(ext: string) {
     set_capabilities :: proc(response: json.Object, data: rawptr) {
         result_obj, _ := response["result"].(json.Object)
 
+        fmt.println(response)
+
+        server := cast(^LanguageServer)data
+
         capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
 
         when ODIN_DEBUG {
             fmt.println("Settings capabilities for LSP..")
         }
  
-        trigger_characters := (capabilities_obj["completionProvider"].(json.Object)["triggerCharacters"].(json.Array))
+        completion_provider, completion_provider_ok := capabilities_obj["completionProvider"].(json.Object)
 
-        trigger_runes : [dynamic]rune = {}
-        for trigger_character in trigger_characters {
-            r := utf8.rune_at_pos(trigger_character.(string), 0)
+        if (completion_provider_ok) {
+            trigger_characters := completion_provider["triggerCharacters"].(json.Array)
 
-            append(&trigger_runes, r)
+            trigger_runes : [dynamic]rune = {}
+            for trigger_character in trigger_characters {
+                r := utf8.rune_at_pos(trigger_character.(string), 0)
+
+                append(&trigger_runes, r)
+            }
+
+            server^.completion_trigger_runes=trigger_runes[:]
         }
        
         provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
         
-        legend_obj := provider_obj["legend"].(json.Object)
+        legend_obj, legend_ok := provider_obj["legend"].(json.Object)
+
+        if legend_ok {
+            modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
+            types_arr := legend_obj["tokenTypes"].(json.Array)
             
-        modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
-        types_arr := legend_obj["tokenTypes"].(json.Array)
+            modifiers := value_to_str_array(modifiers_arr)
+            types := value_to_str_array(types_arr)
 
-        server := cast(^LanguageServer)data
-        
-        modifiers := value_to_str_array(modifiers_arr)
-        types := value_to_str_array(types_arr)
-
-        server^.token_modifiers = modifiers
-        server^.token_types = types
-        server^.completion_trigger_runes=trigger_runes[:]
-        
+            server^.token_modifiers = modifiers
+            server^.token_types = types
+        }
+            
         when ODIN_DEBUG{
             fmt.println("TypeScript LSP has been initialized.")
         }
@@ -1296,16 +1305,15 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
     outer: for ts._query_cursor_next_capture(cursor, &match, capture_index) {
         capture := match.captures[capture_index^]
         predicate_steps_count : u32
-        
+
         predicate_steps := ts._query_predicates_for_pattern(
             active_buffer.query, 
             u32(match.pattern_index), 
             &predicate_steps_count
         )
-        
+       
         for step_index in 0..<predicate_steps_count {
             step := predicate_steps[step_index]
-            
             if step.type == .String {
                 value_len : u32
                 
@@ -1314,25 +1322,6 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
                     step.value_id, 
                     &value_len
                 )
-                
-                if step_value == "match?" {                
-                    name_len: u32
-                    name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
-                    
-                    next_step := predicate_steps[step_index+1]
-                    
-                    match_string := ts._query_string_value_for_id(
-                        active_buffer.query, 
-                        next_step.value_id, 
-                        &value_len
-                    )
-                    
-                    fmt.println(match_string, name)
-                    
-                    if match_string != name {
-                        continue outer
-                    }
-                }
             }
         }
 
