@@ -20,3 +20,5 @@ todo:
 bugs:    
     - hl only works for 1 item per line
     - swapping between files does not change the active language server
+    - any movement action should trigger refresh of everything.
+      including constrain scroll, constrain cursor, get suggestions, and get error.
