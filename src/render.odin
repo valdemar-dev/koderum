@@ -492,20 +492,20 @@ add_code_text :: proc(
 
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
     rune_index := 0
-    for r, i in text {
+    for r, byte_index in text {
         defer rune_index += 1
         
         if len(errors) > 0 {
-            if error != nil && (error.char + error.width <= i) {
+            if error != nil && (error.char + error.width <= rune_index) {
                 error_idx += 1
                 if error_idx < len(errors) {
                     next_error := &errors[error_idx]
 
-                    if next_error.char < i {
+                    if next_error.char < rune_index {
                         error_idx += 1
                     }
 
-                    if error_idx < len(errors) && i >= errors[error_idx].char {
+                    if error_idx < len(errors) && rune_index >= errors[error_idx].char {
                         error = &errors[error_idx]
                     } else {
                         error = nil
@@ -514,23 +514,23 @@ add_code_text :: proc(
                     error = nil
                 }
             } else if error == nil && error_idx < len(errors) {
-                if i >= errors[error_idx].char {
+                if rune_index >= errors[error_idx].char {
                     error = &errors[error_idx]
                 }
             }
         }
 
         defer if len(tokens) > 0 {
-            if token != nil && (token.char + token.length <= i32(i + 1)) {
+            if token != nil && (token.char + token.length <= i32(byte_index + 1)) {
                 token_idx += 1
                 if token_idx < len(tokens) {
                     next_token := &tokens[token_idx]
 
-                    if next_token.char < i32(i) {
+                    if next_token.char < i32(byte_index) {
                         token_idx += 1
                     }
 
-                    if i32(i + 1) >= next_token.char {
+                    if i32(byte_index + 1) >= next_token.char {
                         token = next_token
                     } else {
                         token = nil
@@ -541,7 +541,7 @@ add_code_text :: proc(
             } else if token == nil && token_idx < len(tokens) {
                 next_token := &tokens[token_idx]
 
-                if i32(i + 1) >= next_token.char {
+                if i32(byte_index + 1) >= next_token.char {
                     token = next_token
                 }
             }
@@ -584,7 +584,7 @@ add_code_text :: proc(
                     pen.y + (highlight_height / 2) - 1,
                     2, 2
                 }, no_texture, text_highlight_color, vec2{}, z_index)
-            } else if do_highlight_indents && i % tab_spaces == 0 {
+            } else if do_highlight_indents && rune_index % tab_spaces == 0 {
                 add_rect(&rect_cache, rect{
                     pen.x, pen.y, font_base_px * line_thickness_em, highlight_height
                 }, no_texture, BG_MAIN_30, vec2{}, z_index)
@@ -625,7 +625,7 @@ add_code_text :: proc(
 
         color := TEXT_MAIN
 
-        if is_hit_on_line && i >= selected_hit.start_char && i < selected_hit.end_char {
+        if is_hit_on_line && rune_index >= selected_hit.start_char && rune_index < selected_hit.end_char {
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color

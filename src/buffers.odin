@@ -1918,7 +1918,7 @@ remove_selection :: proc(
     b_char_byte := utf8.rune_offset(string(last_line.characters[:]), b_char)
     
     if a_char_byte == -1 do a_char_byte = len(first_line.characters)
-    if a_char_byte == -1 do b_char_byte = len(last_line.characters)
+    if b_char_byte == -1 do b_char_byte = len(last_line.characters)
 
     if a_line == b_line {
         target_line := &active_buffer.lines[a_line]
