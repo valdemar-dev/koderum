@@ -1,3 +1,1 @@
-const import = giga;
-
-import.meta.dirname = 4;
+const hi = "äåasdf";

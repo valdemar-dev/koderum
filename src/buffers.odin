@@ -254,8 +254,16 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
 
     end_byte := change.start_byte + u32(remove_size)
 
-    a_line, a_char := byte_to_pos(start_byte)
-    b_line, b_char := byte_to_pos(end_byte)
+    a_line, a_char_byte := byte_to_pos(start_byte)
+    b_line, b_char_byte := byte_to_pos(end_byte)
+    
+    first_line := &active_buffer.lines[a_line]
+    last_line := &active_buffer.lines[b_line]
+
+    a_char := byte_offset_to_rune_index(string(first_line.characters[:]), int(a_char_byte))
+    b_char := byte_offset_to_rune_index(string(last_line.characters[:]), int(b_char_byte))
+    
+    fmt.println("BYTE TO POS:", a_line, a_char, b_line, b_char)
 
     if a_line > b_line || (a_line == b_line && a_char > b_char) {
         a_line, b_line = b_line, a_line
@@ -273,16 +281,16 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
         int(b_line),
         int(b_char),
     )
-
+    
+    fmt.println("ACCUMULATED:", start_accumulated, end_accumulated)
+        
+    fmt.println("LOCAL LINE BYTES:", a_char_byte, b_char_byte)
+    
     if a_line == b_line {
-        target_line := &active_buffer.lines[a_line]
-        remove_range(&target_line.characters, a_char, b_char)
+        remove_range(&first_line.characters, a_char_byte, b_char_byte)
     } else {
-        first_line := &active_buffer.lines[a_line]
-        last_line := &active_buffer.lines[b_line]
-
-        remove_range(&last_line.characters, 0, b_char)
-        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char])
+        remove_range(&last_line.characters, 0, b_char_byte)
+        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char_byte])
 
         remove_range(active_buffer.lines, a_line, b_line)
     }
@@ -291,28 +299,20 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
 
     defer delete(split)
 
-    start_line := &active_buffer.lines[a_line]
-    start_chars := start_line.characters[:]
-
-    byte_offset := utf8.rune_offset(
-        string(start_chars),
-        int(a_char),
-    )
-
-    if byte_offset == -1 {
-        byte_offset = len(start_chars)
-    }
-
     if len(split) == 1 {
         first_paste_line := split[0]
 
-        inject_at(&start_line.characters, byte_offset, ..transmute([]u8)first_paste_line)
+        fmt.println(string(first_line.characters[:]))
+        inject_at(&first_line.characters, a_char_byte, ..transmute([]u8)first_paste_line)
+        
+        fmt.println(string(first_line.characters[:]))
+        fmt.println("injected", first_paste_line)
 
         return
     }
 
-    pre := active_buffer.lines[a_line].characters[:a_char]
-    post := strings.clone(string(active_buffer.lines[a_line].characters[a_char:]))
+    pre := first_line.characters[:a_char_byte]
+    post := strings.clone(string(first_line.characters[a_char_byte:]))
 
     for i in 0..<len(split) {
         text_line := split[i]
@@ -320,8 +320,8 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
         if i == 0 {
             buffer_line := &active_buffer.lines[a_line]
 
-            inject_at(&buffer_line.characters, byte_offset, ..transmute([]u8)text_line)
-            resize(&buffer_line.characters, byte_offset + len(text_line))
+            inject_at(&buffer_line.characters, a_char_byte, ..transmute([]u8)text_line)
+            resize(&buffer_line.characters, int(a_char_byte) + len(text_line))
 
             continue
         }
@@ -1916,6 +1916,9 @@ remove_selection :: proc(
     
     a_char_byte := utf8.rune_offset(string(first_line.characters[:]), a_char)
     b_char_byte := utf8.rune_offset(string(last_line.characters[:]), b_char)
+    
+    if a_char_byte == -1 do a_char_byte = len(first_line.characters)
+    if a_char_byte == -1 do b_char_byte = len(last_line.characters)
 
     if a_line == b_line {
         target_line := &active_buffer.lines[a_line]
