@@ -1,0 +1,22 @@
+This is a test file.
+
+Mostly for buffer edit testing.
+
+FILE BEGIN:
+
+ä
+ä
+ä
+ä
+ä
+ää
+ä
+ä
+äääasdfälkjasdfä asdf ä
+äasdf
+äasdfää asädf äasdfä
+asdäf
+äsd fäasdfä asädf aäsdfä
+sadäf saädf äasdfä asädf
+2689352char, byte
+asdf äå asdf

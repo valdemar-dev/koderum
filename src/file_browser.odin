@@ -565,7 +565,7 @@ draw_browser_view :: proc() {
             TEXT_DARKER,
             small_text,
             "Ctrl + [ D: Delete, JK: Scroll, F: Rename, G: Create, U: Up ]",
-            start_z + 2,        
+            start_z + 2,
             false,
             bg_rect.width - padding * 2,
         )
@@ -579,7 +579,7 @@ draw_browser_view :: proc() {
         padding := small_text
         
         max_width := bg_rect.width - padding * 2
-                
+        
         if len(search_term) == 0 {
             add_text(&rect_cache,
                 vec2{
@@ -591,7 +591,7 @@ draw_browser_view :: proc() {
                 "Enter a drive or directory.",
                 start_z + 1,
             )
-    
+            
             return
         }
     
@@ -610,10 +610,10 @@ draw_browser_view :: proc() {
                 false,
                 true,
             )
-    
+            
             return
         }
-    
+        
         if attempting_rename {
             add_text(&rect_cache,
                 vec2{
@@ -629,23 +629,23 @@ draw_browser_view :: proc() {
                 false,
                 true,
             )
-    
+            
             return
         }
-    
+        
         start_idx := item_offset
         
         dir := fp.dir(search_term, context.temp_allocator)
-    
+        
         for found_file,index in found_files {
             if index < start_idx {
                 continue
             }
-    
+            
             font_size : f32 = (index == start_idx) ? large_text : small_text
-    
+            
             gap := font_size * .5
-    
+            
             add_text(&rect_cache,
                 vec2{
                     bg_rect.x + padding,
@@ -662,11 +662,11 @@ draw_browser_view :: proc() {
                 bg_rect.width - padding * 2,
                 false,
             )
-    
+            
             y_pen += font_size + gap
-    
+            
             y_bound := (bg_rect.y+bg_rect.height)
-    
+            
             if y_pen + font_size + gap > y_bound {
                 break
             } 

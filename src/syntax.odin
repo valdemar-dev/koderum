@@ -1142,6 +1142,10 @@ get_autocomplete_hits :: proc(
 }
 
 go_to_definition :: proc() {
+    if active_language_server == nil {
+        return
+    }
+    
     lsp_request_id += 1
 
     msg,id := goto_definition_request_message(
@@ -1166,8 +1170,6 @@ go_to_definition :: proc() {
 
     handle_response :: proc(response: json.Object, data: rawptr) {
         results,_ := response["result"].(json.Array)
-
-        fmt.println(results)
 
         if len(results) == 0 {
             return
@@ -1194,7 +1196,6 @@ go_to_definition :: proc() {
         // open_file() kills the update thread
         // we are in the update thread.
         // therefore, run a separate thread.
-
         PolyData :: struct {
             name: string,
             line: json.Float,

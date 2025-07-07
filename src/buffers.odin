@@ -1891,7 +1891,7 @@ remove_selection :: proc(
         b_line,
         b_char,
     )
-
+    
     defer {
         defer constrain_scroll_to_cursor()
         
@@ -1910,16 +1910,19 @@ remove_selection :: proc(
             {},
         )
     }
+    
+    first_line := &active_buffer.lines[a_line]
+    last_line := &active_buffer.lines[b_line]
+    
+    a_char_byte := utf8.rune_offset(string(first_line.characters[:]), a_char)
+    b_char_byte := utf8.rune_offset(string(last_line.characters[:]), b_char)
 
     if a_line == b_line {
         target_line := &active_buffer.lines[a_line]
-        remove_range(&target_line.characters, a_char, b_char)
+        remove_range(&target_line.characters, a_char_byte, b_char_byte)
     } else {
-        first_line := &active_buffer.lines[a_line]
-        last_line := &active_buffer.lines[b_line]
-
-        remove_range(&last_line.characters, 0, b_char)
-        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char])
+        remove_range(&last_line.characters, 0, b_char_byte)
+        inject_at(&last_line.characters, 0, ..first_line.characters[:a_char_byte])
 
         remove_range(active_buffer.lines, a_line, b_line)
     }

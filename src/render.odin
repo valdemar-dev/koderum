@@ -362,7 +362,12 @@ add_text :: proc(
     return pen
 }
 
-process_highlights :: proc(i: int, is_hl_start,positive_dir,negative_dir,is_hl_end: bool, advance_amount: f32, highlight_width,highlight_offset: ^f32) -> (was_highlighted: bool) {
+process_highlights :: proc(
+    i: int, 
+    is_hl_start,positive_dir,negative_dir,is_hl_end: bool, 
+    advance_amount: f32, 
+    highlight_width,highlight_offset: ^f32
+) -> (was_highlighted: bool) {
     if input_mode != .HIGHLIGHT {
         return false
     }        
@@ -486,7 +491,10 @@ add_code_text :: proc(
     }
 
     is_hit_on_line := selected_hit != nil && selected_hit.line == line_number
+    rune_index := 0
     for r, i in text {
+        defer rune_index += 1
+        
         if len(errors) > 0 {
             if error != nil && (error.char + error.width <= i) {
                 error_idx += 1
@@ -559,7 +567,16 @@ add_code_text :: proc(
                 advance_amount = character.advance.x * f32(tab_spaces)
             }
 
-            was_highlighted := process_highlights(i, is_hl_start, positive_dir, negative_dir, is_hl_end, advance_amount, &highlight_width, &highlight_offset)
+            was_highlighted := process_highlights(
+                rune_index, 
+                is_hl_start, 
+                positive_dir, 
+                negative_dir, 
+                is_hl_end, 
+                advance_amount, 
+                &highlight_width, 
+                &highlight_offset,
+            )
 
             if was_highlighted || is_line_fully_highlighted {
                 add_rect(&rect_cache, rect{
@@ -595,7 +612,16 @@ add_code_text :: proc(
         uvs := char_rects[uvs_index]
 
         advance_amount := character.advance.x
-        was_highlighted := process_highlights(i, is_hl_start, positive_dir, negative_dir, is_hl_end, advance_amount, &highlight_width, &highlight_offset)
+        was_highlighted := process_highlights(
+            rune_index, 
+            is_hl_start, 
+            positive_dir, 
+            negative_dir, 
+            is_hl_end, 
+            advance_amount, 
+            &highlight_width, 
+            &highlight_offset,
+        )
 
         color := TEXT_MAIN
 

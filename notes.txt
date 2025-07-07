@@ -13,11 +13,14 @@ todo:
         - add "do overwrite token if found" to lsp options
     
     - maybe have two trees for parsing, threaded and single-threaded
-    - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.
-    
-    - ui-rework, need some fancy shmancier boxes and stuff.
+    - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.    
+    - implement yank-buffer history usage and view
+    - add go to line
 
 bugs:    
+    - undo redo for reverse removals is kind of weird.
+    - paste replace does not work
+    - paste replace does not use clipboard
     - hl only works for 1 item per line
     - swapping between files does not change the active language server
     - any movement action should trigger refresh of everything.
