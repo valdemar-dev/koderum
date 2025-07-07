@@ -159,6 +159,9 @@ selected_hit: ^SearchHit
 @(private="package")
 buffer_search_term : string
 
+@(private="package")
+go_to_line_input_string : string
+
 undo_change :: proc() {
     if len(active_buffer.undo_stack) == 0 {
         return
@@ -2221,6 +2224,23 @@ handle_buffer_input :: proc() -> bool {
 
         return false
     }
+    
+    if is_key_pressed(glfw.KEY_N) {
+        de := os.get_env("XDG_CURRENT_DESKTOP")
+        
+        if de == "GNOME" {
+            glfw.WaitEvents()
+        }
+        
+        delete(de)
+        
+        input_mode = .GO_TO_LINE
+        
+        cached_buffer_cursor_line = buffer_cursor_line
+        cached_buffer_cursor_char_index = buffer_cursor_char_index
+        
+        return false
+    }
 
     if is_key_pressed(glfw.KEY_MINUS) {
         buffer_text_scale = clamp(buffer_text_scale + .1, buffer_text_scale, 100)
@@ -2492,8 +2512,20 @@ buffer_append_to_search_term :: proc(key: rune) {
     
     append_elems(&buf, ..runes)
     append_elem(&buf, key)
-
+    delete(buffer_search_term)
     buffer_search_term = utf8.runes_to_string(buf[:])
+}
+
+@(private="package")
+append_to_go_to_line_input_string :: proc(key: rune) {
+    buf := make([dynamic]rune)
+
+    runes := utf8.string_to_runes(go_to_line_input_string)
+    
+    append_elems(&buf, ..runes)
+    append_elem(&buf, key)
+    delete(go_to_line_input_string)
+    go_to_line_input_string = utf8.runes_to_string(buf[:])
 }
 
 @(private="package")
@@ -2590,7 +2622,50 @@ handle_search_input :: proc() {
 
         return
     }
+}
 
+@(private="package")
+handle_go_to_line_input :: proc() {
+    if is_key_pressed(glfw.KEY_ESCAPE) {
+        go_to_line_input_string = ""
+
+        input_mode = .COMMAND
+
+        return
+    }
+
+    if is_key_pressed(glfw.KEY_BACKSPACE) {
+        runes := utf8.string_to_runes(go_to_line_input_string)
+
+        end_idx := len(runes)-1        
+
+        runes = runes[:end_idx]
+
+        go_to_line_input_string = utf8.runes_to_string(runes)
+
+        delete(runes)
+    }
+
+    if is_key_pressed(glfw.KEY_ENTER) {
+        target_line := clamp(
+            strconv.atoi(go_to_line_input_string),
+            0,
+            len(active_buffer.lines)
+        )
+        
+        set_buffer_cursor_pos(
+            target_line,
+            buffer_cursor_char_index,
+        )
+        
+        go_to_line_input_string = ""
+        
+        input_mode = .COMMAND
+        
+        constrain_scroll_to_cursor()
+        
+        return
+    }
 }
 
 insert_completion :: proc() {

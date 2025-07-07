@@ -29,6 +29,7 @@ Search
 (Ctrl + J) -> Next Hit
 (Ctrl + K) -> Prev Hit
 (V) -> Highlight search term
+(N) -> Go to line number
 
 Configurations
 Configuration location depends on your platform.

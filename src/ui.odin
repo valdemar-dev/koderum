@@ -127,6 +127,8 @@ draw_ui :: proc() {
         mode_string = "Search"
     case .DEBUG:
         mode_string = "Debug"
+    case .GO_TO_LINE:
+        mode_string = "Go To Line"
     }
 
     add_text(&rect_cache,
@@ -196,6 +198,38 @@ draw_ui :: proc() {
 
     if input_mode == .SEARCH {
         term := buffer_search_term == "" ? "Type to Search" : buffer_search_term
+
+        size := measure_text(normal_text, term)
+
+        middle := fb_size.x / 2 - size.x / 2
+
+        padding :: 10
+
+        add_rect(&rect_cache,
+            rect{
+                middle - (padding * 1.5),
+                fb_size.y - padding - 20 - size.y,
+                size.x + padding * 3,
+                size.y + padding * 2,
+            },
+            no_texture,
+            BG_MAIN_20,
+            vec2{},
+            ui_z_index + 3,
+        )
+
+        add_text(&text_rect_cache,
+            vec2{
+                middle,
+                fb_size.y - 20 - size.y,
+            },
+            TEXT_MAIN,
+            normal_text,
+            term,
+            ui_z_index + 4,
+        )
+    } else if input_mode == .GO_TO_LINE {
+        term := go_to_line_input_string == "" ? "Type a line number." : go_to_line_input_string
 
         size := measure_text(normal_text, term)
 

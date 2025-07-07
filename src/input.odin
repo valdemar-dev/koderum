@@ -33,7 +33,7 @@ InputMode :: enum {
     FILE_CREATE,
     SEARCH,
     HIGHLIGHT,
-
+    GO_TO_LINE,
     DEBUG,
 }
 
@@ -68,6 +68,8 @@ check_inputs :: proc() -> bool {
         handle_browser_input()
     case .SEARCH:
         handle_search_input()
+    case .GO_TO_LINE:
+        handle_go_to_line_input()
     case .HIGHLIGHT:
         handle_highlight_input()
     case .DEBUG:
@@ -112,6 +114,8 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         break
     case .FILE_CREATE:
         break
+    case .GO_TO_LINE:
+        append_to_go_to_line_input_string(key)
     }
 }
 
