@@ -1415,8 +1415,6 @@ handle_text_input :: proc() -> bool {
             indent_level,
         )
         
-        constrain_scroll_to_cursor()    
-
         return false
     }
     
@@ -2052,8 +2050,6 @@ paste_string :: proc(str: string, line: int, char: int) {
 
     absolute_byte_offset := compute_byte_offset(active_buffer, line, char)
 
-    defer constrain_scroll_to_cursor()
-        
     defer {
         notify_server_of_change(
             active_buffer,
@@ -2079,9 +2075,7 @@ paste_string :: proc(str: string, line: int, char: int) {
             int(line_byte),
         )
 
-        set_buffer_cursor_pos(line, char)
-        
-        constrain_scroll_to_cursor();
+        set_buffer_cursor_pos(line, char)        
     }
 
     start_line := &active_buffer.lines[line]
@@ -2134,6 +2128,89 @@ paste_string :: proc(str: string, line: int, char: int) {
 }
 
 
+reload_buffer :: proc(buffer: ^Buffer) {
+    old_byte_length := len(buffer.content)
+    old_line_count := len(buffer.lines)
+    old_last_line_char_count := utf8.rune_count(
+        buffer.lines[old_line_count-1].characters[:]
+    )
+        
+    data, ok := os.read_entire_file_from_filename(buffer.file_name)
+    defer delete(data)
+
+    if !ok {
+        fmt.println("failed to open file")
+
+        return
+    }
+
+    data_string := string(data)
+    
+    lines := strings.split(data_string, "\n")
+    defer delete(lines)
+
+    buffer_lines := new([dynamic]BufferLine)
+
+    new_buffer := new(Buffer)
+    new_buffer^.lines = buffer_lines
+    new_buffer^.file_name = buffer.file_name
+    
+    content := make([dynamic]u8, len(data))
+    copy(content[:], data)
+    
+    new_buffer^.content = content
+
+    new_buffer^.width = fb_size.x
+    new_buffer^.height = fb_size.y
+    new_buffer^.is_saved = true
+
+    file_info, lstat_error := os.lstat(buffer.file_name)
+
+    if lstat_error != os.General_Error.None {
+        fmt.println("failed to lstat")
+
+        return
+    }
+
+    new_buffer^.info = file_info
+    new_buffer^.ext = filepath.ext(new_buffer^.file_name)
+ 
+    when ODIN_DEBUG {
+        fmt.println("Validating buffer lines")
+    }
+    
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    for line in lines { 
+        chars := make([dynamic]u8)
+        
+        append_elems(&chars, ..transmute([]u8)line)
+
+        for r in line {
+            get_char(font_size, u64(r))
+        }
+
+        append_elem(buffer_lines, BufferLine{
+            characters=chars,
+        })
+    }
+    
+    set_buffer_cursor_pos(0,0)
+    constrain_scroll_to_cursor()
+    
+    notify_server_of_change(
+        buffer,
+        0, old_byte_length,
+        0,0,
+        old_line_count, old_last_line_char_count,
+        
+        data,
+    )
+    
+    buffer^ = new_buffer^
+    lsp_handle_file_open()
+}
+
 /*
 
 
@@ -2154,7 +2231,9 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed (glfw.KEY_R) {
-        // add reload logic
+        if key_store[glfw.KEY_R].modifiers == CTRL_SHIFT {
+            reload_buffer(active_buffer)
+        }
     }
 
     if is_key_pressed(glfw.KEY_PERIOD) {
@@ -2648,7 +2727,7 @@ handle_go_to_line_input :: proc() {
 
     if is_key_pressed(glfw.KEY_ENTER) {
         target_line := clamp(
-            strconv.atoi(go_to_line_input_string),
+            strconv.atoi(go_to_line_input_string)-1,
             0,
             len(active_buffer.lines)
         )

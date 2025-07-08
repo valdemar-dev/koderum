@@ -839,6 +839,8 @@ notify_server_of_change :: proc(
 
     do_update_buffer_content := true,
 ) {
+    constrain_scroll_to_cursor()
+    
     new_end_byte := start_byte + len(new_text)
 
     if do_update_buffer_content {
@@ -1496,6 +1498,10 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
                 continue
             }
     
+            if index >= len(line.tokens) {
+                continue
+            }
+            
             line.tokens[index] = token
         
             continue
@@ -1510,9 +1516,9 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
 get_node_text :: proc(node: ts.Node, source: []u8) -> string {
     start := ts.node_start_byte(node)
     end := ts.node_end_byte(node)
+    
     return string(source[start:end])
 }
-
 
 indent_rule_language_list : map[string]^map[string]IndentRule = {
     ".txt"=&generic_indent_rule_list,

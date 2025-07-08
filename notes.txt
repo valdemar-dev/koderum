@@ -4,7 +4,6 @@ today:
 high priority todo:
 
 todo:
-    - close buffer with Ctrl-q
     - Ctrl +DFJK movement for in-buffer movement
     - add ctrl + r reload
     - reopening filebrowser should uncache all files

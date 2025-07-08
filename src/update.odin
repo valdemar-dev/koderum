@@ -64,7 +64,7 @@ message_loop :: proc(thread: ^thread.Thread) {
 
         defer delete(bytes)
 
-        if read_err != os2.ERROR_NONE {
+        if read_err != os2.ERROR_NONE && read_err != os.ERROR_EOF {
             fmt.println(read_err)
             panic("Failed to read LSP Message.")
         }
