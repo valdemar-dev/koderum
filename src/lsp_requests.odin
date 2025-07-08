@@ -292,6 +292,31 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
     })
 }
 
+did_close_message :: proc(uri: string) -> string {
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"method\": \"textDocument/didClose\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", uri, "\"\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    }, context.temp_allocator)
+
+    buf := make([dynamic]u8, 32)
+    defer delete(buf)
+    length := strconv.itoa(buf[:], len(json))
+
+    return strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+}
+
+
 completion_request_message :: proc(
     id: int,
     uri: string,

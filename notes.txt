@@ -5,22 +5,16 @@ high priority todo:
 
 todo:
     - Ctrl +DFJK movement for in-buffer movement
-    - add ctrl + r reload
-    - reopening filebrowser should uncache all files
     - consolidate buffer insert changes into one change on ESC
     - we can probably just do JSON for this
-        - add "do overwrite token if found" to lsp options
-    
+        - add "do overwrite token if found" to lsp options    
     - maybe have two trees for parsing, threaded and single-threaded
     - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.    
     - implement yank-buffer history usage and view
-    - add go to line
 
 bugs:    
-    - undo redo for reverse removals is kind of weird.
     - paste replace does not work
     - paste replace does not use clipboard
     - hl only works for 1 item per line
-    - swapping between files does not change the active language server
     - any movement action should trigger refresh of everything.
       including constrain scroll, constrain cursor, get suggestions, and get error.

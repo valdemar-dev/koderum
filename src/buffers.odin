@@ -266,8 +266,6 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
     a_char := byte_offset_to_rune_index(string(first_line.characters[:]), int(a_char_byte))
     b_char := byte_offset_to_rune_index(string(last_line.characters[:]), int(b_char_byte))
     
-    fmt.println("BYTE TO POS:", a_line, a_char, b_line, b_char)
-
     if a_line > b_line || (a_line == b_line && a_char > b_char) {
         a_line, b_line = b_line, a_line
         a_char, b_char = b_char, a_char
@@ -285,10 +283,6 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
         int(b_char),
     )
     
-    fmt.println("ACCUMULATED:", start_accumulated, end_accumulated)
-        
-    fmt.println("LOCAL LINE BYTES:", a_char_byte, b_char_byte)
-    
     if a_line == b_line {
         remove_range(&first_line.characters, a_char_byte, b_char_byte)
     } else {
@@ -305,12 +299,8 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
     if len(split) == 1 {
         first_paste_line := split[0]
 
-        fmt.println(string(first_line.characters[:]))
         inject_at(&first_line.characters, a_char_byte, ..transmute([]u8)first_paste_line)
         
-        fmt.println(string(first_line.characters[:]))
-        fmt.println("injected", first_paste_line)
-
         return
     }
 
@@ -1021,12 +1011,35 @@ open_file :: proc(file_name: string) {
     thread.run(lsp_handle_file_open)
 }
 
-close_file :: proc(file_name: string) -> (ok: bool) {
-    buffer_to_close : ^Buffer
+close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
+    file_uri := strings.concatenate({
+        "file://",
+        buffer.file_name,
+    }, context.temp_allocator)
     
-    for buffer in buffers {
+    msg := did_close_message(file_uri)
+    defer delete(msg)
     
+    send_lsp_message(msg, "", nil, nil)
+    
+    buffer_index := get_buffer_index(buffer)
+    
+    ordered_remove(&buffers, buffer_index)
+    
+    new_buffer_index := clamp(
+        buffer_index - 1,
+        0,
+        len(buffers) - 1
+    )
+    
+    if new_buffer_index == -1 {
+        active_buffer = nil
+        
+        return true
     }
+    
+    active_buffer = buffers[new_buffer_index]
+    
     return true
 }
 
@@ -2039,10 +2052,6 @@ inject_line :: proc() {
 }
 
 @(private="package")
-close_buffer :: proc(buf: ^Buffer) {
-}
-
-@(private="package")
 paste_string :: proc(str: string, line: int, char: int) {
     split := strings.split(str, "\n")
 
@@ -2242,7 +2251,7 @@ handle_buffer_input :: proc() -> bool {
 
     if is_key_pressed(glfw.KEY_W) {
         if key_store[glfw.KEY_W].modifiers == CTRL_SHIFT {
-            close_buffer(active_buffer)
+            close_file(active_buffer)
         }
     }
 
