@@ -47,6 +47,10 @@ Language :: struct {
         tokens: ^[dynamic]Token,
         priority: ^u8,
     ),
+    
+    // Files to look for to determine the root of a project.
+    // tsconfig.json, ols.json, etc.    
+    project_root_markets: []string,
 
     // Where the installed parser is located.
     // Parsers are here: .local/share/koderum/parsers/<PARSER>.
@@ -103,6 +107,8 @@ languages : map[string]Language = {
         parser_link="https://github.com/tree-sitter-grammars/tree-sitter-odin",
 
         language_symbol_name="tree_sitter_odin",
+        
+        project_root_markets={"ols.json"},
         
         filler_color=ORANGE,
     }
@@ -476,6 +482,36 @@ set_active_language_server :: proc(ext: string) {
     }
 }
 
+get_project_root :: proc(
+    file_path: string, 
+    target_files: []string
+) -> (string, bool) {
+    if len(target_files) == 0 {
+        return "", false
+    }
+    
+	root := fp.dir(file_path)
+
+	for {
+		for target in target_files {
+            marker_path := fp.join({root, target})
+            
+            if os.exists(marker_path) {
+                return strings.concatenate({root, "/"}), true
+            }
+        }
+        
+        parent := fp.dir(root)
+		if parent == root || parent == "" {
+            break
+		}
+
+		root = parent
+	}
+
+	return "", false
+}
+
 init_language_server :: proc(ext: string) {
     language := &languages[ext]
 
@@ -512,6 +548,7 @@ init_language_server :: proc(ext: string) {
     }
 
     process, start_err := os2.process_start(desc)
+    
     if start_err == .Not_Exist {
         notification := new(Notification)
 
@@ -528,6 +565,7 @@ init_language_server :: proc(ext: string) {
 
         return
     }
+    
     if start_err != os2.ERROR_NONE {
         fmt.println(start_err)
         panic("Failed to start language server.")
@@ -548,28 +586,37 @@ init_language_server :: proc(ext: string) {
 
     active_language_server = server
     active_language_servers[ext] = server
+    
+    directory, ok := get_project_root(active_buffer.file_name, language.project_root_markets)
+    
+    if !ok {
+        directory = cwd
+    }
+        
+    fmt.println(directory)
 
-    msg := initialize_message(process.pid, cwd)
+    msg := initialize_message(process.pid, directory)
     defer delete(msg)
 
     id := "1"
 
     send_lsp_message(msg, id, set_capabilities, rawptr(server))
-
-    base := fp.base(dir)
-
+    /*
     msg_2 := did_change_workspace_folders_message(
-        strings.concatenate({"file://",dir}, context.temp_allocator), dir,
+        directory, directory,
     )
  
     send_lsp_init_message(msg_2, stdin_w)
 
     defer delete(msg_2)
+    */
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
         result_obj, _ := response["result"].(json.Object)
 
-        fmt.println(response)
+        when ODIN_DEBUG {
+            fmt.println("Capabilities Object:", response)   
+        }
 
         server := cast(^LanguageServer)data
 
@@ -610,7 +657,7 @@ init_language_server :: proc(ext: string) {
         }
             
         when ODIN_DEBUG{
-            fmt.println("TypeScript LSP has been initialized.")
+            fmt.println("LSP has been initialized.")
         }
 
         active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
@@ -634,10 +681,12 @@ lsp_handle_file_open :: proc() {
     uri := strings.concatenate(
         {"file://", encoded}, context.temp_allocator,
     )
+    
+    language := languages[active_buffer.ext]
 
     msg := did_open_message(
         uri,
-        "typescript",
+        language.parser_name,
         1,
         escaped,
     )
@@ -1171,13 +1220,18 @@ go_to_definition :: proc() {
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
-        results,_ := response["result"].(json.Array)
-
-        if len(results) == 0 {
-            return
+        results,results_ok := response["result"].(json.Array)
+        result : json.Object
+        
+        if results_ok == true {
+            result = results[0].(json.Object)
+        } else {
+            results, results_ok := response["result"].(json.Object)
+            
+            if !results_ok do return
+            
+            result = results
         }
-
-        result := results[0].(json.Object)
 
         uri, _ := result["uri"].(string)
         range, _ := result["range"].(json.Object)

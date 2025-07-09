@@ -298,7 +298,9 @@ send_lsp_message :: proc(
     when ODIN_DEBUG {
         fmt.println("LSP Message: Adding a message with ID", id)
     }
-
+    
+    fmt.println(content)
+    
     if id == "" {
         return
     }
