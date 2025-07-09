@@ -1038,38 +1038,39 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         return true
     }
     
-    active_buffer = buffers[new_buffer_index]
+    open_file(buffers[new_buffer_index].file_name)
     
     return true
 }
 
 save_buffer :: proc() {
-    buffer_to_save := make([dynamic]u8)
-    defer delete(buffer_to_save)
-
-    for line, index in active_buffer.lines {
-        if index != 0 {
-            append(&buffer_to_save, '\n');
-        }
-
-        line_string := string(line.characters[:])
-        for character in line_string {
-            encoded, size := utf8.encode_rune(character);
-            append_elems(&buffer_to_save, ..encoded[0:size]);
-        }
-    }
-
     ok := os.write_entire_file(
         active_buffer.file_name,
-        buffer_to_save[:],
+        transmute([]u8)active_buffer.content[:],
         true,
     );
 
     if !ok {
-        panic("FAILED TO SAVE");
+        create_alert(
+            "Failed to save file.",
+            "This is most likely due to missing permissions.",
+            5,
+            context.allocator,
+        )
+        
+        return
     }
+    
+    msg := text_document_did_save_message(
+        strings.concatenate({
+            "file://",
+            active_buffer.file_name,
+        }, context.temp_allocator),
+    )
+    
+    send_lsp_message(msg, "", nil, nil)
 
-    active_buffer^.is_saved = true;
+    active_buffer^.is_saved = true
 }
 
 
@@ -2232,8 +2233,10 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_S) {
         key := key_store[glfw.KEY_S]
 
-        if key.modifiers == 2 {
+        if key.modifiers == CTRL {
             save_buffer()
+        } else if key.modifiers == 0 {
+            show_yank_history()
         }
 
         return false

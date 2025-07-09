@@ -35,6 +35,7 @@ InputMode :: enum {
     HIGHLIGHT,
     GO_TO_LINE,
     DEBUG,
+    YANK_HISTORY,
 }
 
 @(private="package")

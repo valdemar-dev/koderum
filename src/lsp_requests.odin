@@ -100,6 +100,32 @@ text_document_did_change_message :: proc(doc_uri: string, version: int, start_li
     return strings.clone(header)
 }
 
+text_document_did_save_message :: proc(doc_uri: string) -> string {
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"method\": \"textDocument/didSave\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", doc_uri, "\"\n",
+        "    }\n",
+        "  }\n",
+        "}\n"
+    }, context.temp_allocator)
+
+    buf := make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+
+    header := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    }, context.temp_allocator)
+
+    delete(buf)
+    return strings.clone(header)
+}
+
 
 get_project_info_message :: proc(id: int) -> string {
     buf := make([dynamic]u8, 32)

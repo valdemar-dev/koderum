@@ -129,6 +129,8 @@ draw_ui :: proc() {
         mode_string = "Debug"
     case .GO_TO_LINE:
         mode_string = "Go To Line"
+    case .YANK_HISTORY:
+        mode_string = "Yank History"
     }
 
     add_text(&rect_cache,

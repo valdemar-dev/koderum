@@ -299,7 +299,7 @@ send_lsp_message :: proc(
         fmt.println("LSP Message: Adding a message with ID", id)
     }
     
-    fmt.println(content)
+    // fmt.println(content)
     
     if id == "" {
         return

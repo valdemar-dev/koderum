@@ -30,6 +30,7 @@ Search
 (Ctrl + K) -> Prev Hit
 (V) -> Highlight search term
 (N) -> Go to line number
+(S) -> Show Yank Buffer History
 
 Configurations
 Configuration location depends on your platform.
