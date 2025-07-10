@@ -121,7 +121,7 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
 }
 
 @(private="package")
-key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {
+key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {        
     switch action {
     case glfw.RELEASE:
         key_store[key] = ActiveKey{

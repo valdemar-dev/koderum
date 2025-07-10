@@ -928,6 +928,9 @@ open_file :: proc(file_name: string) {
     
     if existing_file != nil {
         active_buffer = existing_file
+        
+        scroll_target_y = active_buffer.scroll_y
+        scroll_target_x = active_buffer.scroll_x
 
         set_buffer_cursor_pos(
             existing_file.cursor_line,
