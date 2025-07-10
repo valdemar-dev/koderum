@@ -407,21 +407,19 @@ get_buffer_index :: proc(buffer: ^Buffer) -> int {
 find_search_hits :: proc() {
     clear(&search_hits)
 
-    runes := utf8.string_to_runes(buffer_search_term)
-
     for line,i in active_buffer.lines {
-        found, idx := contains_runes(string(line.characters[:]), runes)
-
-        if found {
-            append_elem(&search_hits, SearchHit{
+        hits := get_substring_indices(string(line.characters[:]), buffer_search_term)
+        
+        defer delete(hits)
+        
+        for hit in hits {
+            append(&search_hits, SearchHit{
                 line=i,
-                start_char=idx,
-                end_char=idx + len(runes),
+                start_char=hit,
+                end_char=hit+len(buffer_search_term),
             })
         }
     }
-
-    delete(runes)
 
     if len(search_hits) > 0 {
         set_hit_index(0)
@@ -1061,6 +1059,10 @@ save_buffer :: proc() {
         return
     }
     
+    if active_language_server == nil {
+        return
+    }
+    
     msg := text_document_did_save_message(
         strings.concatenate({
             "file://",
@@ -1503,25 +1505,25 @@ constrain_scroll_to_cursor :: proc() {
     amnt_above_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - edge_padding + cursor_height
 
     if amnt_above_offscreen < 0 {
-        active_buffer.scroll_y -= -amnt_above_offscreen 
+        scroll_target_y -= -amnt_above_offscreen 
     }
 
     amnt_below_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - (fb_size.y - edge_padding)
 
     if amnt_below_offscreen >= 0 {
-        active_buffer.scroll_y += amnt_below_offscreen 
+        scroll_target_y += amnt_below_offscreen 
     }
 
     amnt_left_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x)
 
     if amnt_left_offscreen < 0 {
-        active_buffer.scroll_x -= -amnt_left_offscreen 
+        scroll_target_x -= -amnt_left_offscreen 
     }
 
     amnt_right_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x) - (fb_size.x - edge_padding)
 
     if amnt_right_offscreen >= 0 {
-        active_buffer.scroll_x += amnt_right_offscreen 
+        scroll_target_x += amnt_right_offscreen 
     }
 }
 
@@ -1716,7 +1718,7 @@ move_forward_word :: proc() {
 scroll_down :: proc() {
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     
-    active_buffer.scroll_y += ((font_size * 1.2) * 80) * frame_time
+    scroll_target_y += ((font_size * 1.2) * 80) * frame_time
 
     constrain_cursor_to_scroll()
 }
@@ -1724,7 +1726,7 @@ scroll_down :: proc() {
 scroll_up :: proc() {
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     
-    active_buffer.scroll_y -= ((font_size * 1.2) * 80) * frame_time
+    scroll_target_y -= ((font_size * 1.2) * 80) * frame_time
 
     constrain_cursor_to_scroll()
 }
@@ -1732,8 +1734,8 @@ scroll_up :: proc() {
 scroll_left :: proc() {
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     
-    active_buffer.scroll_x = max(
-        active_buffer.scroll_x - ((font_size * 1.2) * 80) * frame_time,
+    scroll_target_x = max(
+        scroll_target_x - ((font_size * 1.2) * 80) * frame_time,
         0
     )
 }
@@ -1741,7 +1743,7 @@ scroll_left :: proc() {
 scroll_right :: proc() {
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     
-    active_buffer.scroll_x += ((font_size * 1.2) * 80) * frame_time
+    scroll_target_x += ((font_size * 1.2) * 80) * frame_time
 }
 
 append_to_line :: proc() {

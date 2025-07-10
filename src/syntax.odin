@@ -1224,6 +1224,8 @@ go_to_definition :: proc() {
         result : json.Object
         
         if results_ok == true {
+            if len(results) == 0 do return
+            
             result = results[0].(json.Object)
         } else {
             results, results_ok := response["result"].(json.Object)

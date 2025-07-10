@@ -8,7 +8,9 @@ Buffer Motions
 (Z) -> Go to start of line.
 (Shift + C) -> Delete Current Line
 (Ctrl + S) -> Save active buffer.
-(Q) -> Toggle File Info View
+(Q) -> Toggle File Info View.
+(Ctrl + Shift + W) -> Close File.
+(Ctrl + Shift + R) -> Reload File.
 
 File Explorer
 (O) -> Open File Explorer.
@@ -18,19 +20,19 @@ File Explorer
 (Ctrl + G) -> Create file using current Search Term, (if a file with search term is not already found.)
 
 Highlight
-(V) -> Enable Highlight mode
-(C) -> Delete highlighted area and put into Yank Sliding Buffer
-(G) -> Search for highlighted area
+(V) -> Enable Highlight mode.
+(C) -> Delete highlighted area and put into Yank Sliding Buffer.
+(G) -> Search for highlighted area.
 
 Search
-(G) -> Enable Search Mode
-(ANY CHAR) -> Type Search Term
-(Enter) -> Get Results
-(Ctrl + J) -> Next Hit
-(Ctrl + K) -> Prev Hit
-(V) -> Highlight search term
-(N) -> Go to line number
-(S) -> Show Yank Buffer History
+(G) -> Enable Search Mode.
+(ANY CHAR) -> Type Search Term.
+(Enter) -> Get Results.
+(Ctrl + J) -> Next Hit.
+(Ctrl + K) -> Prev Hit.
+(V) -> Highlight search term.
+(N) -> Go to line number.
+(S) -> Show Yank Buffer History.
 
 Configurations
 Configuration location depends on your platform.

@@ -127,6 +127,10 @@ process_lsp_notification :: proc (parsed: json.Object) {
         decoded, decoded_ok := net.percent_decode(url)
 
         buffer := get_buffer_by_name(decoded)
+        
+        if buffer == nil {
+            panic("whatafack?")
+        }
 
         if !ok {
             panic("Malformed diagnostics array in textDocumentation/publishDiagnostics.")
@@ -177,9 +181,7 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
         return int(start_line_a - start_line_b)
     }
-
-    sort.quick_sort_proc(errors[:], sort_proc)
-
+    
     for &line in buffer.lines {
         for error in line.errors {
             delete(error.source)
@@ -188,6 +190,10 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
         clear(&line.errors)
     }
+    
+    if len(errors) == 0 do return
+    
+    sort.quick_sort_proc(errors[:], sort_proc)
 
     for error in errors {
         error_obj, ok := error.(json.Object)
@@ -293,6 +299,10 @@ send_lsp_message :: proc(
     response_proc: proc(response: json.Object, data: rawptr) = nil,
     data: rawptr = nil,
 ) {
+    if active_language_server == nil {
+        return
+    }
+    
     os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
 
     when ODIN_DEBUG {

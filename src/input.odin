@@ -157,10 +157,51 @@ set_keypress_states :: proc() {
 }
 
 @(private="package")
+scroll_target_x : f32
+@(private="package")
+scroll_target_y : f32
+
+@(private="package")
 scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) {
-    scroll_amount := abs(scroll_y * .1)
+    if active_buffer == nil {
+        return
+    }
+    
+    scroll_target_y = scroll_target_y - f32(scroll_y * 20)
+    
+    scroll_target_x = max(
+        scroll_target_x - f32(scroll_x * 20),
+        0
+    )
 }
 
+@(private="package")
+tick_smooth_scroll :: proc() {
+    if active_buffer == nil {
+        return
+    }
+    
+    active_buffer.scroll_x = smooth_lerp(
+        active_buffer.scroll_x, 
+        scroll_target_x, 
+        20,
+        frame_time,
+    )
+    
+    active_buffer.scroll_y = smooth_lerp(
+        active_buffer.scroll_y, 
+        scroll_target_y, 
+        20,
+        frame_time,
+    )
+    
+    /*
+    active_buffer.scroll_x = clamp(
+        active_buffer.scroll_x,
+        -1000,
+        0,
+    )*/
+}
 
 @(private="package")
 cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {

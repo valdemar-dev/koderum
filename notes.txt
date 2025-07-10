@@ -11,10 +11,9 @@ todo:
     - maybe have two trees for parsing, threaded and single-threaded
     - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.    
     - implement yank-buffer history usage and view
+    - add variable font weights
 
 bugs:    
-    - paste replace does not work
-    - paste replace does not use clipboard
     - hl only works for 1 item per line
     - any movement action should trigger refresh of everything.
       including constrain scroll, constrain cursor, get suggestions, and get error.

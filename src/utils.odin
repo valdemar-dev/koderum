@@ -246,3 +246,17 @@ is_point_in_rect :: proc(p: vec2, r: rect) -> bool {
 	       p.y <= r.y + r.height
 }
 
+get_substring_indices :: proc(haystack: string, needle: string) -> [dynamic]int {
+    if len(needle) == 0 || len(haystack) < len(needle) {
+        return {}
+    }
+
+    indices := make([dynamic]int)
+    
+    for i in 0..<len(haystack) - len(needle) + 1 {
+        if haystack[i : i + len(needle)] == needle {
+            append(&indices, i)
+        }
+    }
+    return indices
+}

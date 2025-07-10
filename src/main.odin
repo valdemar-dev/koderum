@@ -111,6 +111,8 @@ main :: proc() {
         tick_notifications()
         tick_alerts()
         
+        tick_smooth_scroll()
+        
         update_fonts()
         update_camera()
  
