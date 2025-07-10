@@ -87,12 +87,6 @@ load_font :: proc(path: cstring) -> (face: ft.Face, err: ft.Error) {
 
     error = ft.set_pixel_sizes(face, 0, 64)
     if error != .Ok do return nil, error
-    /*
-    error = ft.set_lcd_filter(library, ft.FT_LcdFilter.Default)
-    if err == ft.Error.Unimplemented_Feature {
-        panic("AHH")
-    }
-    */
 
     return face, .Ok
 }
