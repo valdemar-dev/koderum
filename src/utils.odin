@@ -235,14 +235,14 @@ run_program :: proc(
         fmt.println("Running program: ", command)
     }
     
-    state, stdout, stderr, ok := os2.process_exec(desc, context.allocator)
+    state, stdout, stderr, error := os2.process_exec(desc, context.allocator)
     
     when ODIN_DEBUG {
         fmt.println("Result of program", command)
         fmt.println(state)
     }
 
-    return os2.ERROR_NONE
+    return error
 }
 
 is_point_in_rect :: proc(p: vec2, r: rect) -> bool {
