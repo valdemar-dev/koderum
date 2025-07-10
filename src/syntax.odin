@@ -374,7 +374,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         }
     } else when ODIN_OS == .Windows {
         dll_path := strings.concatenate({
-            parser_dir, "/tree_sitter.dll",
+            parser_dir, "\\parser.dll",
         })
         
         defer delete(dll_path)
@@ -512,7 +512,7 @@ init_parser :: proc(language: ^Language) {
     } else when ODIN_OS == .Windows {
         parser_path = strings.concatenate({
             parser_dir,
-            "/parser.dll",
+            "\\parser.dll",
         })
     }
     
