@@ -384,8 +384,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
             "-shared",
             "-o",
             dll_path,
-            "parser.obj",
-            "scanner.obj"
+            ".\\parser.obj",
+            ".\\scanner.obj"
         }
     }
 
