@@ -409,6 +409,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         
         command = {
             "gcc",
+            "-m64",
             "-shared",
             "-o",
             dll_path,
