@@ -402,19 +402,17 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         }
     } else when ODIN_OS == .Windows {
         dll_path := strings.concatenate({
-            parser_dir, "\\parser.dll",
+            "/Fe", parser_dir, "\\parser.dll",
         })
         
         defer delete(dll_path)
         
         command = {
-            "gcc",
-            "-m64",
-            "-shared",
-            "-o",
-            dll_path,
+            "cl",
+            "/LD",
             ".\\parser.o",
-            ".\\scanner.o"
+            ".\\scanner.o",
+            dll_path,
         }
     }
 
