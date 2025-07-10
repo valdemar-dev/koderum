@@ -456,12 +456,22 @@ init_parser :: proc(language: ^Language) {
             )
         }
     }
-
-    parser_dir := strings.concatenate({
-        data_dir,
-        "/parsers/",
-        language.parser_name,
-    })
+    
+    parser_dir : string
+    
+    when ODIN_OS == .Windows {    
+        parser_dir = strings.concatenate({
+            data_dir,
+            "\\parsers\\",
+            language.parser_name,
+        })
+    } else {
+        parser_dir = strings.concatenate({
+            data_dir,
+            "/parsers/",
+            language.parser_name,
+        })
+    }
 
     defer delete(parser_dir)
 
@@ -530,7 +540,9 @@ init_parser :: proc(language: ^Language) {
     ptr, found := dynlib.symbol_address(lib, language.language_symbol_name)
 
     if !found || ptr == nil {
-        fmt.eprintln("Symbol not found: %s", dynlib.last_error())
+        fmt.eprintln("Could not load library: ", dynlib.last_error())
+        
+        fmt.eprintln("Path:", parser_path)
 
         panic("Unrecoverable error.")
     }
