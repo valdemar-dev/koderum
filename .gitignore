@@ -3,6 +3,7 @@
 *.png
 *.args
 *.conf
+src.bin
 
 node_modules
 stdout.txt
