@@ -235,7 +235,7 @@ run_program :: proc(
         fmt.println("Running program: ", command)
     }
     
-    state, stdout, stderr := os2.process_exec(desc, context.allocator) or_return
+    state, stdout, stderr, ok := os2.process_exec(desc, context.allocator)
     
     when ODIN_DEBUG {
         fmt.println("Result of program", command)
