@@ -182,12 +182,20 @@ install_tree_sitter :: proc() -> os2.Error {
     defer delete(include_path)
     defer delete(header_loc)
 
-    command = {
-        "cp",
-        header_loc,
-        include_path,
+    when ODIN_OS == .Windows {
+        command = {
+            "copy",
+            header_loc,
+            include_path,
+        }
+    } else {
+        command = {
+            "cp",
+            header_loc,
+            include_path,
+        }
     }
-
+    
     error = run_program(
         command,
         nil,
