@@ -530,8 +530,10 @@ init_parser :: proc(language: ^Language) {
 
     lib, ok := dynlib.load_library(parser_path)
     if !ok {
-        fmt.eprintln("Failed to load: %s", dynlib.last_error())
+        fmt.eprintln("Failed to load:", dynlib.last_error())
 
+        fmt.eprintln("Path:", parser_path)
+        
         panic("Unrecoverable error.")
     }
 
