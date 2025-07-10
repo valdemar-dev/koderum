@@ -115,7 +115,7 @@ init_local :: proc () {
     } else when ODIN_OS == .Windows {
         appdata := os.get_env("APPDATA")
         
-        path = strings.concatenate({ appdata, "/koderum", })
+        path = strings.concatenate({ appdata, "\\koderum", })
         
         delete(appdata)
     } else when ODIN_OS == .Darwin {
