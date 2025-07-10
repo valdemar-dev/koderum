@@ -276,7 +276,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         include_path := strings.concatenate({
             "-I",
             data_dir,
-            "/tree-sitter/lib/include"
+            "\\tree-sitter\\lib\\include"
         })
         
         defer delete(include_path)
@@ -285,8 +285,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
             "gcc",
             include_path,
             "-c",
-            "src/parser.c",
-            "src/scanner.c",
+            ".\\src\\parser.c",
+            ".\\src\\scanner.c",
         }
     }
     
@@ -296,25 +296,37 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         nil,
         compilation_dir,
     )
-
-    parsers_dir := strings.concatenate({
-        data_dir, "/parsers",
-    })
     
-    defer delete(parsers_dir)
-
-    parser_dir := strings.concatenate({
-        parsers_dir, "/", language.parser_name,
-    })
+    when ODIN_OS == .Windows {    
+        parsers_dir := strings.concatenate({
+            data_dir, "\\parsers",
+        })
+        
+        defer delete(parsers_dir)
     
-    defer delete(parser_dir)
+        parser_dir := strings.concatenate({
+            parsers_dir, "\\", language.parser_name,
+        })
+        
+        defer delete(parser_dir)
 
-    when ODIN_OS == .Windows {
         command = {
             "mkdir",
             parser_dir,
         }
-    } else {
+    } else {    
+        parsers_dir := strings.concatenate({
+            data_dir, "/parsers",
+        })
+        
+        defer delete(parsers_dir)
+    
+        parser_dir := strings.concatenate({
+            parsers_dir, "/", language.parser_name,
+        })
+        
+        defer delete(parser_dir)
+    
         command = {
             "mkdir",
             "-p",
