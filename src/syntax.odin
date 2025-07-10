@@ -337,6 +337,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         defer delete(parser_dir)
 
         command = {
+            "cmd.exe",
+            "/C",
             "mkdir",
             parser_dir,
         }
