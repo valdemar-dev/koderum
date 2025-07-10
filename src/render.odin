@@ -51,6 +51,8 @@ render :: proc() {
 
     draw_buffer_info_view()
     draw_browser_view()
+    
+    draw_yank_history()
 
     when ODIN_DEBUG {
         draw_debug()
@@ -236,6 +238,8 @@ add_text_measure :: proc(
         do_wrap,
         split_new_lines,
     )
+    
+    pen.y += font_height
 
     return vec2{
         pen.x - pos.x,

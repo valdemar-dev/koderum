@@ -357,6 +357,8 @@ byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
 
 
 next_buffer :: proc() {
+    clear(&completion_hits)
+    
     set_next_as_current := false
 
     for buffer, index in buffers {
@@ -377,12 +379,16 @@ set_buffer :: proc(number: int) {
     if idx > len(buffers) - 1 {
         return
     }
+    
+    clear(&completion_hits)
 
     buf := buffers[idx]
     open_file(buf.file_name)
 }
 
 prev_buffer :: proc() {
+    clear(&completion_hits)
+    
     set_next_as_current := false
 
     #reverse for buffer, index in buffers {

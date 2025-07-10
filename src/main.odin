@@ -113,6 +113,8 @@ main :: proc() {
         
         tick_smooth_scroll()
         
+        tick_yank_history()
+        
         update_fonts()
         update_camera()
  

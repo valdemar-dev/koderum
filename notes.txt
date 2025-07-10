@@ -12,8 +12,6 @@ todo:
     - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.    
     - implement yank-buffer history usage and view
     - add variable font weights
-
-bugs:    
-    - hl only works for 1 item per line
+bugs:
     - any movement action should trigger refresh of everything.
       including constrain scroll, constrain cursor, get suggestions, and get error.

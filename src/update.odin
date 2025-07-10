@@ -75,6 +75,8 @@ message_loop :: proc(thread: ^thread.Thread) {
         obj, ok := parsed.(json.Object)
 
         if !ok {
+            fmt.println(string(bytes))
+            
             panic("Malformed LSP JSON.")
         }
 

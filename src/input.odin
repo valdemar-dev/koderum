@@ -75,6 +75,8 @@ check_inputs :: proc() -> bool {
         handle_highlight_input()
     case .DEBUG:
         handle_debug_input()
+    case .YANK_HISTORY:
+        handle_yank_history_input()
     }
 
     return false

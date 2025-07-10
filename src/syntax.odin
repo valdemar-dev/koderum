@@ -1475,17 +1475,15 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
     sort_proc :: proc(token_a, token_b: Token) -> int {
         return int(token_a.char - token_b.char)
     }
+    
+    for &line in buffer.lines {
+        clear(&line.lsp_tokens)
+    }
 
-    line_number : i32 = -1
     for &token in lsp_tokens {
         if int(token.line) >= len(buffer.lines) do continue
 
         line := &buffer.lines[token.line]
-        
-        if token.line > line_number {
-            clear(&line.lsp_tokens)
-            line_number = token.line
-        }
         
         append(&line.lsp_tokens, token)
         

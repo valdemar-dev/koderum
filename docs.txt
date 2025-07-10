@@ -32,7 +32,12 @@ Search
 (Ctrl + K) -> Prev Hit.
 (V) -> Highlight search term.
 (N) -> Go to line number.
+
+Yank Buffer
 (S) -> Show Yank Buffer History.
+(J-K) -> Select Index.
+(Enter) -> Set as recent yank.
+(Escape) -> Exist Yank Buffer History.
 
 Configurations
 Configuration location depends on your platform.
