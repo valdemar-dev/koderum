@@ -16,11 +16,15 @@ import ts "../../odin-tree-sitter"
 import "core:time"
 import "core:math"
 import "core:thread"
+import "core:sync"
 
 @(private="package")
 BufferLine :: struct {
     characters: [dynamic]u8,
-    tokens : [dynamic]Token,
+    
+    ts_tokens : [dynamic]Token,
+    lsp_tokens : [dynamic]Token,
+    
     errors : [dynamic]BufferError,
 }
 
@@ -819,12 +823,16 @@ draw_autocomplete :: proc() {
         9,
     )
     
+    sync.lock(&completion_mutex)
+    
     if selected_completion_hit >= len(completion_hits) {
         return
     }
     
     first_hit := &completion_hits[selected_completion_hit]
-
+    
+    sync.unlock(&completion_mutex)
+    
     if first_hit == nil {
         return
     }
@@ -929,8 +937,8 @@ open_file :: proc(file_name: string) {
     if existing_file != nil {
         active_buffer = existing_file
         
-        scroll_target_y = active_buffer.scroll_y
-        scroll_target_x = active_buffer.scroll_x
+        scroll_target_y = existing_file.scroll_y
+        scroll_target_x = existing_file.scroll_x
 
         set_buffer_cursor_pos(
             existing_file.cursor_line,
@@ -970,6 +978,9 @@ open_file :: proc(file_name: string) {
     new_buffer^.width = fb_size.x
     new_buffer^.height = fb_size.y
     new_buffer^.is_saved = true
+    
+    scroll_target_y = 0
+    scroll_target_x = 0
 
     file_info, lstat_error := os.lstat(file_name)
 
@@ -1879,7 +1890,7 @@ array_is_equal :: proc(a, b: []rune) -> bool {
 
 @(private="package")
 get_buffer_by_name :: proc(file_name: string) -> ^Buffer {
-    for &buffer in buffers {
+    for buffer in buffers {
         if buffer.file_name == file_name {
             return buffer
         }
@@ -2465,6 +2476,10 @@ handle_buffer_input :: proc() -> bool {
         clear(&search_hits)
 
         input_mode = .COMMAND
+        
+        if cached_buffer_index == -1 {
+            return false
+        }
 
         cached_file := buffers[cached_buffer_index]
         open_file(cached_file.file_name)

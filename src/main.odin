@@ -152,7 +152,8 @@ main :: proc() {
     for buffer in buffers {
         for &line in buffer.lines {
             delete(line.characters)
-            delete(line.tokens)
+            delete(line.ts_tokens)
+            delete(line.lsp_tokens)
         }
 
         delete(buffer.content)

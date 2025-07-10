@@ -16,12 +16,14 @@ import "core:thread"
 import "core:dynlib"
 import "core:net"
 import fp "core:path/filepath"
-
 import "core:sync"
+
 tree_mutex : sync.Mutex
 
+@(private="package")
+lsp_tokens_mutex : sync.Mutex
 
-@(private="file")
+@(private="package")
 completion_mutex : sync.Mutex
 
 @(private="package")
@@ -865,8 +867,12 @@ set_buffer_tokens_threaded :: proc() {
        
         assert(active_language_server != nil)
 
+        sync.lock(&lsp_tokens_mutex)
+        
         set_lsp_tokens(active_buffer, decoded_tokens[:])
 
+        sync.unlock(&lsp_tokens_mutex)
+        
         delete(decoded_tokens)
     }
 }
@@ -1112,8 +1118,6 @@ get_autocomplete_hits :: proc(
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
-        sync.lock(&completion_mutex)
-
         result,result_ok := response["result"].(json.Object)
         items,ok := result["items"].(json.Array)
 
@@ -1181,7 +1185,9 @@ get_autocomplete_hits :: proc(
             delete(hit.raw_data)
             delete(hit.detail)
         }
-
+        
+        sync.lock(&completion_mutex)
+        
         completion_hits = new_hits
 
         if len(completion_hits) > 0 {
@@ -1322,16 +1328,15 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
         active_buffer.query = query
     }
 
-    sync.unlock(&tree_mutex)
-
     set_tokens(first_line, last_line, &tree)
 
+    sync.unlock(&tree_mutex)
+    
     return tree
 }
 
 set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) { 
     if tree_ptr == nil {
-        fmt.println("hi")
         return
     }
 
@@ -1407,7 +1412,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
 
             if row > line_number {
                 line_number = row
-                clear(&line.tokens)
+                clear(&line.ts_tokens)
             }
 
             start_rune := row == start_row ? int(start_point.col) : 0
@@ -1426,7 +1431,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
                     &current_node_type, node,
                     active_buffer.content[:],
                     &start_point, &end_point,
-                    &line.tokens, &current_priority,
+                    &line.ts_tokens, &current_priority,
                 )
             }
 
@@ -1440,13 +1445,13 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
                 continue
             }
             
-            if len(line.tokens) > 0 {
-                if line.tokens[len(line.tokens)-1].char == i32(start_rune) {
-                    resize(&line.tokens, len(line.tokens)-1)
+            if len(line.ts_tokens) > 0 {
+                if line.ts_tokens[len(line.ts_tokens)-1].char == i32(start_rune) {
+                    resize(&line.ts_tokens, len(line.ts_tokens)-1)
                 }
             }
 
-            append(&line.tokens, Token{
+            append(&line.ts_tokens, Token{
                 char = i32(start_rune),
                 length = i32(length),
                 color = color^,
@@ -1454,77 +1459,6 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
             })
         }
     }
-    
-    
-    /*
-    for ts._query_cursor_next_capture(cursor, &match, capture_index) {
-        capture := match.captures[capture_index^]
-
-        name_len: u32
-        name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
-
-        node := capture.node
-        node_type := string(name)
-
-        start_point := ts.node_start_point(node)
-        end_point := ts.node_end_point(node)
-        start_byte := ts.node_start_byte(node)
-        end_byte := ts.node_end_byte(node)
-
-        start_row := int(start_point.row)
-        end_row := int(end_point.row)
-
-        for row in start_row..=end_row {
-            if row >= len(active_buffer.lines) {
-                break
-            }
-
-            line := &active_buffer.lines[row]
-
-            if row > line_number {
-                line_number = row
-                clear(&line.tokens)
-            }
-
-            start_rune := row == start_row ? int(start_point.col) : 0
-            end_rune := row == end_row ? int(end_point.col) : len(line.characters)
-
-            length := end_rune - start_rune
-            if length <= 0 {
-                continue
-            }
-
-            current_node_type := node_type
-            current_priority: u8 
-
-            if active_language_server.override_node_type != nil {
-                active_language_server.override_node_type(
-                    &current_node_type, node,
-                    active_buffer.content[:],
-                    &start_point, &end_point,
-                    &line.tokens, &current_priority,
-                )
-            }
-
-            if current_node_type == "SKIP" {
-                continue
-            }
-
-            color := &active_language_server.language.ts_colors[current_node_type]
-
-            if color == nil {
-                continue
-            }
-
-            append(&line.tokens, Token{
-                char = i32(start_rune),
-                length = i32(length),
-                color = color^,
-                priority = current_priority,
-            })
-        }
-    }
-    */
 }
 
 set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
@@ -1542,30 +1476,20 @@ set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
         return int(token_a.char - token_b.char)
     }
 
+    line_number : i32 = -1
     for &token in lsp_tokens {
         if int(token.line) >= len(buffer.lines) do continue
 
         line := &buffer.lines[token.line]
-
-        overlapping_token, index := get_overlapping_token(line.tokens, token.char)
-
-        if overlapping_token != nil {
-            if overlapping_token.priority > token.priority {
-                continue
-            }
-    
-            if index >= len(line.tokens) {
-                continue
-            }
-            
-            line.tokens[index] = token
         
-            continue
+        if token.line > line_number {
+            clear(&line.lsp_tokens)
+            line_number = token.line
         }
         
-        append(&line.tokens, token)
+        append(&line.lsp_tokens, token)
         
-        sort.quick_sort_proc(line.tokens[:], sort_proc)
+        sort.quick_sort_proc(line.lsp_tokens[:], sort_proc)
     }
 }
 

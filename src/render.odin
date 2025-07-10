@@ -466,15 +466,23 @@ add_code_text :: proc(
     error : ^BufferError
     error_idx : int = 0
 
-    tokens := buffer_line.tokens
-    token : ^Token
-    token_idx : int = 0
+    ts_tokens := buffer_line.ts_tokens
+    ts_token : ^Token
+    ts_token_idx : int = 0
+    
+    lsp_tokens := buffer_line.lsp_tokens
+    lsp_token : ^Token
+    lsp_token_idx : int = 0
     
     highlight_width : f32 = 0
     highlight_offset : f32 = 0
 
-    if len(tokens) > 0 && tokens[0].char == 0 {
-        token = &tokens[0]
+    if len(ts_tokens) > 0 && ts_tokens[0].char == 0 {
+        ts_token = &ts_tokens[0]
+    }
+    
+    if len(lsp_tokens) > 0 && lsp_tokens[0].char == 0 {
+        lsp_token = &lsp_tokens[0]
     }
 
     is_hl_start := line_number == highlight_start_line
@@ -520,29 +528,56 @@ add_code_text :: proc(
             }
         }
 
-        defer if len(tokens) > 0 {
-            if token != nil && (token.char + token.length <= i32(byte_index + 1)) {
-                token_idx += 1
-                if token_idx < len(tokens) {
-                    next_token := &tokens[token_idx]
+        defer if len(ts_tokens) > 0 {
+            if ts_token != nil && (ts_token.char + ts_token.length <= i32(byte_index + 1)) {
+                ts_token_idx += 1
+                if ts_token_idx < len(ts_tokens) {
+                    next_ts_token := &ts_tokens[ts_token_idx]
 
-                    if next_token.char < i32(byte_index) {
-                        token_idx += 1
+                    if next_ts_token.char < i32(byte_index) {
+                        ts_token_idx += 1
                     }
 
-                    if i32(byte_index + 1) >= next_token.char {
-                        token = next_token
+                    if i32(byte_index + 1) >= next_ts_token.char {
+                        ts_token = next_ts_token
                     } else {
-                        token = nil
+                        ts_token = nil
                     }
                 } else {
-                    token = nil
+                    ts_token = nil
                 }
-            } else if token == nil && token_idx < len(tokens) {
-                next_token := &tokens[token_idx]
+            } else if ts_token == nil && ts_token_idx < len(ts_tokens) {
+                next_ts_token := &ts_tokens[ts_token_idx]
 
-                if i32(byte_index + 1) >= next_token.char {
-                    token = next_token
+                if i32(byte_index + 1) >= next_ts_token.char {
+                    ts_token = next_ts_token
+                }
+            }
+        }        
+        
+        defer if len(lsp_tokens) > 0 {
+            if lsp_token != nil && (lsp_token.char + lsp_token.length <= i32(byte_index + 1)) {
+                lsp_token_idx += 1
+                if lsp_token_idx < len(lsp_tokens) {
+                    next_lsp_token := &lsp_tokens[lsp_token_idx]
+
+                    if next_lsp_token.char < i32(byte_index) {
+                        lsp_token_idx += 1
+                    }
+
+                    if i32(byte_index + 1) >= next_lsp_token.char {
+                        lsp_token = next_lsp_token
+                    } else {
+                        lsp_token = nil
+                    }
+                } else {
+                    lsp_token = nil
+                }
+            } else if lsp_token == nil && lsp_token_idx < len(lsp_tokens) {
+                next_lsp_token := &lsp_tokens[lsp_token_idx]
+
+                if i32(byte_index + 1) >= next_lsp_token.char {
+                    lsp_token = next_lsp_token
                 }
             }
         }        
@@ -629,8 +664,10 @@ add_code_text :: proc(
             color = RED
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
-        } else if token != nil {
-            color = token.color
+        } else if lsp_token != nil {
+            color = lsp_token.color
+        } else if ts_token != nil {
+            color = ts_token.color
         } else if active_language_server != nil {
             color = active_language_server.language.filler_color
         } else if active_language_server == nil {

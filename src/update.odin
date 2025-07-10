@@ -129,7 +129,8 @@ process_lsp_notification :: proc (parsed: json.Object) {
         buffer := get_buffer_by_name(decoded)
         
         if buffer == nil {
-            panic("whatafack?")
+            // lsp can set diagnostics for files that aren't open.
+            return
         }
 
         if !ok {
