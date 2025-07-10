@@ -228,17 +228,19 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         temp_dir,
     )
 
-    compilation_dir := strings.concatenate({
-        temp_dir,
-        "/",
-        language.parser_name,
-        "/",
-        language.parser_subpath,
-    })
+    compilation_dir : string
     
     defer delete(compilation_dir)
 
     when ODIN_OS == .Linux {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "/",
+            language.parser_name,
+            "/",
+            language.parser_subpath,
+        })
+        
         include_path := strings.concatenate({
             "-I",
             data_dir,
@@ -255,7 +257,15 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
             "src/parser.c",
             "src/scanner.c",
         }
-    } else when ODIN_OS == .Darwin {    
+    } else when ODIN_OS == .Darwin {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "/",
+            language.parser_name,
+            "/",
+            language.parser_subpath,
+        })
+        
         include_path := strings.concatenate({
             "-I",
             data_dir,
@@ -273,6 +283,14 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
             "src/scanner.c",
         }
     } else when ODIN_OS == .Windows {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "\\",
+            language.parser_name,
+            "\\",
+            language.parser_subpath,
+        })
+        
         include_path := strings.concatenate({
             "-I",
             data_dir,
