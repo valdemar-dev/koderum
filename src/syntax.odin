@@ -196,7 +196,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
 
     dir_error := os.make_directory(temp_dir, u32(os.File_Mode(0o700)))
 
-    if dir_error != os.ERROR_NONE && dir_error != os.EEXIST {
+    if dir_error != os.ERROR_NONE && os.exists(temp_dir) == false {
+        fmt.println(dir_error)
         panic("Failed to create temp directory.")
     }
 
