@@ -150,13 +150,17 @@ install_tree_sitter :: proc() -> os2.Error {
     )
 
     // Patching weirdness.
+    mkdir_dest := strings.concatenate({
+        tree_sitter_dir,
+        "/lib/include/tree_sitter",
+    })
+    
+    defer delete(mkdir_dest)
+    
     command = {
         "mkdir",
         "-p",
-        strings.concatenate({
-            tree_sitter_dir,
-            "/lib/include/tree_sitter",
-        }, context.temp_allocator),
+        mkdir_dest,
     }
 
     error = run_program(
@@ -164,19 +168,34 @@ install_tree_sitter :: proc() -> os2.Error {
         nil,
         tree_sitter_dir,
     )
+    
+    header_loc := strings.concatenate({
+        tree_sitter_dir,
+        "/lib/src/parser.h",
+    })
+    
+    include_path := strings.concatenate({
+        tree_sitter_dir,
+        "/lib/include/tree_sitter/",
+    })
+    
+    defer delete(include_path)
+    defer delete(header_loc)
 
-    command = {
-        "cp",
-        strings.concatenate({
-            tree_sitter_dir,
-            "/lib/src/parser.h",
-        }, context.temp_allocator),
-        strings.concatenate({
-            tree_sitter_dir,
-            "/lib/include/tree_sitter/",
-        }, context.temp_allocator),
+    when ODIN_OS == .Windows {
+        command = {
+            "copy",
+            header_loc,
+            include_path,
+        }
+    } else {
+        command = {
+            "cp",
+            header_loc,
+            include_path,
+        }
     }
-
+    
     error = run_program(
         command,
         nil,
@@ -196,7 +215,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
 
     dir_error := os.make_directory(temp_dir, u32(os.File_Mode(0o700)))
 
-    if dir_error != os.ERROR_NONE {
+    if dir_error != os.ERROR_NONE && os.exists(temp_dir) == false {
+        fmt.println(dir_error)
         panic("Failed to create temp directory.")
     }
 
@@ -216,47 +236,125 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         temp_dir,
     )
 
-    compilation_dir := strings.concatenate({
-        temp_dir,
-        "/",
-        language.parser_name,
-        "/",
-        language.parser_subpath,
-    })
+    compilation_dir : string
+    
+    defer delete(compilation_dir)
 
-    command = {
-        "cc",
-        "-fPIC",
-        strings.concatenate({
+    when ODIN_OS == .Linux {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "/",
+            language.parser_name,
+            "/",
+            language.parser_subpath,
+        })
+        
+        include_path := strings.concatenate({
             "-I",
             data_dir,
             "/tree-sitter/lib/include"
-        }, context.temp_allocator),
-        "-c",
-        "src/parser.c",
-        "src/scanner.c",
+        })
+        
+        defer delete(include_path)
+
+        command = {
+            "cc",
+            "-fPIC",
+            include_path,
+            "-c",
+            "src/parser.c",
+            "src/scanner.c",
+        }
+    } else when ODIN_OS == .Darwin {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "/",
+            language.parser_name,
+            "/",
+            language.parser_subpath,
+        })
+        
+        include_path := strings.concatenate({
+            "-I",
+            data_dir,
+            "/tree-sitter/lib/include"
+        })
+        
+        defer delete(include_path)
+
+        command = {
+            "cc",
+            "-fPIC",
+            include_path,
+            "-c",
+            "src/parser.c",
+            "src/scanner.c",
+        }
+    } else when ODIN_OS == .Windows {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "\\",
+            language.parser_name,
+            "\\",
+            language.parser_subpath,
+        })
+        
+        include_path := strings.concatenate({
+            "-I",
+            data_dir,
+            "\\tree-sitter\\lib\\include"
+        })
+        
+        defer delete(include_path)
+        
+        command = {
+            "gcc",
+            include_path,
+            "-c",
+            ".\\src\\parser.c",
+            ".\\src\\scanner.c",
+        }
     }
+    
 
     error = run_program(
         command,
         nil,
         compilation_dir,
     )
+    
+    when ODIN_OS == .Windows {    
+        parsers_dir := strings.concatenate({
+            data_dir, "\\parsers",
+        })
+        
+        defer delete(parsers_dir)
+    
+        parser_dir := strings.concatenate({
+            parsers_dir, "\\", language.parser_name,
+        })
+        
+        defer delete(parser_dir)
 
-    parsers_dir := strings.concatenate({
-        data_dir, "/parsers",
-    })
-
-    parser_dir := strings.concatenate({
-        parsers_dir, "/", language.parser_name,
-    })
-
-    when ODIN_OS == .Windows {
         command = {
+            "cmd.exe",
+            "/C",
             "mkdir",
             parser_dir,
         }
-    } else {
+    } else {    
+        parsers_dir := strings.concatenate({
+            data_dir, "/parsers",
+        })
+        
+        defer delete(parsers_dir)
+    
+        parser_dir := strings.concatenate({
+            parsers_dir, "/", language.parser_name,
+        })
+        
+        defer delete(parser_dir)
+    
         command = {
             "mkdir",
             "-p",
@@ -270,19 +368,56 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         compilation_dir,
     )
 
-    command = {
-        "cc",
-        "-shared",
-        "-fPIC",
-        "-o",
-        strings.concatenate({
+    when ODIN_OS == .Linux {
+        dll_path := strings.concatenate({
             parser_dir, "/parser.o",
-        }, context.temp_allocator),
-        "parser.o",
-        "scanner.o"
+        })
+        
+        defer delete(dll_path)
+        
+        command = {
+            "gcc",
+            "-shared",
+            "-fPIC",
+            "-o",
+            dll_path,
+            "parser.o",
+            "scanner.o"
+        }
+    } else when ODIN_OS == .Darwin {
+        dll_path := strings.concatenate({
+            parser_dir, "/parser.o",
+        })
+    
+        defer delete(dll_path)
+        
+        command = {
+            "gcc",
+            "-shared",
+            "-fPIC",
+            "-o",
+            dll_path,
+            "parser.o",
+            "scanner.o"
+        }
+    } else when ODIN_OS == .Windows {
+        dll_path := strings.concatenate({
+            parser_dir, "\\parser.dll",
+        })
+        
+        defer delete(dll_path)
+        
+        command = {
+            "gcc",
+            "-shared",
+            "-o",
+            dll_path,
+            ".\\parser.o",
+            ".\\scanner.o",
+        }
     }
 
-    run_program(
+    error = run_program(
         command,
         nil,
         compilation_dir,
@@ -292,13 +427,17 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
 }
 
 init_parser :: proc(language: ^Language) {
+    message := strings.concatenate({
+        "The parser for the language ",
+        language.parser_name,
+        " is initializing.."
+    })
+    
+    defer delete(message)
+    
     parser_alert = create_alert(
         "Loading parser..",
-        strings.concatenate({
-            "The parser for the language ",
-            language.parser_name,
-            " is initializing.."
-        }, context.temp_allocator),
+        message,
         -1,
         context.allocator,
     )
@@ -345,12 +484,22 @@ init_parser :: proc(language: ^Language) {
             )
         }
     }
-
-    parser_dir := strings.concatenate({
-        data_dir,
-        "/parsers/",
-        language.parser_name,
-    })
+    
+    parser_dir : string
+    
+    when ODIN_OS == .Windows {    
+        parser_dir = strings.concatenate({
+            data_dir,
+            "\\parsers\\",
+            language.parser_name,
+        })
+    } else {
+        parser_dir = strings.concatenate({
+            data_dir,
+            "/parsers/",
+            language.parser_name,
+        })
+    }
 
     defer delete(parser_dir)
 
@@ -364,6 +513,16 @@ init_parser :: proc(language: ^Language) {
         )
 
         error := install_parser(language, parser_dir)
+        
+        if error == os2.General_Error.Not_Exist {
+            edit_alert(
+                parser_alert,
+                "Failed to install parser!",
+                "Make sure you have installed git and gcc, and that both are available in the system PATH."
+            )
+            
+            return
+        }
 
         if error != os2.ERROR_NONE {
             edit_alert(
@@ -374,7 +533,8 @@ init_parser :: proc(language: ^Language) {
                 }, context.temp_allocator),
             )
 
-            panic("Parser could not be installed.")
+            // panic("Parser could not be installed.")
+            return
         } else {
             edit_alert(
                 parser_alert,
@@ -385,16 +545,34 @@ init_parser :: proc(language: ^Language) {
             )
         }
     }
-
-    parser_path := strings.concatenate({
-        parser_dir,
-        "/parser.o",
-    })
+    
+    parser_path : string
+    
+    when ODIN_OS == .Linux {
+        parser_path = strings.concatenate({
+            parser_dir,
+            "/parser.o",
+        })
+    } else when ODIN_OS == .Darwin {
+        parser_path = strings.concatenate({
+            parser_dir,
+            "/parser.o",
+        })
+    } else when ODIN_OS == .Windows {
+        parser_path = strings.concatenate({
+            parser_dir,
+            "\\parser.dll",
+        })
+    }
+    
+    defer delete(parser_path)
 
     lib, ok := dynlib.load_library(parser_path)
     if !ok {
-        fmt.eprintln("Failed to load: %s", dynlib.last_error())
+        fmt.eprintln("Failed to load:", dynlib.last_error())
 
+        fmt.eprintln("Path:", parser_path)
+        
         panic("Unrecoverable error.")
     }
 
@@ -403,7 +581,9 @@ init_parser :: proc(language: ^Language) {
     ptr, found := dynlib.symbol_address(lib, language.language_symbol_name)
 
     if !found || ptr == nil {
-        fmt.eprintln("Symbol not found: %s", dynlib.last_error())
+        fmt.eprintln("Could not load library: ", dynlib.last_error())
+        
+        fmt.eprintln("Path:", parser_path)
 
         panic("Unrecoverable error.")
     }

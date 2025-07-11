@@ -53,7 +53,15 @@ init_config :: proc() -> []u8 {
     when ODIN_OS == .Linux {
         path = strings.concatenate({ home, "/.config/koderum" })
     } else when ODIN_OS == .Windows {
-        path = strings.concatenate({ home, "C:/Users/<user>/AppData/Roaming/koderum" })
+        appdata := os.get_env("APPDATA")
+        
+        path = strings.concatenate({ appdata, "/koderum", })
+        
+        delete(appdata)
+    } else when ODIN_OS == .Darwin {
+        path = strings.concatenate({
+            home, "/Library/Application Support/koderum"
+        })
     }
 
     config_dir = path
@@ -105,7 +113,15 @@ init_local :: proc () {
     when ODIN_OS == .Linux {
         path = strings.concatenate({ home, "/.local/share/koderum" })
     } else when ODIN_OS == .Windows {
-        path = strings.concatenate({ home, "C:/Users/<user>/AppData/Local/koderum" })
+        appdata := os.get_env("APPDATA")
+        
+        path = strings.concatenate({ appdata, "\\koderum", })
+        
+        delete(appdata)
+    } else when ODIN_OS == .Darwin {
+        path = strings.concatenate({
+            home, "/Library/Application Support/koderum"
+        })
     }
 
     data_dir = path

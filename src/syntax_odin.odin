@@ -18,7 +18,6 @@ ts_odin_colors : map[string]vec4 = {
     "number"=LIGHT_GREEN,
     "float"=LIGHT_GREEN,
     "string.escape"=YELLOW,
-    "error"=RED,
     "function"=YELLOW,
     "variable.usage"=PINK,    
     

@@ -1,3 +1,14 @@
+Compilation
+Windows:
+    Dependencies:
+        - https://github.com/laytan/odin-tree-sitter
+          On linux, use odin run build -- install
+          On windows, install tree-sitter, and build a static lib using:
+            cl /c /O2 /Ilib\include lib\src\lib.c
+            lib /OUT:odin-tree-sitter/tree-sitter/libtree-sitter.lib
+        - https://github.com/valdemar-dev/odin-freetype (install to alt-odin-freetype)
+          Make sure to get either freetype.a, or .lib, and put it in the alt-odin-freetype directory.
+
 Buffer Motions
 (D)&(F) -> Left-Right Movement.
 (J)&(K) -> Up-Down Movement.
