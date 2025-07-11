@@ -1026,10 +1026,10 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
-    //sync.lock(&tree_mutex)
+    sync.lock(&tree_mutex)
     new_tree := parse_tree(0, len(active_buffer.lines))
     ts.tree_delete(new_tree)
-    //sync.unlock(&tree_mutex)
+    sync.unlock(&tree_mutex)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
         defer free(data)
