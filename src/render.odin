@@ -168,7 +168,14 @@ measure_text :: proc (
     text: string,
     max_width : f32 = -1,
 ) -> vec2 {
-    max_ascent : f32 = font_height
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+    assert(error == .Ok)
+
+    ascend := primary_font.size.metrics.ascender >> 6
+    descend := primary_font.size.metrics.descender >> 6
+
+    max_ascent := f32(ascend - descend)
+
 
     highest := vec2{
         y=max_ascent,

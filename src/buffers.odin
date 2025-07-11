@@ -433,6 +433,13 @@ find_search_hits :: proc() {
 
     if len(search_hits) > 0 {
         set_hit_index(0)
+    } else {
+        create_alert(
+            "Not Found!",
+            "Search term matched 0 hits.",
+            5,
+            context.allocator
+        )
     }
 }
 
@@ -460,8 +467,6 @@ set_hit_index :: proc(index: int) {
         selected_hit.line,
         selected_hit.start_char,
     )
-
-    constrain_scroll_to_cursor()
 
     hit_index = idx
 }
@@ -1024,7 +1029,6 @@ open_file :: proc(file_name: string) {
     append(&buffers, new_buffer)
     
     set_buffer_cursor_pos(0,0)
-    constrain_scroll_to_cursor() 
 
     thread.run(lsp_handle_file_open)
 }
@@ -1379,6 +1383,19 @@ handle_text_input :: proc() -> bool {
         insert_completion()
     }
     
+    if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        move_down()
+    }
+    if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        move_up()
+    }
+    if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        move_left()
+    }
+    if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        move_right()
+    }
+    
     if is_key_pressed(glfw.KEY_ENTER) {
         defer {
             get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
@@ -1483,8 +1500,6 @@ insert_into_buffer :: proc (key: rune) {
     
     get_char(font_size, u64(key))
     add_missing_characters()
-
-    constrain_scroll_to_cursor()
 
     when ODIN_DEBUG {
         now := time.now()
@@ -1592,9 +1607,6 @@ move_up :: proc() {
             buffer_cursor_char_index,
         )
     }
-
-    constrain_scroll_to_cursor()
-    clear(&completion_hits)
 }
 
 move_left :: proc() {
@@ -1610,9 +1622,6 @@ move_left :: proc() {
             new,
         )
     }
-
-    constrain_scroll_to_cursor()
-    clear(&completion_hits)
 }
 
 move_right :: proc() {
@@ -1622,9 +1631,6 @@ move_right :: proc() {
         buffer_cursor_line,
         buffer_cursor_char_index + 1,
     )
-
-    constrain_scroll_to_cursor()
-    clear(&completion_hits)
 }
 
 move_down :: proc() {
@@ -1636,9 +1642,6 @@ move_down :: proc() {
             buffer_cursor_char_index,
         )
     }
-
-    constrain_scroll_to_cursor()
-    clear(&completion_hits)
 }
 
 move_back_word :: proc() {
@@ -1687,8 +1690,6 @@ move_back_word :: proc() {
         buffer_cursor_line,
         new_index,
     )
-
-    constrain_scroll_to_cursor()
 }
 
 move_forward_word :: proc() {
@@ -1731,8 +1732,6 @@ move_forward_word :: proc() {
         buffer_cursor_line,
         rune_index,
     )
-
-    constrain_scroll_to_cursor()
 }
 
 scroll_down :: proc() {
@@ -1930,8 +1929,6 @@ remove_selection :: proc(
     )
     
     defer {
-        defer constrain_scroll_to_cursor()
-        
         notify_server_of_change(
             active_buffer,
 
@@ -2228,7 +2225,6 @@ reload_buffer :: proc(buffer: ^Buffer) {
     }
     
     set_buffer_cursor_pos(0,0)
-    constrain_scroll_to_cursor()
     
     notify_server_of_change(
         buffer,
@@ -2779,8 +2775,6 @@ handle_go_to_line_input :: proc() {
         
         input_mode = .COMMAND
         
-        constrain_scroll_to_cursor()
-        
         return
     }
 }
@@ -2802,10 +2796,14 @@ buffer_go_to_cursor_pos :: proc() {
     
     line_height := (ascender - descender)
     
+    if len(active_buffer.lines) == 0 {
+        return
+    }
+    
     line_idx := clamp(
         math.floor_f32(click_pos_y / line_height), 
         0, 
-        f32(len(active_buffer.lines)),
+        f32(len(active_buffer.lines)-1),
     )
     
     line := active_buffer.lines[int(line_idx)]

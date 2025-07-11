@@ -58,6 +58,7 @@ draw_alerts :: proc() {
     pen_y := fb_size.y - margin
     
     small_text := font_base_px * small_text_scale
+    normal_text := math.round_f32(font_base_px * normal_text_scale)
     line_thickness := font_base_px * line_thickness_em
 
     for alert in alert_queue {
@@ -124,7 +125,7 @@ draw_alerts :: proc() {
         add_text(&text_rect_cache,
             pen,
             TEXT_MAIN,
-            small_text,
+            normal_text,
             alert.title,
             13,
         )

@@ -60,6 +60,8 @@ is_key_pressed :: proc(key: i32) -> bool {
 }
 
 check_inputs :: proc() -> bool {
+    handle_global_input() or_return
+    
     #partial switch input_mode {
     case .COMMAND:
         handle_command_input() or_return
@@ -80,6 +82,51 @@ check_inputs :: proc() -> bool {
     }
 
     return false
+}
+
+handle_global_input :: proc() -> (continue_execution: bool = true) {
+    if is_key_pressed(glfw.KEY_MINUS) {
+        key := key_store[glfw.KEY_MINUS]
+        
+        if key.modifiers == CTRL_SHIFT {
+            font_base_px += 1
+        
+            continue_execution = false
+            
+            if active_buffer != nil {
+                set_buffer_cursor_pos(
+                    buffer_cursor_line,
+                    buffer_cursor_char_index,
+                )
+            }
+        
+            return
+            
+        }
+    }
+    
+    if is_key_pressed(glfw.KEY_SLASH) {
+        key := key_store[glfw.KEY_SLASH]
+        
+        if key.modifiers == CTRL_SHIFT {
+            font_base_px = clamp(font_base_px - 1, 4, font_base_px)
+            
+            continue_execution = false
+            
+            if active_buffer != nil {
+                set_buffer_cursor_pos(
+                    buffer_cursor_line,
+                    buffer_cursor_char_index,
+                )
+            }
+            
+            return
+        }
+        
+    }
+
+    
+    return continue_execution
 }
 
 @(private="package")

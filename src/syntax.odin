@@ -882,8 +882,6 @@ lsp_handle_file_open :: proc() {
 
     send_lsp_message(msg, "") 
     
-    set_buffer_tokens()
-    /*    
     sync.lock(&tree_mutex)
 
     new_tree := parse_tree(
@@ -895,7 +893,6 @@ lsp_handle_file_open :: proc() {
     
     sync.unlock(&tree_mutex)
 
-    */
     do_refresh_buffer_tokens = true
 }
 
@@ -1477,8 +1474,6 @@ go_to_definition :: proc() {
                 int(data.line),
                 int(data.char),
             )
-
-            constrain_scroll_to_cursor()
         }
 
         thread.run_with_poly_data(data, handle_file_open) 
