@@ -661,8 +661,13 @@ init_language_server :: proc(ext: string) {
         when ODIN_DEBUG{
             fmt.println("LSP has been initialized.")
         }
+        
+        sync.lock(&tree_mutex)
 
         active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
+        
+        sync.unlock(&tree_mutex)
+
         do_refresh_buffer_tokens = true
     }
 }
@@ -696,6 +701,10 @@ lsp_handle_file_open :: proc() {
     defer delete(msg)
 
     send_lsp_message(msg, "") 
+    
+    set_buffer_tokens()
+    /*    
+    sync.lock(&tree_mutex)
 
     new_tree := parse_tree(
         0, len(active_buffer.lines)
@@ -703,7 +712,10 @@ lsp_handle_file_open :: proc() {
 
     ts.tree_delete(active_buffer.previous_tree)
     active_buffer.previous_tree = new_tree
+    
+    sync.unlock(&tree_mutex)
 
+    */
     do_refresh_buffer_tokens = true
 }
 
@@ -783,6 +795,8 @@ set_buffer_tokens :: proc() {
     
     start_version := active_buffer.version 
     
+    sync.lock(&tree_mutex)
+
     new_tree := parse_tree(
         active_buffer.first_drawn_line,
         active_buffer.last_drawn_line,
@@ -790,6 +804,8 @@ set_buffer_tokens :: proc() {
 
     ts.tree_delete(active_buffer.previous_tree)
     active_buffer.previous_tree = new_tree
+    
+    sync.unlock(&tree_mutex)
 
     {
         when ODIN_DEBUG {
@@ -830,8 +846,10 @@ set_buffer_tokens_threaded :: proc() {
         rawptr(start_version),
     )
 
+    //sync.lock(&tree_mutex)
     new_tree := parse_tree(0, len(active_buffer.lines))
     ts.tree_delete(new_tree)
+    //sync.unlock(&tree_mutex)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
         defer free(data)
@@ -1292,8 +1310,6 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
         return nil
     }
 
-    sync.lock(&tree_mutex)
-
     active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
     defer delete(active_buffer_cstring)
 
@@ -1322,6 +1338,15 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
             fmt.println(string(language.ts_query_src)[error_offset:])
             fmt.println(error_type)
             
+            create_alert(
+                "Failed to query file.",
+                "The query string for the tree-sitter parser contains errors.",
+                5,
+                context.allocator,
+            )
+            
+            active_language_server = nil
+            
             return nil
         }
         
@@ -1329,8 +1354,6 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
     }
 
     set_tokens(first_line, last_line, &tree)
-
-    sync.unlock(&tree_mutex)
     
     return tree
 }

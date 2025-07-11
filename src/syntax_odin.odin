@@ -64,7 +64,7 @@ ts_odin_query_src := strings.clone_to_cstring(strings.concatenate({`
 
 (call_expression
   function: (identifier) @function
-  (#prec 2))
+  )
 
 (package_declaration
   (identifier) @package.name)
