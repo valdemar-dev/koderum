@@ -35,6 +35,10 @@ Highlight
 (C) -> Delete highlighted area and put into Yank Sliding Buffer.
 (G) -> Search for highlighted area.
 
+General
+(Ctrl + Shift + Plus (minus on US keyboards)) -> Zoom In
+(Ctrl + Shift + Minus (slash on US keyboards)) -> Zoom Out
+
 Search
 (G) -> Enable Search Mode.
 (ANY CHAR) -> Type Search Term.
