@@ -41,7 +41,6 @@ parse_args :: proc() {
             log_unhandled_treesitter_cases = true
         } else if arg == "-print_frame_time" {
             do_print_frame_time = true
-
         }
     }
 }

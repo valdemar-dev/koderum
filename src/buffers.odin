@@ -2785,6 +2785,80 @@ handle_go_to_line_input :: proc() {
     }
 }
 
+@(private="package")
+buffer_go_to_cursor_pos :: proc() {
+    if active_buffer == nil do return
+    
+    click_pos_y := mouse_pos.y + active_buffer.scroll_y
+    click_pos_x := mouse_pos.x - active_buffer.scroll_x - active_buffer.offset_x
+        
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_size))
+    assert(error == .Ok)
+
+    ascender := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+    
+    line_height := (ascender - descender)
+    
+    line_idx := clamp(
+        math.floor_f32(click_pos_y / line_height), 
+        0, 
+        f32(len(active_buffer.lines)),
+    )
+    
+    line := active_buffer.lines[int(line_idx)]
+    
+    pen := vec2{}
+    
+    rune_index := -1
+    did_hit := false
+    
+    for r in string(line.characters[:]) {
+        if pen.x > click_pos_x {
+            did_hit = true
+            break
+        }
+
+        rune_index += 1
+        
+        if r == '\t' {
+            character := get_char(font_size, u64(' '))
+
+            if character == nil {
+                continue
+            }
+
+            advance_amount := (character.advance.x) * f32(tab_spaces)
+            pen.x += advance_amount
+
+            continue
+        }
+
+        character := get_char(font_size, u64(r))
+
+        if character == nil {
+            continue
+        }
+
+        pen.x = pen.x + (character.advance.x)
+    }
+    
+    if did_hit == false {
+        rune_index = len(line.characters)
+    }
+    
+    if rune_index == -1 {
+        rune_index = 0
+    }
+    
+    set_buffer_cursor_pos(
+        int(line_idx),
+        max(rune_index, 0),
+    )
+}
+
 insert_completion :: proc() {
     if selected_completion_hit >= len(completion_hits) {
         return

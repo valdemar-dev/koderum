@@ -205,17 +205,66 @@ tick_smooth_scroll :: proc() {
     )*/
 }
 
+is_clicking := false
+
 @(private="package")
 cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {
     mouse_pos = vec2{
         f32(pos_x),
         f32(pos_y),
     }
+    
+    context = runtime.default_context()
+    
+    #partial switch input_mode {
+    case .COMMAND:
+        if is_clicking == true {
+            input_mode = .HIGHLIGHT
+            
+            buffer_go_to_cursor_pos()
+            
+            highlight_start_line = buffer_cursor_line
+            highlight_start_char = buffer_cursor_char_index
+        }
+    case .HIGHLIGHT:
+        if is_clicking == true {
+            buffer_go_to_cursor_pos()
+        }
+    }
 }
 
 @(private="package")
 mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods: i32) {
     context = runtime.default_context()
+    
+    if active_buffer == nil {
+        return
+    }
+    
+    #partial switch input_mode {
+    case .COMMAND:
+        if button == glfw.MOUSE_BUTTON_1 {
+            if action == glfw.PRESS {
+                is_clicking = true
+            } else if action == glfw.RELEASE {
+                is_clicking = false
+                buffer_go_to_cursor_pos()
+            }
+            
+        }
+        
+        break
+    case .HIGHLIGHT:
+        if button == glfw.MOUSE_BUTTON_1 {
+            if action == glfw.PRESS {
+                is_clicking = true
+            
+                input_mode = .COMMAND
+            } else if action == glfw.RELEASE {
+                is_clicking = false
+            }
+        }
+    }
 }
 
 handle_command_input :: proc() -> bool {
