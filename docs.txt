@@ -17,11 +17,17 @@ Buffer Motions
 (I) -> Go into Text Insert mode.
 (A) -> Go to end of line.
 (Z) -> Go to start of line.
+(Shift + Z) -> Go to start of file.
+(Shift + A) -> Go to end of file.
 (Shift + C) -> Delete Current Line
 (Ctrl + S) -> Save active buffer.
 (Q) -> Toggle File Info View.
 (Ctrl + Shift + W) -> Close File.
 (Ctrl + Shift + R) -> Reload File.
+
+Mouse Motions
+(Left Click) -> Move Buffer Cursor to Mouse Pos.
+(Drag) -> Highlight Region.
 
 File Explorer
 (O) -> Open File Explorer.
@@ -49,10 +55,9 @@ Search
 (N) -> Go to line number.
 
 Yank Buffer
-(S) -> Show Yank Buffer History.
+(S) -> Toggle yank buffer history.
 (J-K) -> Select Index.
 (Enter) -> Set as recent yank.
-(Escape) -> Exist Yank Buffer History.
 
 Configurations
 Configuration location depends on your platform.
