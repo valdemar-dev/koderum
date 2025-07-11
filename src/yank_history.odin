@@ -92,6 +92,22 @@ draw_yank_history :: proc() {
             break
         }
         
+        // Divider
+        if i % 2 != 0 && i != 0 {
+            pen.y += gap
+            
+            divider := rect{
+                pen.x,
+                pen.y,
+                last_width,
+                line_thickness,
+            }
+            
+            add_rect(&rect_cache, divider, no_texture, BG_MAIN_30, vec2{}, ui_z_index+1)
+            
+            pen.y += gap
+        }
+        
     	buf: [4]byte
     	result := strconv.itoa(buf[:], i+1)
         
@@ -108,21 +124,7 @@ draw_yank_history :: proc() {
             true,
         )
         
-        pen.y += size.y + (gap)
-        
-        // Divider
-        {
-            divider := rect{
-                pen.x,
-                pen.y,
-                last_width,
-                line_thickness,
-            }
-            
-            add_rect(&rect_cache, divider, no_texture, BG_MAIN_30, vec2{}, ui_z_index+1)
-        }
-        
-        pen.y += gap
+        pen.y += size.y
     }
     
     // Draw Background
