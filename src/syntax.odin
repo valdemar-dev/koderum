@@ -376,7 +376,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         defer delete(dll_path)
         
         command = {
-            "cc",
+            "gcc",
             "-shared",
             "-fPIC",
             "-o",
@@ -392,7 +392,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         defer delete(dll_path)
         
         command = {
-            "cc",
+            "gcc",
             "-shared",
             "-fPIC",
             "-o",
@@ -417,7 +417,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         }
     }
 
-    run_program(
+    error = run_program(
         command,
         nil,
         compilation_dir,
@@ -513,6 +513,16 @@ init_parser :: proc(language: ^Language) {
         )
 
         error := install_parser(language, parser_dir)
+        
+        if error == os2.General_Error.Not_Exist {
+            edit_alert(
+                parser_alert,
+                "Failed to install parser!",
+                "Make sure you have installed git and gcc, and that both are available in the system PATH."
+            )
+            
+            return
+        }
 
         if error != os2.ERROR_NONE {
             edit_alert(
@@ -523,7 +533,8 @@ init_parser :: proc(language: ^Language) {
                 }, context.temp_allocator),
             )
 
-            panic("Parser could not be installed.")
+            // panic("Parser could not be installed.")
+            return
         } else {
             edit_alert(
                 parser_alert,
