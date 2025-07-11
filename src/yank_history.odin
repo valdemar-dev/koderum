@@ -93,7 +93,7 @@ draw_yank_history :: proc() {
         }
         
         // Divider
-        if i % 2 != 0 && i != 0 {
+        if i != selected_index {
             pen.y += gap
             
             divider := rect{
@@ -176,7 +176,7 @@ tick_yank_history :: proc() {
 
 @(private="package")
 handle_yank_history_input :: proc() {
-    if is_key_pressed(glfw.KEY_ESCAPE) {
+    if is_key_pressed(glfw.KEY_S) {
         hide_yank_history()
         
         return
