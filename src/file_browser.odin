@@ -56,10 +56,7 @@ renaming_file_name : string
 @(private="package")
 handle_browser_input :: proc() {
     if attempting_file_deletion {
-        if (
-            is_key_pressed(glfw.KEY_ENTER) &&
-            is_key_down(glfw.KEY_LEFT_CONTROL)
-        ) {
+        if (is_key_pressed(glfw.KEY_ENTER) && is_key_down(glfw.KEY_LEFT_CONTROL)) {
             target := item_offset
 
             file := found_files[target]
@@ -144,6 +141,12 @@ handle_browser_input :: proc() {
         }
 
         if is_key_pressed(glfw.KEY_ENTER) {
+            existing_buffer := get_buffer_by_name(renaming_file_name)
+            
+            if existing_buffer != nil {
+                (&existing_buffer)^.file_name = search_term
+            }
+            
             os.rename(renaming_file_name, search_term)
 
             attempting_rename = false
@@ -229,18 +232,43 @@ handle_browser_input :: proc() {
         if os.exists(search_term) {
             return
         }
+        
+        if strings.ends_with(search_term, "/") {
+            err := os.make_directory(search_term)
+            
+            if err != os.General_Error.None {
+                create_alert(
+                    "Failed to create directory.",
+                    "This is most likely due to missing permissions.",
+                    5,
+                    context.allocator
+                )
+                
+                return
+            }
+        } else {        
+            success := os.write_entire_file(search_term, {})
 
-        success := os.write_entire_file(search_term, {})
+            if !success {
+                create_alert(
+                    "Failed to create file.",
+                    "This is most likely due to missing permissions.",
+                    5,
+                    context.allocator
+                )
 
-        if !success {
-            return
+                return
+            }
+            
+            set_found_files()
+            
+            dir := fp.dir(search_term, context.temp_allocator)
+            delete_key(&cached_dirs, dir)
+    
+            toggle_browser_view()
+            open_file(search_term)
         }
 
-        dir := fp.dir(search_term, context.temp_allocator)
-        delete_key(&cached_dirs, dir)
-
-        toggle_browser_view()
-        open_file(search_term)
 
         return
     }
@@ -495,8 +523,11 @@ draw_browser_view :: proc() {
         dir := fp.dir(search_term, context.temp_allocator)
         is_cwd := dir == cwd 
         
-        cwd_size := is_cwd ? measure_text(small_text, "CWD") : vec2{}
-        gap : f32 = is_cwd ? 5 : 0
+        doesnt_exist := os.exists(dir) == false
+        
+        cwd_size := (is_cwd || doesnt_exist) ? measure_text(small_text, "CWD") : vec2{}
+        
+        gap : f32 = (is_cwd || doesnt_exist) ? 5 : 0
         
         padding := small_text
         
@@ -544,6 +575,18 @@ draw_browser_view :: proc() {
                     TEXT_DARKEST,
                     small_text,
                     "CWD",
+                    start_z + 2,
+                )
+            } else if doesnt_exist {
+                add_text(
+                    &rect_cache,
+                    vec2{
+                        search_rect.x + padding,
+                        search_rect.y + search_size.y + gap + padding,
+                    },
+                    TEXT_DARKEST,
+                    small_text,
+                    "Path doesn't exist.",
                     start_z + 2,
                 )
             }

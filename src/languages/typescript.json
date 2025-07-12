@@ -1,0 +1,21 @@
+{
+    "ts_colors": [
+        "string.fragment": 2,
+    ],
+    "lsp_colors": [
+        "parameter": 6,
+    ],
+    "lsp_command": [
+        "typescript-language-server",
+        "--stdio",
+        "--log-level",
+        "1",
+    ],
+    "lsp_working_dir": "",
+    "lsp_install_command": "npm install -g typescript-language-server typescript",
+    "parser_name": "typescript",
+    "parser_subpath": "typescript",
+    "parser_link": "https://github.com/tree-sitter/tree-sitter-typescript",
+    "language_symbol_name": "tree_sitter_typescript",
+    "filler_color": 5,
+}

@@ -306,6 +306,10 @@ send_lsp_message :: proc(
         return
     }
     
+    if active_language_server.lsp_server_pid == 0 {
+        return
+    }
+    
     os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
 
     when ODIN_DEBUG {

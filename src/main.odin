@@ -159,9 +159,9 @@ main :: proc() {
         delete(buffer.content)
 
         delete(buffer.lines^)
-        free(buffer.lines)
+        //free(buffer.lines)
 
-        free(buffer)
+        //free(buffer)
     }
 
     for dir in search_ignored_dirs {
@@ -169,7 +169,7 @@ main :: proc() {
     }
 
     for key,server in active_language_servers {
-        free(server)
+        //free(server)
     }
 
     delete(default_cwd)
@@ -186,4 +186,7 @@ main :: proc() {
     }
 
     delete(requests)
+    
+    delete(data_dir)
+    delete(config_dir)
 }

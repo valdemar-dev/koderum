@@ -4,14 +4,13 @@ today:
 high priority todo:
 
 todo:
-    - Ctrl +DFJK movement for in-buffer movement
     - consolidate buffer insert changes into one change on ESC
     - we can probably just do JSON for this
         - add "do overwrite token if found" to lsp options    
-    - maybe have two trees for parsing, threaded and single-threaded
-    - probably separate LSP and TS tokens? this will prevent the "flash", that is seen.    
-    - implement yank-buffer history usage and view
     - add variable font weights
+    - add fps and char-line to ui
+    - add is saved state to ui
+    
 bugs:
-    - any movement action should trigger refresh of everything.
-      including constrain scroll, constrain cursor, get suggestions, and get error.
+    - shift c on last line doesn't work
+    - ctrl + b is janky, goes to buffers that don't exist

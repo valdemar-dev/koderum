@@ -2585,8 +2585,6 @@ handle_movement_input :: proc() -> bool {
                 buffer_cursor_char_index,
             )
             
-            constrain_scroll_to_cursor()
-        
             return true
         }
         
@@ -2597,8 +2595,6 @@ handle_movement_input :: proc() -> bool {
             buffer_cursor_line,
             len(line.characters),
         )
-        
-        constrain_scroll_to_cursor()
 
         return true
     }
@@ -2610,8 +2606,6 @@ handle_movement_input :: proc() -> bool {
             key.modifiers == SHIFT ? 0 : buffer_cursor_line,
             0,
         )
-        
-        constrain_scroll_to_cursor()
     }
 
     return false

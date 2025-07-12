@@ -48,17 +48,18 @@ draw_alerts :: proc() {
     if len(alert_queue) == 0 {
         return
     }
+    
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    normal_text := math.round_f32(font_base_px * normal_text_scale)
 
     em := font_base_px
-    margin := em
+    margin := small_text
 
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
 
     pen_y := fb_size.y - margin
     
-    small_text := font_base_px * small_text_scale
-    normal_text := math.round_f32(font_base_px * normal_text_scale)
     line_thickness := font_base_px * line_thickness_em
 
     for alert in alert_queue {
@@ -66,12 +67,12 @@ draw_alerts :: proc() {
         title_size := measure_text(small_text, alert.title)
 
         time_bar_height := alert.show_seconds != -1 ? small_text * line_thickness_em : 0
-        gap : f32 = 5
+        gap : f32 = em / 4
 
-        alert_height := content_size.y + title_size.y + time_bar_height + gap + (em * 2)
+        alert_height := content_size.y + title_size.y + time_bar_height + gap + (margin * 2)
 
         alert_width := max(
-            max(content_size.x, title_size.x) + (em * 2),
+            max(content_size.x, title_size.x) + (margin * 2),
             300,
         )
 
@@ -118,8 +119,8 @@ draw_alerts :: proc() {
 
         // Draw Content
         pen := vec2{
-            start_pen.x + em,
-            start_pen.y + em,
+            start_pen.x + margin,
+            start_pen.y + margin,
         }
 
         add_text(&text_rect_cache,

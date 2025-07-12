@@ -4,9 +4,57 @@ font = /usr/share/fonts/noto/NotoSansMono-Regular.ttf
 font = /usr/share/fonts/liberation/LiberationMono-Regular.ttf
 font = /usr/share/fonts/CascadiaMono/CaskaydiaMonoNerdFont-Regular.ttf
 
+[fallback unix fonts]
+font = /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
+font = /usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf
+font = /usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf
+
+[windows fonts]
+font = C:\Windows\Fonts\consola.ttf
+
+[bg colors]
+bg_main_00 = 171A21FF
+bg_main_05 = 1B1F28FF
+bg_main_10 = 171A21FF
+bg_main_20 = 282F3EFF
+bg_main_30 = 313A4DFF
+bg_main_40 = 3A455CFF
+bg_main_50 = 43506BFF
+
+[text colors]
+text_main = FFFFFFFF
+text_darker = AAAAAAFF
+text_darkest = 888888FF
+text_error = F04E48ff
+
+[token colors]
+token_color_00 = F04E48ff
+token_color_01 = F16763ff
+token_color_02 = ADFF88ff
+token_color_03 = 747B8Bff
+token_color_04 = E0D382ff
+token_color_05 = FDA35Eff
+token_color_06 = ffbb87ff
+token_color_07 = 8DE0D2ff
+token_color_08 = BC88FFFF
+token_color_09 = 707EFFff
+token_color_10 = CB8CBFff
+token_color_11 = D9FF87ff
+token_color_12 = 394357ff
+token_color_13 = ff008cff
+token_color_14 = 57ff9dff
+
+[lsp error colors]
+error = RED
+warn = YELLOW
+information = BLUE
+hint = GRAY
+
+[macos fonts]
+font = /System/Library/Fonts/Menlo.ttc
+
 [user interface]
 font_base_px = 20
-
 small_text_scale = .7
 normal_text_scale = .8
 large_text_scale = 1
@@ -14,11 +62,9 @@ buffer_text_scale = .8
 line_thickness_em = 0.05
 line_count_padding_em = .5
 cursor_edge_padding_em = 5
-
 ui_scale = 1
 
 [cursor]
-
 do_animate_cursor = true
 do_constrain_cursor_to_scroll = false
 
@@ -29,7 +75,6 @@ do_draw_line_count = true
 do_highlight_current_line = false
 do_highlight_indents = true
 differentiate_tab_and_spaces = true
-
 tab_spaces = 4
 do_highlight_current_line = true
 

@@ -17,6 +17,7 @@ import "core:dynlib"
 import "core:net"
 import fp "core:path/filepath"
 import "core:sync"
+import "base:runtime"
 
 tree_mutex : sync.Mutex
 
@@ -71,6 +72,49 @@ Language :: struct {
     // This colour is used when no token is present.
     filler_color: vec4,
 }
+
+LanguageServer :: struct {
+    name : string,
+
+    lsp_stdin_w : ^os2.File,
+    lsp_stdout_r : ^os2.File,
+    lsp_server_pid : int,
+    
+    token_types : []string,
+    token_modifiers : []string,
+
+    completion_trigger_runes : []rune,
+    
+    ts_parser: ts.Parser, 
+
+    override_node_type: proc(
+        node_type: ^string,
+        node: ts.Node, 
+        source: []u8,
+        start_point,
+        end_point: ^ts.Point,
+        tokens: ^[dynamic]Token,  
+        priority: ^u8,
+    ),
+
+    language: ^Language,
+}
+
+Token :: struct {
+    line: i32,
+    char:        i32,
+    length:      i32,
+    color: vec4,
+    modifiers:   []string,
+    priority: u8,
+}
+
+log_unhandled_treesitter_cases := false
+lsp_request_id := 10
+
+active_language_server : ^LanguageServer
+active_language_servers : map[string]^LanguageServer = {}
+
 
 languages : map[string]Language = {
     ".ts"=Language{
@@ -604,48 +648,6 @@ init_parser :: proc(language: ^Language) {
     language.ts_language = ts_lang
 }
 
-LanguageServer :: struct {
-    name : string,
-
-    lsp_stdin_w : ^os2.File,
-    lsp_stdout_r : ^os2.File,
-    lsp_server_pid : int,
-    
-    token_types : []string,
-    token_modifiers : []string,
-
-    completion_trigger_runes : []rune,
-    
-    ts_parser: ts.Parser, 
-
-    override_node_type: proc(
-        node_type: ^string,
-        node: ts.Node, 
-        source: []u8,
-        start_point,
-        end_point: ^ts.Point,
-        tokens: ^[dynamic]Token,  
-        priority: ^u8,
-    ),
-
-    language: ^Language,
-}
-
-Token :: struct {
-    line: i32,
-    char:        i32,
-    length:      i32,
-    color: vec4,
-    modifiers:   []string,
-    priority: u8,
-}
-
-log_unhandled_treesitter_cases := false
-lsp_request_id := 10
-
-active_language_server : ^LanguageServer
-active_language_servers : map[string]^LanguageServer = {}
-
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
 
@@ -999,7 +1001,9 @@ set_buffer_tokens_threaded :: proc() {
     if active_language_server == nil {
         return
     } 
-
+    
+    context = runtime.default_context()
+    
     do_refresh_buffer_tokens = false
   
     start_version := new(int)
@@ -1029,6 +1033,8 @@ set_buffer_tokens_threaded :: proc() {
     sync.unlock(&tree_mutex)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        context = runtime.default_context()
+        
         defer free(data)
 
         start_version_ptr := (cast(^int)data)

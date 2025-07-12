@@ -75,12 +75,14 @@ draw_ui :: proc() {
         f32(status_bar_height),
     }
 
+    /*
     status_bar_bg_rect := rect{
         status_bar_rect.x - 15,
         status_bar_rect.y - 10,
         status_bar_rect.width + 30,
         status_bar_rect.height + 20,
     }
+    */
     
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
 
@@ -226,24 +228,33 @@ draw_ui :: proc() {
     if active_buffer != nil {
         file_name := active_buffer.info.name
 
-        file_name_size := measure_text(small_text, file_name)
+        file_name_size := measure_text(normal_text, file_name)
 
         half_offset := file_name_size.x / 2
+        
+        padding : f32 = small_text / 2
 
         pos := vec2{
             status_bar_rect.x + (status_bar_rect.width / 2) - half_offset,
             status_bar_rect.y,
         }
+                
+        add_text(&rect_cache,
+            pos,
+            TEXT_MAIN,
+            normal_text,
+            file_name,
+            ui_z_index + 5,
+        )
 
-        padding : f32 : 10
 
         // Draw Background
         {
             bg_rect := rect{
-                pos.x - padding,
-                status_bar_bg_rect.y,
-                file_name_size.x + padding * 2,
-                status_bar_bg_rect.height,
+                pos.x - padding * 2,
+                pos.y - padding,
+                file_name_size.x + padding * 4,
+                file_name_size.y + padding * 2,
             }
             
             add_rect(&rect_cache,
@@ -251,7 +262,7 @@ draw_ui :: proc() {
                 no_texture,
                 BG_MAIN_10,
                 vec2{},
-                ui_z_index + 2,
+                ui_z_index + 4,
             )
             
             border_rect := rect{
@@ -267,17 +278,8 @@ draw_ui :: proc() {
                 no_texture,
                 BG_MAIN_30,
                 vec2{},
-                ui_z_index + 1,
-            )
-    
-            add_text(&rect_cache,
-                pos,
-                TEXT_MAIN,
-                small_text,
-                file_name,
                 ui_z_index + 3,
-            )
-            
+            )        
         }
     }
     

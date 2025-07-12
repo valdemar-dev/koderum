@@ -19,8 +19,36 @@ buffer_text_scale : f32
 line_thickness_em : f32
 line_count_padding_em : f32
 cursor_edge_padding_em : f32
-
 ui_scale : f32
+
+BG_MAIN_00 : vec4
+BG_MAIN_05 : vec4
+BG_MAIN_10 : vec4
+BG_MAIN_20 : vec4
+BG_MAIN_30 : vec4
+BG_MAIN_40 : vec4
+BG_MAIN_50 : vec4
+
+TEXT_MAIN : vec4
+TEXT_DARKER : vec4
+TEXT_DARKEST : vec4
+TEXT_ERROR : vec4
+
+TOKEN_COLOR_00 : vec4
+TOKEN_COLOR_01 : vec4
+TOKEN_COLOR_02 : vec4
+TOKEN_COLOR_03 : vec4
+TOKEN_COLOR_04 : vec4
+TOKEN_COLOR_05 : vec4
+TOKEN_COLOR_06 : vec4
+TOKEN_COLOR_07 : vec4
+TOKEN_COLOR_08 : vec4
+TOKEN_COLOR_09 : vec4
+TOKEN_COLOR_10 : vec4
+TOKEN_COLOR_11 : vec4
+TOKEN_COLOR_12 : vec4
+TOKEN_COLOR_13 : vec4
+TOKEN_COLOR_14 : vec4
 
 do_highlight_long_lines : bool
 long_line_required_characters : int
@@ -97,8 +125,6 @@ init_config :: proc() -> []u8 {
         fmt.println("Failed to open custom config file.", config_location)
         panic("Unrecoverable error.")
     }
-
-    delete(path)
 
     return bytes
 }
@@ -319,7 +345,59 @@ set_option :: proc(options: []string) {
     case "delimiter_runes":
         delimiter_runes = utf8.string_to_runes(value)
     case "do_constrain_cursor_to_scroll":
-        do_constrain_cursor_to_scroll = (value == "true")
+        do_constrain_cursor_to_scroll = (value == "true")    
+    case "bg_main_00":
+        BG_MAIN_00 = hex_string_to_vec4(value)
+    case "bg_main_05":
+        BG_MAIN_05 = hex_string_to_vec4(value)
+    case "bg_main_10":
+        BG_MAIN_10 = hex_string_to_vec4(value)
+    case "bg_main_20":
+        BG_MAIN_20 = hex_string_to_vec4(value)
+    case "bg_main_30":
+        BG_MAIN_30 = hex_string_to_vec4(value)
+    case "bg_main_40":
+        BG_MAIN_40 = hex_string_to_vec4(value)
+    case "bg_main_50":
+        BG_MAIN_50 = hex_string_to_vec4(value)
+    case "text_main":
+        TEXT_MAIN = hex_string_to_vec4(value)    
+    case "text_darker":
+        TEXT_DARKER = hex_string_to_vec4(value)
+    case "text_darkest":
+        TEXT_DARKEST = hex_string_to_vec4(value)
+    case "text_error":
+        TEXT_ERROR = hex_string_to_vec4(value)
+    case "token_color_00":
+        TOKEN_COLOR_00 = hex_string_to_vec4(value)
+    case "token_color_01":
+        TOKEN_COLOR_01 = hex_string_to_vec4(value)
+    case "token_color_02":
+        TOKEN_COLOR_02 = hex_string_to_vec4(value)
+    case "token_color_03":
+        TOKEN_COLOR_03 = hex_string_to_vec4(value)
+    case "token_color_04":
+        TOKEN_COLOR_04 = hex_string_to_vec4(value)
+    case "token_color_05":
+        TOKEN_COLOR_05 = hex_string_to_vec4(value)
+    case "token_color_06":
+        TOKEN_COLOR_06 = hex_string_to_vec4(value)
+    case "token_color_07":
+        TOKEN_COLOR_07 = hex_string_to_vec4(value)
+    case "token_color_08":
+        TOKEN_COLOR_08 = hex_string_to_vec4(value)
+    case "token_color_09":
+        TOKEN_COLOR_09 = hex_string_to_vec4(value)
+    case "token_color_10":
+        TOKEN_COLOR_10 = hex_string_to_vec4(value)
+    case "token_color_11":
+        TOKEN_COLOR_11 = hex_string_to_vec4(value)
+    case "token_color_12":
+        TOKEN_COLOR_13 = hex_string_to_vec4(value)
+    case "token_color_13":
+        TOKEN_COLOR_14 = hex_string_to_vec4(value)
+    case "token_color_14":
+        TOKEN_COLOR_14 = hex_string_to_vec4(value)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }
