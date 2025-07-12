@@ -83,33 +83,6 @@ draw_ui :: proc() {
     }
     
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
-    
-    /*
-    {
-        border_rect := rect{
-            status_bar_bg_rect.x - line_thickness,
-            status_bar_bg_rect.y - line_thickness,
-            status_bar_bg_rect.width + line_thickness * 2,
-            status_bar_bg_rect.height + line_thickness * 2,
-        }
-        
-        add_rect(&rect_cache,
-            border_rect,
-            no_texture,
-            BG_MAIN_30,
-            vec2{},
-            ui_z_index,
-        )
-    }
-
-    add_rect(&rect_cache,
-        status_bar_bg_rect,
-        no_texture,
-        BG_MAIN_10,
-        vec2{},
-        ui_z_index + .1,
-    )
-    */
 
     text_pos := vec2{
         status_bar_rect.x,
@@ -190,27 +163,66 @@ draw_ui :: proc() {
         )
     }
 
-    buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:ui_sliding_buffer.count])
-    defer delete(buf_data_string)
-
-    end_pos := status_bar_rect.x + status_bar_rect.width
-
-    buf_data_string_size := measure_text(
-        normal_text,
-        buf_data_string,
-    )
-
-    add_text(&rect_cache,
-        vec2{
+    // Draw Char History
+    if ui_sliding_buffer.count > 0 {
+        buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:ui_sliding_buffer.count])
+        defer delete(buf_data_string)
+    
+        end_pos := status_bar_rect.x + status_bar_rect.width
+    
+        buf_data_string_size := measure_text(
+            normal_text,
+            buf_data_string,
+        )
+        
+        text_pos := vec2{
             end_pos - buf_data_string_size.x,
             status_bar_rect.y
-        },
-        TEXT_MAIN,
-        normal_text,
-        buf_data_string,
-        ui_z_index + 1,
-    )
-
+        }
+    
+        add_text(&text_rect_cache,
+            text_pos,
+            TEXT_MAIN,
+            normal_text,
+            buf_data_string,
+            ui_z_index + 3,
+        )
+        
+        padding := small_text / 2
+        
+        bg_rect := rect{
+            text_pos.x - padding * 2,
+            text_pos.y - padding,
+            buf_data_string_size.x + padding * 4,
+            buf_data_string_size.y + padding * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            bg_rect,
+            no_texture,
+            BG_MAIN_10,
+            vec2{},
+            ui_z_index + 2,
+        )
+        
+        border_rect := rect{
+            bg_rect.x - line_thickness,
+            bg_rect.y - line_thickness,
+            bg_rect.width + line_thickness * 2,
+            bg_rect.height + line_thickness * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            border_rect,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            ui_z_index + 1,
+        )
+    }
+    
     if active_buffer != nil {
         file_name := active_buffer.info.name
 
