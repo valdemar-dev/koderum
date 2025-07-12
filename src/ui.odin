@@ -70,7 +70,7 @@ draw_ui :: proc() {
 
     status_bar_rect = rect{
         margin,
-        20,
+        normal_text,
         fb_size.x - (margin * 2),
         f32(status_bar_height),
     }
@@ -86,7 +86,7 @@ draw_ui :: proc() {
 
     text_pos := vec2{
         status_bar_rect.x,
-        20,
+        status_bar_rect.y,
     }
 
     mode_string : string
