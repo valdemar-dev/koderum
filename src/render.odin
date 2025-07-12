@@ -41,9 +41,6 @@ render :: proc() {
     prev_time = time
 
     draw_cursor()    
-
-    draw_ui()
-
     draw_buffer()
 
     draw_notification()
@@ -53,6 +50,8 @@ render :: proc() {
     draw_browser_view()
     
     draw_yank_history()
+    
+    draw_ui()
 
     when ODIN_DEBUG {
         draw_debug()
@@ -176,7 +175,6 @@ measure_text :: proc (
 
     max_ascent := f32(ascend - descend)
 
-
     highest := vec2{
         y=max_ascent,
     }
@@ -233,6 +231,14 @@ add_text_measure :: proc(
         y=pos.y,
     }
 
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_height))
+    assert(error == .Ok)
+
+    ascend := primary_font.size.metrics.ascender >> 6
+    descend := primary_font.size.metrics.descender >> 6
+
+    max_ascent := f32(ascend - descend)
+
     pen = add_text(
         rect_cache,
         pen,
@@ -246,7 +252,7 @@ add_text_measure :: proc(
         split_new_lines,
     )
     
-    pen.y += font_height
+    pen.y += max_ascent
 
     return vec2{
         pen.x - pos.x,

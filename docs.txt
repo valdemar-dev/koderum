@@ -25,6 +25,12 @@ Buffer Motions
 (Ctrl + Shift + W) -> Close File.
 (Ctrl + Shift + R) -> Reload File.
 
+LSP Motions
+(.) -> Go to definition.
+(Ctrl + E) -> Next Completion.
+(Ctrl + W) -> Previous Completion.
+(Alt) -> Insert Completion.
+
 Mouse Motions
 (Left Click) -> Move Buffer Cursor to Mouse Pos.
 (Drag) -> Highlight Region.

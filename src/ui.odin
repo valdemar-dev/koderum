@@ -84,6 +84,7 @@ draw_ui :: proc() {
     
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
     
+    /*
     {
         border_rect := rect{
             status_bar_bg_rect.x - line_thickness,
@@ -108,38 +109,86 @@ draw_ui :: proc() {
         vec2{},
         ui_z_index + .1,
     )
+    */
 
     text_pos := vec2{
         status_bar_rect.x,
-        status_bar_rect.y,
+        20,
     }
 
     mode_string : string
-
+    mode_bg_color : vec4 = BG_MAIN_10
+    mode_text_color : vec4
+    
     switch input_mode {
     case .COMMAND:
         mode_string = "Command"
+        mode_text_color = GREEN
     case .BUFFER_INPUT, .BROWSER_SEARCH, .FILE_CREATE, .FILE_RENAME:
         mode_string = "Text Input"
+        mode_text_color = RED
     case .HIGHLIGHT:
         mode_string = "Highlighting"
+        mode_text_color = YELLOW
     case .SEARCH:
         mode_string = "Search"
+        mode_text_color = CYAN
     case .DEBUG:
         mode_string = "Debug"
+        mode_text_color = PURPLE
     case .GO_TO_LINE:
         mode_string = "Go To Line"
+        mode_text_color = BLUE
     case .YANK_HISTORY:
         mode_string = "Yank History"
+        mode_text_color = ORANGE
     }
-
-    add_text(&rect_cache,
-        text_pos,
-        TEXT_MAIN,
-        normal_text,
-        mode_string,
-        ui_z_index + 1
-    )
+    
+    // Draw Input Mode
+    {
+        size := add_text_measure(
+            &text_rect_cache,
+            text_pos,
+            mode_text_color,
+            normal_text,
+            mode_string,
+            ui_z_index + 3
+        )
+        
+        padding := small_text / 2
+            
+        bg_rect := rect{
+            text_pos.x - padding * 2,
+            text_pos.y - padding,
+            size.x + padding * 4,
+            size.y + padding * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            bg_rect,
+            no_texture,
+            mode_bg_color,
+            vec2{},
+            ui_z_index + 2,
+        )
+        
+        border_rect := rect{
+            bg_rect.x - line_thickness,
+            bg_rect.y - line_thickness,
+            bg_rect.width + line_thickness * 2,
+            bg_rect.height + line_thickness * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            border_rect,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            ui_z_index + 1,
+        )
+    }
 
     buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:ui_sliding_buffer.count])
     defer delete(buf_data_string)
@@ -176,26 +225,48 @@ draw_ui :: proc() {
 
         padding : f32 : 10
 
-        add_rect(&rect_cache,
-            rect{
+        // Draw Background
+        {
+            bg_rect := rect{
                 pos.x - padding,
                 status_bar_bg_rect.y,
                 file_name_size.x + padding * 2,
                 status_bar_bg_rect.height,
-            },
-            no_texture,
-            BG_MAIN_20,
-            vec2{},
-            ui_z_index + 2,
-        )
-
-        add_text(&rect_cache,
-            pos,
-            TEXT_MAIN,
-            small_text,
-            file_name,
-            ui_z_index + 3,
-        )
+            }
+            
+            add_rect(&rect_cache,
+                bg_rect,
+                no_texture,
+                BG_MAIN_10,
+                vec2{},
+                ui_z_index + 2,
+            )
+            
+            border_rect := rect{
+                bg_rect.x - line_thickness,
+                bg_rect.y - line_thickness,
+                bg_rect.width + line_thickness * 2,
+                bg_rect.height + line_thickness * 2,
+            }
+            
+            add_rect(
+                &rect_cache,
+                border_rect,
+                no_texture,
+                BG_MAIN_30,
+                vec2{},
+                ui_z_index + 1,
+            )
+    
+            add_text(&rect_cache,
+                pos,
+                TEXT_MAIN,
+                small_text,
+                file_name,
+                ui_z_index + 3,
+            )
+            
+        }
     }
     
     if input_mode == .SEARCH {
@@ -272,8 +343,6 @@ draw_ui :: proc() {
                 ui_z_index + 4,
             )       
         }
-
-
     } else if input_mode == .GO_TO_LINE {
         term := go_to_line_input_string == "" ? "Type a line number." : go_to_line_input_string
 
