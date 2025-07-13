@@ -17,6 +17,7 @@ TEXT_DARKEST := hex_string_to_vec4("888888FF")
 TEXT_ERROR := RED
 */
 
+/*
 RED := hex_string_to_vec4("F04E48ff") // 0
 LIGHT_RED := hex_string_to_vec4("F16763ff") // 1
 GREEN := hex_string_to_vec4("ADFF88ff") // 2
@@ -37,3 +38,5 @@ ERROR := RED
 WARN := YELLOW
 INFORMATION := BLUE
 HINT := GRAY
+*/
+

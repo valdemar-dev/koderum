@@ -20,12 +20,16 @@ bg_main_20 = 282F3EFF
 bg_main_30 = 313A4DFF
 bg_main_40 = 3A455CFF
 bg_main_50 = 43506BFF
+bg_accent_00 = 707EFFff
 
 [text colors]
 text_main = FFFFFFFF
 text_darker = AAAAAAFF
 text_darkest = 888888FF
 text_error = F04E48ff
+
+text_highlight_color = FFFFFFFF
+text_highlight_bg = 3A455CFF
 
 [token colors]
 token_color_00 = F04E48ff
@@ -45,10 +49,8 @@ token_color_13 = ff008cff
 token_color_14 = 57ff9dff
 
 [lsp error colors]
-error = RED
-warn = YELLOW
-information = BLUE
-hint = GRAY
+lsp_color_error = F04E48ff
+lsp_color_warn = E0D382ff
 
 [macos fonts]
 font = /System/Library/Fonts/Menlo.ttc
@@ -81,7 +83,7 @@ do_highlight_current_line = true
 [general]
 default_cwd = /home/v/prog/projects/koderum
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
-delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\t
+delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
 
 [search]
 search_ignored_dir = node_modules

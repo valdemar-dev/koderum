@@ -266,3 +266,40 @@ get_substring_indices :: proc(haystack: string, needle: string) -> [dynamic]int 
     }
     return indices
 }
+
+color_index_to_color :: proc(color_index : int) -> ^vec4 {
+    switch color_index {
+    case 0:
+        return &TOKEN_COLOR_00
+    case 1:
+        return &TOKEN_COLOR_01
+    case 2:
+        return &TOKEN_COLOR_02
+    case 3:
+        return &TOKEN_COLOR_03
+    case 4:
+        return &TOKEN_COLOR_04
+    case 5:
+        return &TOKEN_COLOR_05
+    case 6:
+        return &TOKEN_COLOR_06
+    case 7:
+        return &TOKEN_COLOR_07
+    case 8:
+        return &TOKEN_COLOR_08
+    case 9:
+        return &TOKEN_COLOR_09
+    case 10:
+        return &TOKEN_COLOR_10
+    case 11:
+        return &TOKEN_COLOR_11
+    case 12:
+        return &TOKEN_COLOR_12
+    case 13:
+        return &TOKEN_COLOR_13
+    case 14:
+        return &TOKEN_COLOR_14
+    case:
+        return nil
+    }
+}

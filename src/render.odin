@@ -351,7 +351,7 @@ add_text :: proc(
 
         add_rect(rect_cache,
             rect{
-                math.round_f32(pen.x + character.offset.x + 0.11),
+                (pen.x + character.offset.x + 0.11),
                 ((pen.y - character.offset.y + f32(ascend))),
                 (width),
                 (height),
@@ -678,7 +678,7 @@ add_code_text :: proc(
         color := TEXT_MAIN
 
         if is_hit_on_line && rune_index >= selected_hit.start_char && rune_index < selected_hit.end_char {
-            color = RED
+            color = TOKEN_COLOR_00
         } else if was_highlighted || is_line_fully_highlighted {
             color = text_highlight_color
         } else if lsp_token != nil {
@@ -733,9 +733,9 @@ add_code_text :: proc(
 
             switch error.severity {
             case 1:
-                color = ERROR
+                color = LSP_COLOR_ERROR
             case 2:
-                color = WARN
+                color = LSP_COLOR_WARN
             }
 
             add_rect(&text_rect_cache, rect{

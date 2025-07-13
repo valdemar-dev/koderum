@@ -117,7 +117,7 @@ active_language_servers : map[string]^LanguageServer = {}
 
 
 languages : map[string]Language = {
-    ".ts"=Language{
+/*    ".ts"=Language{
         ts_query_src=ts_ts_query_src,
 
         ts_colors=ts_ts_colors,
@@ -135,8 +135,8 @@ languages : map[string]Language = {
 
         language_symbol_name="tree_sitter_typescript",
         
-        filler_color=ORANGE,
-    },
+        filler_color=TOKEN_COLOR_05,
+    }, */
     ".odin"=Language{
         ts_query_src=ts_odin_query_src,
 
@@ -156,7 +156,7 @@ languages : map[string]Language = {
         
         project_root_markets={"ols.json"},
         
-        filler_color=ORANGE,
+        filler_color=TOKEN_COLOR_05,
     }
 }
 
@@ -650,20 +650,72 @@ init_parser :: proc(language: ^Language) {
 
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
+    
+    if ext in active_language_servers {
+        active_language_server = active_language_servers[ext]
+    }
 
     defer {
         init_message_thread()
     }
+    
+    exe_path := os2.args[0]
+    
+    exe_dir := fp.dir(exe_path)
+    defer delete(exe_dir)
+    
+    languages_path := strings.concatenate({
+        exe_dir,
+        "/languages",
+    })
+    
+    defer delete(languages_path)
 
-    if ext not_in languages {
+    language_servers_list, error := os2.read_directory_by_path(
+        languages_path,
+        -1, 
+        context.allocator
+    )
+    
+    defer delete(language_servers_list)
+    
+    if error != os2.ERROR_NONE {
+        create_alert(
+            "Failed to get language servers.",
+            "This error is not recoverable.",
+            5,
+            context.allocator,
+        )
+        
         return
     }
-
-    if ext not_in active_language_servers {
-        init_language_server(ext)
-    } else {
-        active_language_server = active_language_servers[ext]
+    
+    hit : ^os2.File_Info
+    scm_file_path : string
+    
+    defer delete(scm_file_path)
+    
+    for &file in language_servers_list {
+        ext_name := ext[1:]
+    
+        file_name := fp.short_stem(file.name)
+        
+        if ext_name == file_name {
+            hit = &file
+            
+            scm_file_path = strings.concatenate({languages_path, "/", ext_name, ".scm"})
+            
+            break
+        }
     }
+    
+    if hit == nil {
+        return
+    }
+    
+    read_language_from_file(ext, hit.fullpath, scm_file_path)
+
+    init_language_server(ext)
 }
 
 get_project_root :: proc(
@@ -694,6 +746,288 @@ get_project_root :: proc(
 	}
 
 	return "", false
+}
+
+read_language_from_file :: proc(
+    ext: string, 
+    language_file_path: string,
+    scm_file_path: string,
+) {
+    bytes, ok := os.read_entire_file_from_filename(language_file_path)
+    defer delete(bytes)
+    
+    if !ok {
+        return
+    }
+    
+    value, err := json.parse_string(string(bytes))
+    obj,obj_ok := value.(json.Object)
+    
+    show_malformed_err :: proc(language_file_path: string) {
+        create_alert(
+            "Malformed language file JSON",
+            language_file_path,
+            10,
+            context.allocator
+        )
+        
+        return
+    }
+    
+    if err != .None || obj_ok == false {
+        show_malformed_err(language_file_path)
+    }
+    
+    language : Language
+    
+    // Parse Colors
+    {
+        color_map, ok := obj["ts_colors"].(json.Object)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        ts_colors : map[string]vec4
+        
+        for field, color_val in color_map {
+            color_index, ok := color_val.(json.Float)
+            
+            if !ok {
+                show_malformed_err(language_file_path)
+            
+                return
+            }
+            
+            color := color_index_to_color(int(color_index))
+            
+            if color == nil {
+                buf : [4]byte
+                
+                error_msg := strings.concatenate({
+                    "Color with index ",
+                    strconv.itoa(buf[:], int(color_index)),
+                    " was not found."
+                })
+                
+                create_alert(
+                    "Color not found.",
+                    error_msg,
+                    5,
+                    context.allocator,
+                )
+                
+                return
+            }
+            
+            ts_colors[field] = color^
+        }
+        
+        language.ts_colors = ts_colors
+    }
+    
+    // Parse LSP Colors
+    {
+        color_map, ok := obj["lsp_colors"].(json.Object)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        lsp_colors : map[string]vec4
+        
+        for field, color_val in color_map {
+            color_index, ok := color_val.(json.Float)
+            
+            if !ok {
+                show_malformed_err(language_file_path)
+            
+                return
+            }
+            
+            color := color_index_to_color(int(color_index))
+            
+            if color == nil {
+                buf : [4]byte
+                
+                error_msg := strings.concatenate({
+                    "Color with index ",
+                    strconv.itoa(buf[:], int(color_index)),
+                    " was not found."
+                })
+                
+                create_alert(
+                    "Color not found.",
+                    error_msg,
+                    5,
+                    context.allocator,
+                )
+                
+                return
+            }
+            
+            lsp_colors[field] = color^
+        }
+        
+        language.lsp_colors = lsp_colors
+    }
+    
+    // LSP Command
+    {
+        lsp_command_arr, ok := obj["lsp_command"].(json.Array)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        dyn := make([dynamic]string)
+        
+        for command_arg in lsp_command_arr {
+            string_val, ok := command_arg.(json.String)
+            
+            if !ok {
+                show_malformed_err(language_file_path)
+                
+                return
+            }
+            
+            append(&dyn, strings.clone(string_val))
+        }
+        
+        language.lsp_command = dyn[:]
+    }
+    
+    // LSP Working Dir
+    {
+        lsp_working_dir, ok := obj["lsp_working_dir"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.lsp_working_dir = lsp_working_dir
+    }
+    
+    // LSP Install Command
+    {
+        lsp_install_command, ok := obj["lsp_install_command"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.lsp_install_command = lsp_install_command
+    }
+    
+    
+    // Parser Name
+    {
+        parser_name, ok := obj["parser_name"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.parser_name = parser_name
+    }
+    
+    // Parser Subpath
+    {
+        parser_subpath, ok := obj["parser_subpath"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.parser_subpath = parser_subpath
+    }
+    
+    // Parser Link
+    {
+        parser_link, ok := obj["parser_link"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.parser_link = parser_link
+    }
+    
+    // Language Symbol Name
+    {
+        language_symbol_name, ok := obj["language_symbol_name"].(json.String)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        language.language_symbol_name = language_symbol_name
+    }
+    
+    // Filler Color
+    {
+        filler_color, ok := obj["filler_color"].(json.Float)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return
+        }
+        
+        color := color_index_to_color(int(filler_color))
+        
+        if color == nil {
+            buf : [4]byte
+            
+            error_msg := strings.concatenate({
+                "Color with index ",
+                strconv.itoa(buf[:], int(filler_color)),
+                " was not found."
+            })
+            
+            create_alert(
+                "Color not found.",
+                error_msg,
+                5,
+                context.allocator,
+            )
+            
+            return
+        }
+        
+        language.filler_color = color^
+    }
+    
+    // Get SCM TS Query
+    if os.exists(scm_file_path) {
+        bytes, ok := os.read_entire_file_from_filename(scm_file_path)
+        
+        language.ts_query_src = strings.clone_to_cstring(string(bytes[:]))
+        
+        delete(bytes)
+    }
+    
+    fmt.println(language)
+    
+    languages[ext] = language
 }
 
 init_language_server :: proc(ext: string) {
@@ -1040,11 +1374,11 @@ set_buffer_tokens_threaded :: proc() {
         start_version_ptr := (cast(^int)data)
 
         start_version := (start_version_ptr^)
-
+        
         obj,ok := response["result"].(json.Object)
         
         if !ok {
-            panic("Malformed json in set_buffer_tokens")
+            return
         }
         
         obj_data,data_ok := obj["data"].(json.Array)

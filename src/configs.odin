@@ -29,6 +29,8 @@ BG_MAIN_30 : vec4
 BG_MAIN_40 : vec4
 BG_MAIN_50 : vec4
 
+BG_ACCENT_00 : vec4
+
 TEXT_MAIN : vec4
 TEXT_DARKER : vec4
 TEXT_DARKEST : vec4
@@ -50,6 +52,9 @@ TOKEN_COLOR_12 : vec4
 TOKEN_COLOR_13 : vec4
 TOKEN_COLOR_14 : vec4
 
+LSP_COLOR_ERROR : vec4
+LSP_COLOR_WARN : vec4
+
 do_highlight_long_lines : bool
 long_line_required_characters : int
 do_draw_line_count : bool
@@ -63,8 +68,8 @@ default_cwd : string
 
 program_dir : string
 
-text_highlight_color : vec4 = TEXT_MAIN
-text_highlight_bg : vec4 = BG_MAIN_40
+text_highlight_color : vec4
+text_highlight_bg : vec4
 delimiter_runes : []rune = {}
 
 search_ignored_dirs : [dynamic]string
@@ -345,7 +350,9 @@ set_option :: proc(options: []string) {
     case "delimiter_runes":
         delimiter_runes = utf8.string_to_runes(value)
     case "do_constrain_cursor_to_scroll":
-        do_constrain_cursor_to_scroll = (value == "true")    
+        do_constrain_cursor_to_scroll = (value == "true")
+    case "bg_accent_00":
+        BG_ACCENT_00 = hex_string_to_vec4(value)
     case "bg_main_00":
         BG_MAIN_00 = hex_string_to_vec4(value)
     case "bg_main_05":
@@ -398,6 +405,10 @@ set_option :: proc(options: []string) {
         TOKEN_COLOR_14 = hex_string_to_vec4(value)
     case "token_color_14":
         TOKEN_COLOR_14 = hex_string_to_vec4(value)
+    case "lsp_color_error":
+        LSP_COLOR_ERROR = hex_string_to_vec4(value)
+    case "lsp_color_warn":
+        LSP_COLOR_WARN = hex_string_to_vec4(value)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }

@@ -98,25 +98,25 @@ draw_ui :: proc() {
     switch input_mode {
     case .COMMAND:
         mode_string = "Command"
-        mode_text_color = GREEN
+        mode_text_color = TOKEN_COLOR_02
     case .BUFFER_INPUT, .BROWSER_SEARCH, .FILE_CREATE, .FILE_RENAME:
         mode_string = "Text Input"
-        mode_text_color = RED
+        mode_text_color = TOKEN_COLOR_00
     case .HIGHLIGHT:
         mode_string = "Highlighting"
-        mode_text_color = YELLOW
+        mode_text_color = TOKEN_COLOR_04
     case .SEARCH:
         mode_string = "Search"
-        mode_text_color = CYAN
+        mode_text_color = TOKEN_COLOR_07
     case .DEBUG:
         mode_string = "Debug"
-        mode_text_color = PURPLE
+        mode_text_color = TOKEN_COLOR_08
     case .GO_TO_LINE:
         mode_string = "Go To Line"
-        mode_text_color = BLUE
+        mode_text_color = TOKEN_COLOR_09
     case .YANK_HISTORY:
         mode_string = "Yank History"
-        mode_text_color = ORANGE
+        mode_text_color = TOKEN_COLOR_05
     }
     
     // Draw Input Mode

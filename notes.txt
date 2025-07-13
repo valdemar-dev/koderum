@@ -1,5 +1,5 @@
 today:
-    - add priority checking :D
+    - load languages from language.scm and language.json files
 
 high priority todo:
 

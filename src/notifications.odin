@@ -165,7 +165,7 @@ draw_alerts :: proc() {
                 &rect_cache,
                 bar_rect,
                 no_texture,
-                BLUE,
+                BG_ACCENT_00,
                 vec2{},
                 13,
             )
