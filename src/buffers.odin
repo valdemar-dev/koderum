@@ -109,6 +109,9 @@ Buffer :: struct {
 
     redo_stack: [dynamic]BufferChange,
     undo_stack: [dynamic]BufferChange,
+    
+    // Purely for display purposes.
+    error_count: int,
 }
 
 @(private="package")
@@ -1054,6 +1057,8 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         len(buffers) - 1
     )
     
+    active_language_server = nil
+    
     if new_buffer_index == -1 {
         active_buffer = nil
         
@@ -1969,11 +1974,18 @@ remove_selection :: proc(
 
 delete_line :: proc(line: int) {
     byte_offset := compute_byte_offset(active_buffer, line, 0)
-
+    buf_line := active_buffer.lines[line]
+    
+    size := len(buf_line.characters)
+    
+    if line < (len(active_buffer.lines)-1) {
+        size += 1
+    }
+    
     notify_server_of_change(
         active_buffer,
         byte_offset,
-        byte_offset + len(active_buffer.lines[line].characters)+1,
+        byte_offset + size,
         line,
         0,
         line+1,
@@ -2361,8 +2373,6 @@ handle_buffer_input :: proc() -> bool {
         
         update_fonts()
 
-        constrain_scroll_to_cursor()
-
         return false
     }
 
@@ -2376,8 +2386,6 @@ handle_buffer_input :: proc() -> bool {
         
         update_fonts()
         
-        constrain_scroll_to_cursor()
-
         return false
     }
 
@@ -2490,8 +2498,6 @@ handle_buffer_input :: proc() -> bool {
             cached_buffer_cursor_line,
             cached_buffer_cursor_char_index,
         )
-        
-        constrain_scroll_to_cursor()
         
         return false
     }
@@ -2688,8 +2694,6 @@ handle_search_input :: proc() {
             cached_buffer_cursor_line,
             cached_buffer_cursor_char_index,
         )
-        
-        constrain_scroll_to_cursor()
         
         return
     }

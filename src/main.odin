@@ -16,6 +16,9 @@ import "core:os"
 
 target_fps :: 144.0
 target_frame_time :: 1.0 / target_fps
+target_fps_measurement_time :: 1.0
+
+fps : int
 
 second := time.Duration(1_000_000_000)
 
@@ -77,6 +80,7 @@ main :: proc() {
     init()
 
     last_time := glfw.GetTime()
+    last_fps_measurement_time := glfw.GetTime()
 
     glfw.SwapBuffers(window)
 
@@ -85,12 +89,19 @@ main :: proc() {
 
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
+        local_fps_measurement_time := current_time - last_fps_measurement_time
 
         if local_frame_time < target_frame_time {
             sleep_duration := (target_frame_time - local_frame_time) * f64(second)
             time.sleep(time.Duration(sleep_duration))
 
             continue
+        }
+        
+        if local_fps_measurement_time >= target_fps_measurement_time {
+            last_fps_measurement_time = current_time
+            
+            fps = int(1 / frame_time)
         }
 
         if do_print_frame_time do fmt.println(frame_time)

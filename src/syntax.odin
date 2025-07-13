@@ -53,7 +53,7 @@ Language :: struct {
     
     // Files to look for to determine the root of a project.
     // tsconfig.json, ols.json, etc.    
-    project_root_markets: []string,
+    project_root_markers: []string,
 
     // Where the installed parser is located.
     // Parsers are here: .local/share/koderum/parsers/<PARSER>.
@@ -154,7 +154,7 @@ languages : map[string]Language = {
 
         language_symbol_name="tree_sitter_odin",
         
-        project_root_markets={"ols.json"},
+        project_root_markers={"ols.json"},
         
         filler_color=TOKEN_COLOR_05,
     }
@@ -811,6 +811,33 @@ read_language_from_file :: proc(
     
     language : Language
     
+    // Parser Project Root Markers
+    {
+        project_root_markers, ok := obj["project_root_markers"].(json.Array)
+        
+        if !ok {
+            show_malformed_err(language_file_path)
+            
+            return false
+        }
+                
+        dyn := make([dynamic]string)
+        
+        for marker in project_root_markers {
+            string_val, ok := marker.(json.String)
+            
+            if !ok {
+                show_malformed_err(language_file_path)
+                
+                return false
+            }
+            
+            append(&dyn, strings.clone(string_val))
+        }
+        
+        language.project_root_markers = dyn[:]
+    }
+    
     // Parse Colors
     {
         color_map, ok := obj["ts_colors"].(json.Object)
@@ -1150,7 +1177,7 @@ init_language_server :: proc(ext: string) {
         panic("Failed to start language server.")
     }
     
-    directory, ok := get_project_root(active_buffer.file_name, language.project_root_markets)
+    directory, ok := get_project_root(active_buffer.file_name, language.project_root_markers)
     
     if !ok {
         directory = cwd

@@ -1,14 +1,10 @@
 today:
-    - load languages from language.scm and language.json files
 
 high priority todo:
 
 todo:
     - consolidate buffer insert changes into one change on ESC
-    - we can probably just do JSON for this
-        - add "do overwrite token if found" to lsp options    
     - add variable font weights
-    - add fps and char-line to ui
     - add is saved state to ui
     
 bugs:

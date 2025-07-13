@@ -44,4 +44,5 @@
     "parser_link": "https://github.com/tree-sitter/tree-sitter-typescript",
     "language_symbol_name": "tree_sitter_typescript",
     "filler_color": 5,
+    "project_root_markers": ["tsconfig.json", "package.json"],
 }

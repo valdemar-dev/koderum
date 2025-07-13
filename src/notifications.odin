@@ -58,7 +58,7 @@ draw_alerts :: proc() {
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
 
-    pen_y := fb_size.y - margin
+    pen_y := fb_size.y - (margin * 3)
     
     line_thickness := font_base_px * line_thickness_em
 

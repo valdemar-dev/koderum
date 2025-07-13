@@ -2,6 +2,7 @@ package main
 
 import "core:fmt"
 import "core:math"
+import "core:strings"
 import "vendor:glfw"
 import "core:unicode/utf8"
 import ft "../../alt-odin-freetype"
@@ -74,15 +75,6 @@ draw_ui :: proc() {
         fb_size.x - (margin * 2),
         f32(status_bar_height),
     }
-
-    /*
-    status_bar_bg_rect := rect{
-        status_bar_rect.x - 15,
-        status_bar_rect.y - 10,
-        status_bar_rect.width + 30,
-        status_bar_rect.height + 20,
-    }
-    */
     
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
 
@@ -225,6 +217,7 @@ draw_ui :: proc() {
         )
     }
     
+    // Draw Current File
     if active_buffer != nil {
         file_name := active_buffer.info.name
 
@@ -283,6 +276,7 @@ draw_ui :: proc() {
         }
     }
     
+    // Draw GREP
     if input_mode == .SEARCH {
         title := "Type to Search"
         
@@ -387,6 +381,131 @@ draw_ui :: proc() {
             TEXT_MAIN,
             normal_text,
             term,
+            ui_z_index + 4,
+        )
+    }
+    
+    
+    // Draw Bottom Status Bar
+    {
+        left_size : vec2
+        right_size : vec2
+        
+        error := ft.set_pixel_sizes(primary_font, 0, u32(small_text))
+        if error != .Ok do return
+    
+        asc := primary_font.size.metrics.ascender >> 6
+        desc := primary_font.size.metrics.descender >> 6
+        
+        font_height := f32(asc - desc)
+        
+        padding := math.round_f32(font_base_px / 4)
+        
+        text_y_pos := fb_size.y - font_height - (padding)
+        
+        // Draw Left
+        {
+            sb := strings.builder_make()
+            
+            defer strings.builder_destroy(&sb)
+            
+            // FPS
+            strings.write_string(&sb, "FPS: ")
+            strings.write_int(&sb, fps)
+            
+            strings.write_string(&sb, " - ")
+            
+            // FRAME_TIME
+            strings.write_string(&sb, "Frame Time: ")
+            strings.write_f32(&sb, frame_time, 'f')
+            
+            left_text := strings.to_string(sb)
+            
+            left_size = add_text_measure(
+                &text_rect_cache,
+                vec2{
+                    padding,
+                    text_y_pos,
+                },
+                TEXT_DARKER,
+                small_text,
+                left_text,
+                ui_z_index + 5,     
+            )
+            
+        }
+        
+        // Draw Right
+        {
+            width : f32 = 0
+            
+            sb := strings.builder_make()
+            
+            defer strings.builder_destroy(&sb)
+            
+            // Language Server Draw
+            if active_language_server != nil {
+                strings.write_string(&sb, "Parser: Yes | ")
+                
+                if active_language_server.lsp_server_pid == 0 {
+                    strings.write_string(&sb, "LSP: No")
+                } else {
+                    strings.write_string(&sb, "LSP: Yes")
+                    
+                    strings.write_string(&sb, " - Diagnostics: ")
+                    strings.write_int(&sb, active_buffer.error_count)
+                }
+            } else {
+                strings.write_string(&sb, "Parser: No")
+            }
+            
+            right_text := strings.to_string(sb)
+            
+            right_size = measure_text(small_text, right_text)
+            
+            add_text(
+                &text_rect_cache,
+                vec2{
+                    fb_size.x - padding - right_size.x,
+                    text_y_pos,
+                },
+                TEXT_DARKER,
+                small_text,
+                right_text,
+                ui_z_index + 5,     
+            )
+            
+        }
+    
+        bg_rect := rect{
+            0,
+            text_y_pos - padding,
+            fb_size.x,
+            font_height + padding * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            bg_rect,
+            no_texture,
+            BG_MAIN_00,
+            vec2{},
+            ui_z_index + 4,
+        )
+        
+        border_rect := rect{
+            bg_rect.x,
+            bg_rect.y - line_thickness,
+            bg_rect.width,
+            bg_rect.height + line_thickness * 2,
+        }
+        
+        add_rect(
+            &rect_cache,
+            border_rect,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
             ui_z_index + 4,
         )
     }

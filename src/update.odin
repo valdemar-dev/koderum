@@ -198,6 +198,7 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
         clear(&line.errors)
     }
     
+    buffer^.error_count = len(errors)
     if len(errors) == 0 do return
     
     sort.quick_sort_proc(errors[:], sort_proc)
