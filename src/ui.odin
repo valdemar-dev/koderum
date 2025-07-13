@@ -239,7 +239,7 @@ draw_ui :: proc() {
             status_bar_rect.y,
         }
                 
-        add_text(&rect_cache,
+        add_text(&text_rect_cache,
             pos,
             TEXT_MAIN,
             normal_text,

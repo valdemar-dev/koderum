@@ -283,58 +283,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
     compilation_dir : string
     
     defer delete(compilation_dir)
-
-    when ODIN_OS == .Linux {
-        compilation_dir = strings.concatenate({
-            temp_dir,
-            "/",
-            language.parser_name,
-            "/",
-            language.parser_subpath,
-        })
-        
-        include_path := strings.concatenate({
-            "-I",
-            data_dir,
-            "/tree-sitter/lib/include"
-        })
-        
-        defer delete(include_path)
-
-        command = {
-            "cc",
-            "-fPIC",
-            include_path,
-            "-c",
-            "src/parser.c",
-            "src/scanner.c",
-        }
-    } else when ODIN_OS == .Darwin {
-        compilation_dir = strings.concatenate({
-            temp_dir,
-            "/",
-            language.parser_name,
-            "/",
-            language.parser_subpath,
-        })
-        
-        include_path := strings.concatenate({
-            "-I",
-            data_dir,
-            "/tree-sitter/lib/include"
-        })
-        
-        defer delete(include_path)
-
-        command = {
-            "cc",
-            "-fPIC",
-            include_path,
-            "-c",
-            "src/parser.c",
-            "src/scanner.c",
-        }
-    } else when ODIN_OS == .Windows {
+    
+    when ODIN_OS == .Windows {
         compilation_dir = strings.concatenate({
             temp_dir,
             "\\",
@@ -351,13 +301,69 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         
         defer delete(include_path)
         
-        command = {
-            "gcc",
-            include_path,
-            "-c",
-            ".\\src\\parser.c",
-            ".\\src\\scanner.c",
+        scanner_path := strings.concatenate({ compilation_dir, "\\src\\scanner.c", })
+        
+        scanner_txt : string
+        if os.exists(scanner_path) == true {
+            command = {
+                "gcc",
+                include_path,
+                "-c",
+                ".\\src\\parser.c",
+                ".\\src\\scanner.c",
+            }
+        } else {
+            command = {
+                "gcc",
+                include_path,
+                "-c",
+                ".\\src\\parser.c",
+            }
         }
+        
+        defer delete(scanner_path)
+        
+
+    } else {
+        compilation_dir = strings.concatenate({
+            temp_dir,
+            "/",
+            language.parser_name,
+            "/",
+            language.parser_subpath,
+        })
+        
+        include_path := strings.concatenate({
+            "-I",
+            data_dir,
+            "/tree-sitter/lib/include"
+        })
+        
+        defer delete(include_path)
+        
+        scanner_path := strings.concatenate({ compilation_dir, "/src/scanner.c", })
+        
+        scanner_txt : string
+        if os.exists(scanner_path) == true {
+            command = {
+                "cc",
+                "-fPIC",
+                include_path,
+                "-c",
+                "./src/parser.c",
+                "./src/scanner.c",
+            }
+        } else {
+            command = {
+                "cc",
+                "-fPIC",
+                include_path,
+                "-c",
+                "./src/parser.c",
+            }
+        }
+        
+        defer delete(scanner_path)
     }
     
 
@@ -406,58 +412,67 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         }
     }
 
-    run_program(
+    error = run_program(
         command,
         nil,
         compilation_dir,
     )
 
-    when ODIN_OS == .Linux {
-        dll_path := strings.concatenate({
-            parser_dir, "/parser.o",
-        })
-        
-        defer delete(dll_path)
-        
-        command = {
-            "gcc",
-            "-shared",
-            "-fPIC",
-            "-o",
-            dll_path,
-            "parser.o",
-            "scanner.o"
-        }
-    } else when ODIN_OS == .Darwin {
-        dll_path := strings.concatenate({
-            parser_dir, "/parser.o",
-        })
-    
-        defer delete(dll_path)
-        
-        command = {
-            "gcc",
-            "-shared",
-            "-fPIC",
-            "-o",
-            dll_path,
-            "parser.o",
-            "scanner.o"
-        }
-    } else when ODIN_OS == .Windows {
+    when ODIN_OS == .Windows {
         dll_path := strings.concatenate({
             parser_dir, "\\parser.dll",
         })
         
         defer delete(dll_path)
         
-        command = {
-            "gcc",
-            "-shared",
-            "-o",
-            dll_path,
-            ".\\parser.o",
-            ".\\scanner.o",
+        scanner_path = strings.concatenate({ compilation_dir, "\\scanner.o", })
+        
+        if os.exists(scanner_path) == true {
+            command = {
+                "gcc",
+                "-shared",
+                "-o",
+                dll_path,
+                ".\\parser.o",
+                ".\\scanner.o",
+            }
+        } else {
+            command = {
+                "gcc",
+                "-shared",
+                "-o",
+                dll_path,
+                ".\\parser.o",
+            }
+        }
+    } else {
+        dll_path := strings.concatenate({
+            parser_dir, "/parser.o",
+        })
+    
+        defer delete(dll_path)
+        
+        scanner_path = strings.concatenate({ compilation_dir, "/scanner.o", })
+        
+        if os.exists(scanner_path) == true {
+            command = {
+                "gcc",
+                "-shared",
+                "-fPIC",
+                "-o",
+                dll_path,
+                "./parser.o",
+                "./scanner.o",
+            }
+        } else {
+            command = {
+                "gcc",
+                "-shared",
+                "-fPIC",
+                "-o",
+                dll_path,
+                "./parser.o",
+            }
         }
     }
 
@@ -653,6 +668,8 @@ set_active_language_server :: proc(ext: string) {
     
     if ext in active_language_servers {
         active_language_server = active_language_servers[ext]
+        
+        return   
     }
 
     defer {
@@ -713,7 +730,11 @@ set_active_language_server :: proc(ext: string) {
         return
     }
     
-    read_language_from_file(ext, hit.fullpath, scm_file_path)
+    ok := read_language_from_file(ext, hit.fullpath, scm_file_path)
+    
+    if !ok {
+        return
+    }
 
     init_language_server(ext)
 }
@@ -752,12 +773,19 @@ read_language_from_file :: proc(
     ext: string, 
     language_file_path: string,
     scm_file_path: string,
-) {
+) -> bool {
     bytes, ok := os.read_entire_file_from_filename(language_file_path)
     defer delete(bytes)
     
     if !ok {
-        return
+        create_alert(
+            "Failed to init parser.",
+            "Could not read language JSON file.",
+            5,
+            context.allocator,
+        )
+        
+        return false
     }
     
     value, err := json.parse_string(string(bytes))
@@ -776,6 +804,8 @@ read_language_from_file :: proc(
     
     if err != .None || obj_ok == false {
         show_malformed_err(language_file_path)
+        
+        return false
     }
     
     language : Language
@@ -787,7 +817,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         ts_colors : map[string]vec4
@@ -798,7 +828,7 @@ read_language_from_file :: proc(
             if !ok {
                 show_malformed_err(language_file_path)
             
-                return
+                return false
             }
             
             color := color_index_to_color(int(color_index))
@@ -819,7 +849,7 @@ read_language_from_file :: proc(
                     context.allocator,
                 )
                 
-                return
+                return false
             }
             
             ts_colors[field] = color^
@@ -835,7 +865,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         lsp_colors : map[string]vec4
@@ -846,7 +876,7 @@ read_language_from_file :: proc(
             if !ok {
                 show_malformed_err(language_file_path)
             
-                return
+                return false
             }
             
             color := color_index_to_color(int(color_index))
@@ -867,7 +897,7 @@ read_language_from_file :: proc(
                     context.allocator,
                 )
                 
-                return
+                return false
             }
             
             lsp_colors[field] = color^
@@ -883,7 +913,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         dyn := make([dynamic]string)
@@ -894,7 +924,7 @@ read_language_from_file :: proc(
             if !ok {
                 show_malformed_err(language_file_path)
                 
-                return
+                return false
             }
             
             append(&dyn, strings.clone(string_val))
@@ -910,7 +940,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.lsp_working_dir = lsp_working_dir
@@ -923,7 +953,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.lsp_install_command = lsp_install_command
@@ -937,7 +967,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.parser_name = parser_name
@@ -950,7 +980,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.parser_subpath = parser_subpath
@@ -963,7 +993,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.parser_link = parser_link
@@ -976,7 +1006,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         language.language_symbol_name = language_symbol_name
@@ -989,7 +1019,7 @@ read_language_from_file :: proc(
         if !ok {
             show_malformed_err(language_file_path)
             
-            return
+            return false
         }
         
         color := color_index_to_color(int(filler_color))
@@ -1010,7 +1040,7 @@ read_language_from_file :: proc(
                 context.allocator,
             )
             
-            return
+            return false
         }
         
         language.filler_color = color^
@@ -1025,9 +1055,9 @@ read_language_from_file :: proc(
         delete(bytes)
     }
     
-    fmt.println(language)
-    
     languages[ext] = language
+    
+    return true
 }
 
 init_language_server :: proc(ext: string) {
@@ -1046,6 +1076,32 @@ init_language_server :: proc(ext: string) {
     if !ts.parser_set_language(parser, language.ts_language^) {
         panic("Failed to set parser language to.")
     }
+    
+    
+    server := new(LanguageServer)
+    server^ = LanguageServer{
+        override_node_type=language.override_node_type,
+        ts_parser=parser,
+        token_types={},
+        token_modifiers={},
+        language=language,
+        completion_trigger_runes={},
+    }
+    
+    active_language_server = server
+    active_language_servers[ext] = server
+    
+    defer {
+        sync.lock(&tree_mutex)
+
+        active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
+        
+        sync.unlock(&tree_mutex)
+
+        do_refresh_buffer_tokens = true
+    }
+
+    if len(language.lsp_command) == 0 do return
     
     stdin_r, stdin_w, _ := os2.pipe()
     stdout_r, stdout_w, _ := os2.pipe()
@@ -1066,6 +1122,10 @@ init_language_server :: proc(ext: string) {
     }
 
     process, start_err := os2.process_start(desc)
+    
+    server^.lsp_stdin_w = stdin_w
+    server^.lsp_stdout_r = stdout_r
+    server^.lsp_server_pid = process.pid
     
     if start_err == .Not_Exist {
         notification := new(Notification)
@@ -1088,22 +1148,6 @@ init_language_server :: proc(ext: string) {
         fmt.println(start_err)
         panic("Failed to start language server.")
     }
-
-    server := new(LanguageServer)
-    server^ = LanguageServer{
-        lsp_stdin_w = stdin_w,
-        lsp_stdout_r = stdout_r,
-        lsp_server_pid = process.pid,
-        override_node_type=language.override_node_type,
-        ts_parser=parser,
-        token_types={},
-        token_modifiers={},
-        language=language,
-        completion_trigger_runes={},
-    }
-
-    active_language_server = server
-    active_language_servers[ext] = server
     
     directory, ok := get_project_root(active_buffer.file_name, language.project_root_markets)
     
@@ -1119,15 +1163,6 @@ init_language_server :: proc(ext: string) {
     id := "1"
 
     send_lsp_message(msg, id, set_capabilities, rawptr(server))
-    /*
-    msg_2 := did_change_workspace_folders_message(
-        directory, directory,
-    )
- 
-    send_lsp_init_message(msg_2, stdin_w)
-
-    defer delete(msg_2)
-    */
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
         result_obj, _ := response["result"].(json.Object)
@@ -1177,14 +1212,6 @@ init_language_server :: proc(ext: string) {
         when ODIN_DEBUG{
             fmt.println("LSP has been initialized.")
         }
-        
-        sync.lock(&tree_mutex)
-
-        active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
-        
-        sync.unlock(&tree_mutex)
-
-        do_refresh_buffer_tokens = true
     }
 }
 

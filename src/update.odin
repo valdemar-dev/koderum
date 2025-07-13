@@ -54,6 +54,10 @@ message_loop :: proc(thread: ^thread.Thread) {
         if active_language_server == nil {
             return
         }
+        
+        if active_language_server.lsp_server_pid == 0 {
+            return
+        }
 
         last_time = current_time
 

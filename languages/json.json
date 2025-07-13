@@ -1,0 +1,19 @@
+{
+    "ts_colors": {
+        "comment": 3,
+        "escape": 4,
+        "constant.builtin": 0,
+        "number": 9,
+        "string": 2,
+        "string.special.key": 3,
+    },
+    "lsp_colors": {},
+    "lsp_command": [],
+    "lsp_working_dir": "",
+    "lsp_install_command": "",
+    "parser_name": "json",
+    "parser_subpath": "",
+    "parser_link": "https://github.com/tree-sitter/tree-sitter-json",
+    "language_symbol_name": "tree_sitter_json",
+    "filler_color": 3,
+}
