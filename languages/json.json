@@ -15,5 +15,5 @@
     "parser_subpath": "",
     "parser_link": "https://github.com/tree-sitter/tree-sitter-json",
     "language_symbol_name": "tree_sitter_json",
-    "filler_color": 3,
+    "filler_color": 3
 }

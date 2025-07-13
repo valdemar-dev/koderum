@@ -716,8 +716,9 @@ set_active_language_server :: proc(ext: string) {
         ext_name := ext[1:]
     
         file_name := fp.short_stem(file.name)
+        ext := fp.ext(file.fullpath)
         
-        if ext_name == file_name {
+        if ext_name == file_name && ext == ".json" {
             hit = &file
             
             scm_file_path = strings.concatenate({languages_path, "/", ext_name, ".scm"})
