@@ -1049,6 +1049,10 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     
     buffer_index := get_buffer_index(buffer)
     
+    cached_buffer_index = -1
+    cached_buffer_cursor_char_index = -1
+    cached_buffer_cursor_line = -1
+    
     ordered_remove(&buffers, buffer_index)
     
     new_buffer_index := clamp(
@@ -2338,6 +2342,7 @@ handle_buffer_input :: proc() -> bool {
 
         input_mode = .SEARCH
         
+        cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
         cached_buffer_cursor_char_index = buffer_cursor_char_index
 
@@ -2490,7 +2495,10 @@ handle_buffer_input :: proc() -> bool {
         }
 
         cached_file := buffers[cached_buffer_index]
-        open_file(cached_file.file_name)
+        
+        if cached_file.file_name != active_buffer.file_name {
+            open_file(cached_file.file_name)
+        }
         
         set_buffer_cursor_pos(
             cached_buffer_cursor_line,

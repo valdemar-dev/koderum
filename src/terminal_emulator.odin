@@ -167,15 +167,13 @@ draw_terminal_emulator :: proc() {
 }
 
 @(private="package")
-handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) {
+handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_continue: bool) {
     if action == glfw.RELEASE do return
     
-    if is_key_pressed(glfw.KEY_D) {
-        key := key_store[glfw.KEY_D]
-        
-        if key.modifiers == CTRL {
+    if key == (glfw.KEY_D) {
+        if mods == CTRL {
             input_mode = .COMMAND
-            return
+            return false
         }
     }
     
@@ -188,6 +186,8 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) {
     if did_allocate {
         delete(seq)
     }
+    
+    return true
 }
 
 @(private="package")

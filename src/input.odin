@@ -173,7 +173,15 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
 }
 
 @(private="package")
-key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {        
+key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {
+    context = runtime.default_context()
+    
+    if input_mode == .TERMINAL {
+        do_continue := handle_terminal_emulator_input(key, scancode, action, mods)
+        
+        if !do_continue do return
+    }
+    
     switch action {
     case glfw.RELEASE:
         key_store[key] = ActiveKey{
@@ -193,13 +201,7 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
         break
     }
 
-    context = runtime.default_context()
-
     handle_ui_input(key, scancode, action, mods)
-    
-    if input_mode == .TERMINAL {
-        handle_terminal_emulator_input(key, scancode, action, mods)
-    }
 }
 
 set_keypress_states :: proc() {

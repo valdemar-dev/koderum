@@ -281,6 +281,8 @@ draw_ui :: proc() {
     
     // Draw GREP
     if input_mode == .SEARCH {
+        ui_z_index : f32 = ui_z_index + 10
+        
         title := "Type to Search"
         
         term_size := measure_text(small_text, buffer_search_term)
@@ -293,7 +295,7 @@ draw_ui :: proc() {
         
         middle := fb_size.x / 2 - width / 2
         
-        y_pos := fb_size.y - (padding * 2) - 20 - height
+        y_pos := fb_size.y - (small_text * 3) - (height + padding * 2)
         
         // Draw Background
         {

@@ -88,18 +88,18 @@ main :: proc() {
     glfw.SwapBuffers(window)
 
     for !glfw.WindowShouldClose(window) {
-        glfw.PollEvents()
-
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
         local_fps_measurement_time := current_time - last_fps_measurement_time
 
+        /*
         if local_frame_time < target_frame_time {
             sleep_duration := (target_frame_time - local_frame_time) * f64(second)
             time.sleep(time.Duration(sleep_duration))
 
             continue
         }
+        */
         
         if local_fps_measurement_time >= target_fps_measurement_time {
             last_fps_measurement_time = current_time
@@ -134,11 +134,14 @@ main :: proc() {
         render()
 
         free_all(context.temp_allocator)
+        
+        glfw.PollEvents()
 
         when ODIN_OS == .Windows {
             glfw.SwapBuffers(window)
         }
 
+        /*
         when ODIN_OS == .Linux {
             if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
                glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1 
@@ -148,7 +151,13 @@ main :: proc() {
                 continue
             }
         }
+        */
+            if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1
+            {
+                glfw.SwapBuffers(window)
 
+                continue
+            }
     }
 
     clear_fonts()
