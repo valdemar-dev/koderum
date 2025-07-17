@@ -60,16 +60,16 @@ resize_terminal :: proc () {
 
     // Compute actual term height using cells.
     {
-        small_text := math.round_f32(font_base_px * small_text_scale)
+        text := math.round_f32(font_base_px * normal_text_scale)
 
-        error := ft.set_pixel_sizes(primary_font, 0, u32(small_text))
+        error := ft.set_pixel_sizes(primary_font, 0, u32(text))
         assert(error == .Ok)
     
         ascender := f32(primary_font.size.metrics.ascender >> 6)
         descender := f32(primary_font.size.metrics.descender >> 6)
         
-        char_map := get_char_map(small_text)
-        char := get_char_with_char_map(char_map, small_text, ' ')
+        char_map := get_char_map(text)
+        char := get_char_with_char_map(char_map, text, ' ')
         if char == nil do return
         
         desired_width := (fb_size.x / 100) * width_percentage    
@@ -116,8 +116,8 @@ draw_terminal_emulator :: proc() {
         return
     }
 
-    small_text := math.round_f32(font_base_px * small_text_scale)
-    error := ft.set_pixel_sizes(primary_font, 0, u32(small_text))
+    text := math.round_f32(font_base_px * normal_text_scale)
+    error := ft.set_pixel_sizes(primary_font, 0, u32(text))
     assert(error == .Ok)
 
     ascender := f32(primary_font.size.metrics.ascender >> 6)
@@ -153,7 +153,7 @@ draw_terminal_emulator :: proc() {
             &text_rect_cache,
             pen,
             TEXT_MAIN,
-            small_text,
+            text,
             string(row[:]),
             z_index + 1,
             true,
@@ -179,10 +179,14 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) {
         }
     }
     
-    seq := map_glfw_key_to_escape_sequence(key, mods)
+    seq, did_allocate := map_glfw_key_to_escape_sequence(key, mods)
     
     if seq != "" {
         write_to_shell(tty^, seq)
+    }
+    
+    if did_allocate {
+        delete(seq)
     }
 }
 
@@ -234,7 +238,9 @@ when ODIN_OS == .Linux {
             slave_fd := posix.open(slave_name, {posix.O_Flag_Bits.RDWR})
         
             linux.ioctl(linux.Fd(slave_fd), u32(TIOCSCTTY), 0)
-        
+            posix.setpgid(0, 0) // set child as its own process group leader
+            posix.tcsetpgrp(slave_fd, posix.getpgrp()) // set foreground pgrp
+
             posix.dup2(slave_fd, 0) // stdin
             posix.dup2(slave_fd, 1) // stdout
             posix.dup2(slave_fd, 2) // stderr

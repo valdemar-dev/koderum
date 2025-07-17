@@ -371,7 +371,7 @@ sanitize_ansi_string :: proc(text: string) -> (sanitized: [dynamic]u8, escapes: 
     return sanitized, escapes
 }
 
-map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> string {
+map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string, did_allocate: bool = false) {
     ctrl  := mods == CTRL
     alt   := mods == ALT
     shift := mods == SHIFT
@@ -379,85 +379,96 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> string {
     // Ctrl + A-Z → control characters
     if ctrl {
         if key == glfw.KEY_LEFT_BRACKET {
-            return "\x1B" // ESC
+            return "\x1B", false // ESC
         }
 
         if key == glfw.KEY_GRAVE_ACCENT {
-            return "\x00" // NUL
+            return "\x00", false // NUL
         }
 
         if key == glfw.KEY_SLASH && shift {
-            return "\x7F" // DEL
+            return "\x7F", false // DEL
         }
 
         if key == glfw.KEY_BACKSLASH {
-            return "\x1C" // FS
+            return "\x1C", false // FS
         }
 
         if key == glfw.KEY_RIGHT_BRACKET {
-            return "\x1D" // GS
+            return "\x1D", false // GS
         }
+    }
+    
+    if ctrl && key >= glfw.KEY_A && key <= glfw.KEY_Z {
+    	builder := strings.builder_make()
+    	strings.write_rune(&builder, rune(u64(key - glfw.KEY_A + 1)))
+    
+        defer strings.builder_destroy(&builder)
+        
+        ch: string = strings.to_string(builder)
+        
+        return strings.clone(ch), true
     }
 
     switch key {
     case glfw.KEY_ENTER:
-        return "\n"
+        return "\n", false
     case glfw.KEY_BACKSPACE:
-        return "\b"
+        return "\b", false
     case glfw.KEY_TAB:
         if shift {
-            return "\x1B[Z"
+            return "\x1B[Z", false
         }
-        return "\t"
+        return "\t", false
     case glfw.KEY_ESCAPE:
-        return "\x1B"
+        return "\x1B", false
 
     case glfw.KEY_UP:
-        return "\x1B[A"
+        return "\x1B[A", false
     case glfw.KEY_DOWN:
-        return "\x1B[B"
+        return "\x1B[B", false
     case glfw.KEY_RIGHT:
-        return "\x1B[C"
+        return "\x1B[C", false
     case glfw.KEY_LEFT:
-        return "\x1B[D"
+        return "\x1B[D", false
 
     case glfw.KEY_HOME:
-        return "\x1B[H"
+        return "\x1B[H", false
     case glfw.KEY_END:
-        return "\x1B[F"
+        return "\x1B[F", false
     case glfw.KEY_PAGE_UP:
-        return "\x1B[5~"
+        return "\x1B[5~", false
     case glfw.KEY_PAGE_DOWN:
-        return "\x1B[6~"
+        return "\x1B[6~", false
     case glfw.KEY_INSERT:
-        return "\x1B[2~"
+        return "\x1B[2~", false
     case glfw.KEY_DELETE:
-        return "\x1B[3~"
+        return "\x1B[3~", false
 
     case glfw.KEY_F1:
-        return "\x1BOP"
+        return "\x1BOP", false
     case glfw.KEY_F2:
-        return "\x1BOQ"
+        return "\x1BOQ", false
     case glfw.KEY_F3:
-        return "\x1BOR"
+        return "\x1BOR", false
     case glfw.KEY_F4:
-        return "\x1BOS"
+        return "\x1BOS", false
     case glfw.KEY_F5:
-        return "\x1B[15~"
+        return "\x1B[15~", false
     case glfw.KEY_F6:
-        return "\x1B[17~"
+        return "\x1B[17~", false
     case glfw.KEY_F7:
-        return "\x1B[18~"
+        return "\x1B[18~", false
     case glfw.KEY_F8:
-        return "\x1B[19~"
+        return "\x1B[19~", false
     case glfw.KEY_F9:
-        return "\x1B[20~"
+        return "\x1B[20~", false
     case glfw.KEY_F10:
-        return "\x1B[21~"
+        return "\x1B[21~", false
     case glfw.KEY_F11:
-        return "\x1B[23~"
+        return "\x1B[23~", false
     case glfw.KEY_F12:
-        return "\x1B[24~"
+        return "\x1B[24~", false
     }
 
     // Alt + printable key → ESC + char
@@ -477,8 +488,8 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> string {
         }
         
         
-        return strings.concatenate({ "\x1B", ch })
+        return strings.concatenate({ "\x1B", ch }), true
     }
 
-    return ""
+    return "", false
 }
