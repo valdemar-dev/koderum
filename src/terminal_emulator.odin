@@ -10,6 +10,7 @@ import "core:mem"
 import "core:thread"
 import "core:unicode/utf8"
 import "core:sys/linux"
+import "core:strings"
 import ft "../../alt-odin-freetype"
 
 suppress := true
@@ -207,6 +208,12 @@ when ODIN_OS == .Linux {
     TCSANOW: int = 0
     
     spawn_shell :: proc() {
+        cwd_string := strings.clone_to_cstring(cwd)
+        
+        posix.chdir(cwd_string)
+        
+        delete(cwd_string)
+        
         master_fd := posix.posix_openpt({
             posix.O_Flag_Bits.RDWR, 
             posix.O_Flag_Bits.NOCTTY,
@@ -245,7 +252,7 @@ when ODIN_OS == .Linux {
             posix.setenv("TERM", "xterm", true)
             
             posix.execl("/bin/bash", "bash", nil)
-
+            
             posix._exit(1)
         }
         
@@ -315,44 +322,44 @@ terminal_loop :: proc(thread: ^thread.Thread) {
         sanitized, escapes := sanitize_ansi_string(string(read_buf[:n]))
         
         for escape in escapes {
-        switch escape {
-        case "\x1B[H":
-            cursor_row = 0
-            cursor_col = 0
-        case "\x1B[2J":
-            cursor_row = 0
-            cursor_col = 0
-            clear(&scrollback_buffer)
-        case "\x1B[3J":
-            clear(&scrollback_buffer)
-        case "\x1B[K":
-            // Erase from cursor to end of line
-            for i in cursor_col..<cell_count_x {
-                scrollback_buffer[cursor_row][i] = 0
+            switch escape {
+            case "\x1B[H":
+                cursor_row = 0
+                cursor_col = 0
+            case "\x1B[2J":
+                cursor_row = 0
+                cursor_col = 0
+                clear(&scrollback_buffer)
+            case "\x1B[3J":
+                clear(&scrollback_buffer)
+            case "\x1B[K":
+                // Erase from cursor to end of line
+                for i in cursor_col..<cell_count_x {
+                    scrollback_buffer[cursor_row][i] = 0
+                }
+            case "\x1B[1K":
+                // Erase from start of line to cursor
+                for i in 0..<cursor_col+1 {
+                    scrollback_buffer[cursor_row][i] = 0
+                }
+            case "\x1B[2K":
+                // Erase entire line
+                for i in 0..<cell_count_x {
+                    scrollback_buffer[cursor_row][i] = 0
+                }
+            case "\b", "\x7F":
+                if cursor_col > 0 {
+                    cursor_col -= 1
+                    scrollback_buffer[cursor_row][cursor_col] = 0
+                } else if cursor_row > 0 {
+                    cursor_row -= 1
+                    cursor_col = cell_count_x - 1
+                    scrollback_buffer[cursor_row][cursor_col] = 0
+                }
+                break
+            case:
+                //fmt.println(transmute([]u8)escape)
             }
-        case "\x1B[1K":
-            // Erase from start of line to cursor
-            for i in 0..<cursor_col+1 {
-                scrollback_buffer[cursor_row][i] = 0
-            }
-        case "\x1B[2K":
-            // Erase entire line
-            for i in 0..<cell_count_x {
-                scrollback_buffer[cursor_row][i] = 0
-            }
-        case "\b", "\x7F":
-            if cursor_col > 0 {
-                cursor_col -= 1
-                scrollback_buffer[cursor_row][cursor_col] = 0
-            } else if cursor_row > 0 {
-                cursor_row -= 1
-                cursor_col = cell_count_x - 1
-                scrollback_buffer[cursor_row][cursor_col] = 0
-            }
-            break
-        case:
-            //fmt.println(transmute([]u8)escape)
-        }
         }
     
         for char in transmute([]u8)sanitized[:] {
