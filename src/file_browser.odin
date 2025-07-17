@@ -312,23 +312,18 @@ toggle_browser_view :: proc() {
 
         return
     } else {
-        suppress = false
-        show_browser_view = true
-
-        de := os.get_env("XDG_CURRENT_DESKTOP") 
-
-            glfw.WaitEvents()
-
-        delete(de)
-
-
-        input_mode = .BROWSER_SEARCH
-
-        search_term = strings.concatenate({
-            cwd, "/",
-        })
-
-        set_found_files()
+        callback :: proc() {
+            suppress = false
+            show_browser_view = true
+            
+            search_term = strings.concatenate({
+                cwd, "/",
+            })
+    
+            set_found_files()
+        }
+        
+        set_mode(.BROWSER_SEARCH, glfw.KEY_O, callback)
 
         return
     }

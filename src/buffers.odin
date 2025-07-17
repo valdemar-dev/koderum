@@ -2076,13 +2076,7 @@ inject_line :: proc() {
         indent_spaces, 
     )
 
-    de := os.get_env("XDG_CURRENT_DESKTOP") 
-
-    glfw.WaitEvents()
-
-    delete(de)
-    
-    input_mode = .BUFFER_INPUT
+    set_mode(.BUFFER_INPUT, glfw.KEY_L, nil)
 }
 
 @(private="package")
@@ -2332,36 +2326,24 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_G) {
-        de := os.get_env("XDG_CURRENT_DESKTOP") 
-
-        if de == "GNOME" || de == "Budgie" {
-            glfw.WaitEvents()
+        callback :: proc() {
+            cached_buffer_index = get_buffer_index(active_buffer)
+            cached_buffer_cursor_line = buffer_cursor_line
+            cached_buffer_cursor_char_index = buffer_cursor_char_index
         }
-
-        delete(de)
-
-        input_mode = .SEARCH
         
-        cached_buffer_index = get_buffer_index(active_buffer)
-        cached_buffer_cursor_line = buffer_cursor_line
-        cached_buffer_cursor_char_index = buffer_cursor_char_index
-
+        set_mode(.SEARCH, glfw.KEY_G, callback)
+        
         return false
     }
     
     if is_key_pressed(glfw.KEY_N) {
-        de := os.get_env("XDG_CURRENT_DESKTOP")
-        
-        if de == "GNOME" || de == "Budgie" {
-            glfw.WaitEvents()
+        callback :: proc() {
+            cached_buffer_cursor_line = buffer_cursor_line
+            cached_buffer_cursor_char_index = buffer_cursor_char_index
         }
         
-        delete(de)
-        
-        input_mode = .GO_TO_LINE
-        
-        cached_buffer_cursor_line = buffer_cursor_line
-        cached_buffer_cursor_char_index = buffer_cursor_char_index
+        set_mode(.GO_TO_LINE, glfw.KEY_N, callback)
         
         return false
     }
@@ -2393,25 +2375,21 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_I) {
-        de := os.get_env("XDG_CURRENT_DESKTOP") 
-
-        if de == "GNOME" || de == "Budgie" {
-            glfw.WaitEvents()
+        callback :: proc() {
+            input_mode = .BUFFER_INPUT
+    
+            constrain_scroll_to_cursor()
+    
+            get_autocomplete_hits(
+                buffer_cursor_line,
+                buffer_cursor_char_index,
+                "1",
+                "",
+            )
         }
-
-        delete(de)
-
-        input_mode = .BUFFER_INPUT
-
-        constrain_scroll_to_cursor()
-
-        get_autocomplete_hits(
-            buffer_cursor_line,
-            buffer_cursor_char_index,
-            "1",
-            "",
-        )
-
+        
+        set_mode(.BUFFER_INPUT, glfw.KEY_I, callback)
+        
         return false
     }
 

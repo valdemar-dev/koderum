@@ -143,6 +143,41 @@ process_input :: proc() {
     set_keypress_states()
 }
 
+did_release := false
+target_key : i32 = -1
+target_input_mode: InputMode
+release_callback : proc()
+
+@(private="package")
+set_mode :: proc(mode: InputMode, key: i32, callback: proc()) {
+    target_key = key
+    
+    glfw.SetKeyCallback(window, key_callback_hijack)
+    
+    release_callback = callback
+    target_input_mode = mode
+}
+
+key_callback_hijack :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {
+    context = runtime.default_context()
+    
+    if (key == target_key) && action == glfw.RELEASE {
+        did_release = true
+        target_key = -1
+    
+        glfw.SetKeyCallback(window, key_callback)
+        
+        did_release = false    
+        input_mode = target_input_mode
+        
+        if release_callback != nil {    
+            release_callback()
+        }
+        
+        release_callback = nil
+    }
+}
+
 @(private="package")
 char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
