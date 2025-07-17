@@ -24,7 +24,6 @@ init :: proc() {
     update_thread_allocator = context.allocator
 
     init_update_thread()
-
     init_message_thread()
 
     fb_width, fb_height := glfw.GetFramebufferSize(window)
@@ -51,6 +50,9 @@ size_callback :: proc "c" (
 ) {
     fb_size = vec2{f32(width), f32(height)}
     gl.Viewport(0,0,width,height)
+    
+    context = runtime.default_context()
+    resize_terminal()
 }
 
 @(private="package")
@@ -67,6 +69,9 @@ init_update_thread :: proc() {
 
 @(private="package")
 message_thread : ^thread.Thread
+
+@(private="package")
+terminal_thread : ^thread.Thread
 
 @(private="package")
 init_message_thread :: proc() {
@@ -86,6 +91,12 @@ init_message_thread :: proc() {
     message_thread = thread.create(message_loop)
 
     thread.start(message_thread)
+}
+
+init_terminal_thread :: proc() {
+    terminal_thread = thread.create(terminal_loop)
+
+    thread.start(terminal_thread)
 }
 
 init_window :: proc() {
@@ -132,8 +143,8 @@ init_window :: proc() {
         panic("Could not create window.") 
     }
 
-    glfw.SetWindowSizeLimits(window, 600, 800, glfw.DONT_CARE, glfw.DONT_CARE)
-
+    glfw.SetWindowSizeLimits(window, glfw.DONT_CARE, glfw.DONT_CARE, glfw.DONT_CARE, glfw.DONT_CARE)
+    
     width, height := glfw.GetWindowSize(window)
 
     fb_size = vec2{
@@ -153,11 +164,7 @@ init_window :: proc() {
 
     glfw.SwapInterval(1)
 
-    glfw.SetWindowSize(window, width, height)
-
     gl.load_up_to(3, 3, glfw.gl_set_proc_address)
-
-
 }
 
 vbo : u32

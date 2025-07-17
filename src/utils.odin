@@ -7,6 +7,7 @@ import "core:encoding/json"
 import "core:unicode/utf8"
 import "core:strings"
 import "core:os/os2"
+import "vendor:glfw"
 
 vec2 :: struct {
     x: f32,
@@ -302,4 +303,182 @@ color_index_to_color :: proc(color_index : int) -> ^vec4 {
     case:
         return nil
     }
+}
+
+sanitize_ansi_string :: proc(text: string) -> (sanitized: [dynamic]u8, escapes: [dynamic]string) {
+    i := 0
+
+    for i < len(text) {
+        c := text[i]
+        if c == 0x1B {
+            start := i
+            i += 1
+            if i >= len(text) {
+                break
+            }
+            next := text[i]
+
+            if next == '[' {
+                i += 1
+                for i < len(text) && ((text[i] < 0x40) || (text[i] > 0x7E)) {
+                    i += 1
+                }
+                if i < len(text) {
+                    i += 1
+                }
+                
+                append(&escapes, text[start:i])
+            } else if next == ']' {
+                i += 1
+                for i < len(text) {
+                    if text[i] == 0x07 {
+                        i += 1
+                        break;
+                    } else if text[i] == 0x1B && i+1 < len(text) && text[i+1] == '\\' {
+                        i += 2
+                        break
+                    }
+                    i += 1
+                }
+                append(&escapes, text[start:i])
+
+            } else if next == 'P' || next == '^' || next == '_' {
+                i += 1
+                for i < len(text) {
+                    if text[i] == 0x1B && i+1 < len(text) && text[i+1] == '\\' {
+                        i += 2
+                        break
+                    }
+                    i += 1
+                }
+                append(&escapes, text[start:i])
+
+            } else {
+                i += 1
+                append(&escapes, text[start:i])
+            }
+        } else if c == 0x08 {
+            start := i
+            i += 1
+            append(&escapes, text[start:i])
+        } else {
+            append(&sanitized, c)
+            i += 1
+        }
+
+    }
+
+    return sanitized, escapes
+}
+
+map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> string {
+    ctrl  := mods == CTRL
+    alt   := mods == ALT
+    shift := mods == SHIFT
+
+    // Ctrl + A-Z → control characters
+    if ctrl {
+        if key == glfw.KEY_LEFT_BRACKET {
+            return "\x1B" // ESC
+        }
+
+        if key == glfw.KEY_GRAVE_ACCENT {
+            return "\x00" // NUL
+        }
+
+        if key == glfw.KEY_SLASH && shift {
+            return "\x7F" // DEL
+        }
+
+        if key == glfw.KEY_BACKSLASH {
+            return "\x1C" // FS
+        }
+
+        if key == glfw.KEY_RIGHT_BRACKET {
+            return "\x1D" // GS
+        }
+    }
+
+    switch key {
+    case glfw.KEY_ENTER:
+        return "\n"
+    case glfw.KEY_BACKSPACE:
+        return "\b"
+    case glfw.KEY_TAB:
+        if shift {
+            return "\x1B[Z"
+        }
+        return "\t"
+    case glfw.KEY_ESCAPE:
+        return "\x1B"
+
+    case glfw.KEY_UP:
+        return "\x1B[A"
+    case glfw.KEY_DOWN:
+        return "\x1B[B"
+    case glfw.KEY_RIGHT:
+        return "\x1B[C"
+    case glfw.KEY_LEFT:
+        return "\x1B[D"
+
+    case glfw.KEY_HOME:
+        return "\x1B[H"
+    case glfw.KEY_END:
+        return "\x1B[F"
+    case glfw.KEY_PAGE_UP:
+        return "\x1B[5~"
+    case glfw.KEY_PAGE_DOWN:
+        return "\x1B[6~"
+    case glfw.KEY_INSERT:
+        return "\x1B[2~"
+    case glfw.KEY_DELETE:
+        return "\x1B[3~"
+
+    case glfw.KEY_F1:
+        return "\x1BOP"
+    case glfw.KEY_F2:
+        return "\x1BOQ"
+    case glfw.KEY_F3:
+        return "\x1BOR"
+    case glfw.KEY_F4:
+        return "\x1BOS"
+    case glfw.KEY_F5:
+        return "\x1B[15~"
+    case glfw.KEY_F6:
+        return "\x1B[17~"
+    case glfw.KEY_F7:
+        return "\x1B[18~"
+    case glfw.KEY_F8:
+        return "\x1B[19~"
+    case glfw.KEY_F9:
+        return "\x1B[20~"
+    case glfw.KEY_F10:
+        return "\x1B[21~"
+    case glfw.KEY_F11:
+        return "\x1B[23~"
+    case glfw.KEY_F12:
+        return "\x1B[24~"
+    }
+
+    // Alt + printable key → ESC + char
+    if alt && key >= glfw.KEY_SPACE && key <= glfw.KEY_Z {
+    
+    	builder := strings.builder_make()
+    	strings.write_rune(&builder, rune(key))
+    
+        defer strings.builder_destroy(&builder)
+        
+        ch: string = strings.to_string(builder)
+        
+        if shift {
+            ch = strings.to_upper(ch)
+        } else {
+            ch = strings.to_lower(ch)
+        }
+        
+        
+        return strings.concatenate({ "\x1B", ch })
+    }
+
+    return ""
 }

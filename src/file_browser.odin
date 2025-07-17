@@ -317,9 +317,7 @@ toggle_browser_view :: proc() {
 
         de := os.get_env("XDG_CURRENT_DESKTOP") 
 
-        if de == "GNOME" {
             glfw.WaitEvents()
-        }
 
         delete(de)
 

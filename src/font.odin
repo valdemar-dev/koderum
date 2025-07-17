@@ -547,7 +547,7 @@ get_char_with_char_map :: proc(
 ) -> ^Character {
     character, ok := char_map^[char_code]
 
-    if character == nil {
+    if character == nil || ok == false {
         report_missing_character(char_code, font_height) 
 
         return nil

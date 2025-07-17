@@ -78,6 +78,9 @@ main :: proc() {
     parse_args()
     
     init()
+    resize_terminal()
+    update_fonts()
+    resize_terminal()
 
     last_time := glfw.GetTime()
     last_fps_measurement_time := glfw.GetTime()
@@ -123,6 +126,7 @@ main :: proc() {
         
         tick_smooth_scroll()
         tick_yank_history()
+        tick_terminal_emulator()
         
         update_fonts()
         update_camera()

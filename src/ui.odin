@@ -109,6 +109,9 @@ draw_ui :: proc() {
     case .YANK_HISTORY:
         mode_string = "Yank History"
         mode_text_color = TOKEN_COLOR_05
+    case .TERMINAL:
+        mode_string = "Terminal"
+        mode_text_color = TOKEN_COLOR_11
     }
     
     // Draw Input Mode

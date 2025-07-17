@@ -36,6 +36,7 @@ InputMode :: enum {
     GO_TO_LINE,
     DEBUG,
     YANK_HISTORY,
+    TERMINAL,
 }
 
 @(private="package")
@@ -166,6 +167,8 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         break
     case .GO_TO_LINE:
         append_to_go_to_line_input_string(key)
+    case .TERMINAL:
+        handle_terminal_input(key)
     }
 }
 
@@ -193,6 +196,10 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
     context = runtime.default_context()
 
     handle_ui_input(key, scancode, action, mods)
+    
+    if input_mode == .TERMINAL {
+        handle_terminal_emulator_input(key, scancode, action, mods)
+    }
 }
 
 set_keypress_states :: proc() {
@@ -212,6 +219,18 @@ scroll_target_y : f32
 
 @(private="package")
 scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) {
+    context = runtime.default_context()
+    
+    if input_mode == .TERMINAL {
+        if scroll_y > 0 {
+            scroll_terminal_up(1)
+        } else {
+            scroll_terminal_down(1)
+        }
+        
+        return
+    }
+    
     if active_buffer == nil {
         return
     }
@@ -315,6 +334,26 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
 }
 
 handle_command_input :: proc() -> bool {
+    if is_key_pressed(glfw.KEY_F) && is_terminal_open {
+        key := key_store[glfw.KEY_F]
+        
+        if key.modifiers == CTRL {
+            input_mode = .TERMINAL
+            
+            return false
+        }
+    }
+    
+    if is_key_pressed(glfw.KEY_T) {
+        key := key_store[glfw.KEY_T]
+        
+        if key.modifiers == CTRL {
+            toggle_terminal_emulator()
+            
+            return false
+        }
+    }
+    
     if is_key_pressed(glfw.KEY_O) {
         toggle_browser_view()
 

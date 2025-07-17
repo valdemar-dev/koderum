@@ -2074,9 +2074,7 @@ inject_line :: proc() {
 
     de := os.get_env("XDG_CURRENT_DESKTOP") 
 
-    if de == "GNOME" {
-        glfw.WaitEvents()
-    }
+    glfw.WaitEvents()
 
     delete(de)
     
@@ -2332,7 +2330,7 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_G) {
         de := os.get_env("XDG_CURRENT_DESKTOP") 
 
-        if de == "GNOME" {
+        if de == "GNOME" || de == "Budgie" {
             glfw.WaitEvents()
         }
 
@@ -2349,7 +2347,7 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_N) {
         de := os.get_env("XDG_CURRENT_DESKTOP")
         
-        if de == "GNOME" {
+        if de == "GNOME" || de == "Budgie" {
             glfw.WaitEvents()
         }
         
@@ -2392,7 +2390,7 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_I) {
         de := os.get_env("XDG_CURRENT_DESKTOP") 
 
-        if de == "GNOME" {
+        if de == "GNOME" || de == "Budgie" {
             glfw.WaitEvents()
         }
 

@@ -52,6 +52,7 @@ render :: proc() {
     draw_yank_history()
     
     draw_ui()
+    draw_terminal_emulator()
 
     when ODIN_DEBUG {
         draw_debug()
@@ -271,6 +272,7 @@ add_text :: proc(
     max_width: f32 = -1,
     do_wrap: bool = false,
     split_new_lines : bool = false,
+    max_height: f32 = -1
 ) -> vec2 {
     pen := vec2{
         x=pos.x,
@@ -295,6 +297,10 @@ add_text :: proc(
         if split_new_lines == true && r == '\n' {
             pen.y += line_height
             pen.x = pos.x
+            
+            if pen.y - pos.y >= max_height && max_height != -1 {
+                break
+            }
 
             continue
         }
@@ -340,10 +346,14 @@ add_text :: proc(
         height := f32(character.rows)
         width := f32(character.width)
 
-        if math.round_f32(pen.x - pos.x) > max_width && max_width > -1 {
+        if math.round_f32(pen.x - pos.x + width) > max_width && max_width > -1 {
             if do_wrap {
                 pen.y += line_height
                 pen.x = pos.x
+                
+                if pen.y - pos.y >= max_height && max_height != -1 {
+                    break
+                }
             } else {
                 break
             }
