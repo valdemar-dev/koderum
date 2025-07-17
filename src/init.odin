@@ -94,6 +94,11 @@ init_message_thread :: proc() {
 }
 
 init_terminal_thread :: proc() {
+    if terminal_thread != nil {
+        thread.terminate(terminal_thread, 9)
+        thread.destroy(terminal_thread)
+    }
+    
     terminal_thread = thread.create(terminal_loop)
 
     thread.start(terminal_thread)

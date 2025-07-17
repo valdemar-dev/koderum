@@ -2076,7 +2076,7 @@ inject_line :: proc() {
         indent_spaces, 
     )
 
-    set_mode(.BUFFER_INPUT, glfw.KEY_L, nil)
+    set_mode(.BUFFER_INPUT, glfw.KEY_L, 'l')
 }
 
 @(private="package")
@@ -2326,24 +2326,20 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_G) {
-        callback :: proc() {
-            cached_buffer_index = get_buffer_index(active_buffer)
-            cached_buffer_cursor_line = buffer_cursor_line
-            cached_buffer_cursor_char_index = buffer_cursor_char_index
-        }
+        set_mode(.SEARCH, glfw.KEY_G, 'g')
         
-        set_mode(.SEARCH, glfw.KEY_G, callback)
+        cached_buffer_index = get_buffer_index(active_buffer)
+        cached_buffer_cursor_line = buffer_cursor_line
+        cached_buffer_cursor_char_index = buffer_cursor_char_index
         
         return false
     }
     
     if is_key_pressed(glfw.KEY_N) {
-        callback :: proc() {
-            cached_buffer_cursor_line = buffer_cursor_line
-            cached_buffer_cursor_char_index = buffer_cursor_char_index
-        }
+        set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
         
-        set_mode(.GO_TO_LINE, glfw.KEY_N, callback)
+        cached_buffer_cursor_line = buffer_cursor_line
+        cached_buffer_cursor_char_index = buffer_cursor_char_index
         
         return false
     }
@@ -2375,20 +2371,16 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_I) {
-        callback :: proc() {
-            input_mode = .BUFFER_INPUT
-    
-            constrain_scroll_to_cursor()
-    
-            get_autocomplete_hits(
-                buffer_cursor_line,
-                buffer_cursor_char_index,
-                "1",
-                "",
-            )
-        }
+        set_mode(.BUFFER_INPUT, glfw.KEY_I, 'i')
         
-        set_mode(.BUFFER_INPUT, glfw.KEY_I, callback)
+        constrain_scroll_to_cursor()
+
+        get_autocomplete_hits(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+            "1",
+            "",
+        )
         
         return false
     }

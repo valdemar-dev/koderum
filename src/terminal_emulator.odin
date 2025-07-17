@@ -124,12 +124,21 @@ draw_terminal_emulator :: proc() {
     descender := f32(primary_font.size.metrics.descender >> 6)
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
 
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    padding := small_text
+    
     z_index: f32 = 100
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
-
+    
     {
-        bg_rect := rect{x_pos, margin, width, height}
+        bg_rect := rect{
+            x_pos - padding,
+            margin - padding, 
+            width + padding * 2, 
+            height + padding * 2,
+        }
+        
         add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_10, vec2{}, z_index)
 
         border_rect := rect{
@@ -196,8 +205,10 @@ tick_terminal_emulator :: proc() {
         return
     }
     
+    small_text := math.round_f32(font_base_px * small_text_scale)
+    
     if is_terminal_open {
-        x_pos = smooth_lerp(x_pos, fb_size.x - width - font_base_px, 100, frame_time)
+        x_pos = smooth_lerp(x_pos, fb_size.x - width - font_base_px - small_text, 100, frame_time)
     } else {
         x_pos = smooth_lerp(x_pos, fb_size.x, 100, frame_time)
         
@@ -319,9 +330,10 @@ terminal_loop :: proc(thread: ^thread.Thread) {
         n := posix.read(tty.master_fd, raw_data(read_buf), len(read_buf))
         
         if n == -1 {
-            tty = nil
             clear(&scrollback_buffer)
+            close_shell(tty^)
             toggle_terminal_emulator()
+            tty = nil
             return
         }
         

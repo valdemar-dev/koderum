@@ -143,44 +143,41 @@ process_input :: proc() {
     set_keypress_states()
 }
 
-did_release := false
 target_key : i32 = -1
-target_input_mode: InputMode
-release_callback : proc()
+char_to_suppress : rune
 
 @(private="package")
-set_mode :: proc(mode: InputMode, key: i32, callback: proc()) {
+set_mode :: proc(mode: InputMode, key: i32, char: rune) {
+    input_mode = mode
+    
     target_key = key
+    char_to_suppress = char
     
     glfw.SetKeyCallback(window, key_callback_hijack)
-    
-    release_callback = callback
-    target_input_mode = mode
 }
 
 key_callback_hijack :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {
     context = runtime.default_context()
     
-    if (key == target_key) && action == glfw.RELEASE {
-        did_release = true
+    if ((key == target_key) && action == glfw.RELEASE) || target_key == -1{
         target_key = -1
     
         glfw.SetKeyCallback(window, key_callback)
-        
-        did_release = false    
-        input_mode = target_input_mode
-        
-        if release_callback != nil {    
-            release_callback()
-        }
-        
-        release_callback = nil
     }
+    
+    key_callback(handle, key, scancode, action, mods)
 }
 
 @(private="package")
 char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
+
+    if target_key != -1 && char_to_suppress == key {
+        fmt.println("ignored key", key)
+        return
+    } else {
+        fmt.println("processing key", key)
+    }    
 
     #partial switch input_mode {
     case .BUFFER_INPUT:
@@ -212,11 +209,11 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
     context = runtime.default_context()
     
     if input_mode == .TERMINAL {
-        do_continue := handle_terminal_emulator_input(key, scancode, action, mods)
-        
-        if !do_continue do return
+        handle_terminal_emulator_input(key, scancode, action, mods)
     }
-    
+
+    handle_ui_input(key, scancode, action, mods)
+        
     switch action {
     case glfw.RELEASE:
         key_store[key] = ActiveKey{
@@ -236,7 +233,6 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
         break
     }
 
-    handle_ui_input(key, scancode, action, mods)
 }
 
 set_keypress_states :: proc() {

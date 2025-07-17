@@ -312,19 +312,17 @@ toggle_browser_view :: proc() {
 
         return
     } else {
-        callback :: proc() {
-            suppress = false
-            show_browser_view = true
-            
-            search_term = strings.concatenate({
-                cwd, "/",
-            })
-    
-            set_found_files()
-        }
-        
-        set_mode(.BROWSER_SEARCH, glfw.KEY_O, callback)
+        set_mode(.BROWSER_SEARCH, glfw.KEY_O, 'o')
 
+        suppress = false
+        show_browser_view = true
+        
+        search_term = strings.concatenate({
+            cwd, "/",
+        })
+
+        set_found_files()
+        
         return
     }
 }
