@@ -173,10 +173,7 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
     context = runtime.default_context()
 
     if target_key != -1 && char_to_suppress == key {
-        fmt.println("ignored key", key)
         return
-    } else {
-        fmt.println("processing key", key)
     }    
 
     #partial switch input_mode {

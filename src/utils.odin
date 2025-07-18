@@ -69,7 +69,18 @@ next_power_of_two :: proc(n: int) -> int {
 
 smooth_lerp :: proc(current, target, smoothing_factor: f32, frame_time: f32) -> f32 {
     return current + (target - current) * (1 - math.pow(2.71828, -smoothing_factor * frame_time))
-}   
+} 
+
+smooth_lerp_vec4 :: proc(current, target: vec4, smoothing_factor, frame_time: f32) -> vec4 {
+    t := 1 - math.pow(2.71828, -smoothing_factor * frame_time)
+    return vec4{
+        current.x + (target.x - current.x) * t,
+        current.y + (target.y - current.y) * t,
+        current.z + (target.z - current.z) * t,
+        current.w + (target.w - current.w) * t,
+    }
+}
+
 
 SlidingBuffer :: struct($Type: typeid) {
     data: ^Type,
@@ -357,7 +368,7 @@ sanitize_ansi_string :: proc(text: string) -> (sanitized: [dynamic]u8, escapes: 
                 i += 1
                 append(&escapes, text[start:i])
             }
-        } else if c == 0x08 {
+        } else if c == 0x08 || c == 0x07 {
             start := i
             i += 1
             append(&escapes, text[start:i])

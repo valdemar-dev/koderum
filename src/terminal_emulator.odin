@@ -55,6 +55,11 @@ width : f32
 height : f32
 margin : f32
 
+border_color : vec4
+
+cell_width : f32
+cell_height : f32
+
 @(private="package")
 resize_terminal :: proc () {
 
@@ -79,8 +84,8 @@ resize_terminal :: proc () {
         width = max(desired_width, 500)
         height = fb_size.y - margin * 2
         
-        cell_width := char.advance.x
-        cell_height := ascender - descender
+        cell_width = char.advance.x
+        cell_height = ascender - descender
             
         cell_count_x = int(math.round_f32(width / f32(cell_width)))
         cell_count_y = int(math.round_f32(height / f32(cell_height)))
@@ -148,7 +153,7 @@ draw_terminal_emulator :: proc() {
             bg_rect.height + line_thickness * 2,
         }
         
-        add_rect(&rect_cache, border_rect, no_texture, BG_MAIN_30, vec2{}, z_index - 1)
+        add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 1)
     }
 
     pen := vec2{x_pos, margin}
@@ -169,6 +174,24 @@ draw_terminal_emulator :: proc() {
             -1
         )
         pen.y += (ascender - descender)
+    }
+    
+    if input_mode == .TERMINAL {
+        cursor_rect := rect{
+            x=x_pos + (f32(cursor_col) * cell_width),
+            y=margin + (f32(cursor_row) * cell_height),
+            width=cell_width,
+            height=cell_height
+        }
+        
+        add_rect(
+            &rect_cache,
+            cursor_rect,
+            no_texture,
+            TEXT_MAIN,
+            vec2{},
+            z_index + 2,
+        )
     }
 
     draw_rects(&text_rect_cache)
@@ -206,6 +229,12 @@ tick_terminal_emulator :: proc() {
     }
     
     small_text := math.round_f32(font_base_px * small_text_scale)
+
+    if input_mode == .TERMINAL {
+        border_color = smooth_lerp_vec4(border_color, BG_MAIN_40, 30, frame_time)
+    } else {
+        border_color = smooth_lerp_vec4(border_color, BG_MAIN_20, 30, frame_time)
+    }
     
     if is_terminal_open {
         x_pos = smooth_lerp(x_pos, fb_size.x - width - font_base_px - small_text, 100, frame_time)
@@ -337,10 +366,14 @@ terminal_loop :: proc(thread: ^thread.Thread) {
             return
         }
         
+        fmt.println("raw read:", read_buf[:n])
+        
         sanitized, escapes := sanitize_ansi_string(string(read_buf[:n]))
         
         for escape in escapes {
             switch escape {
+            case "\x07":
+                break
             case "\x1B[H":
                 cursor_row = 0
                 cursor_col = 0
@@ -351,17 +384,14 @@ terminal_loop :: proc(thread: ^thread.Thread) {
             case "\x1B[3J":
                 clear(&scrollback_buffer)
             case "\x1B[K":
-                // Erase from cursor to end of line
                 for i in cursor_col..<cell_count_x {
                     scrollback_buffer[cursor_row][i] = 0
                 }
             case "\x1B[1K":
-                // Erase from start of line to cursor
                 for i in 0..<cursor_col+1 {
                     scrollback_buffer[cursor_row][i] = 0
                 }
             case "\x1B[2K":
-                // Erase entire line
                 for i in 0..<cell_count_x {
                     scrollback_buffer[cursor_row][i] = 0
                 }
@@ -376,22 +406,31 @@ terminal_loop :: proc(thread: ^thread.Thread) {
                 }
                 break
             case:
-                //fmt.println(transmute([]u8)escape)
+                fmt.println(transmute([]u8)escape)
             }
         }
     
-        for char in transmute([]u8)sanitized[:] {
+        for char in sanitized {
             switch char {
             case '\r':
                 cursor_col = 0
                 continue
             case '\n':
                 cursor_row += 1
+                
                 if cursor_row >= len(scrollback_buffer) {
                     ensure_scrollback_row()
                     cursor_row = len(scrollback_buffer) - 1
                 }
+                
                 cursor_col = 0
+                
+                continue
+            case '\t':
+                for i in 0..<8 {
+                    cursor_col = clamp(cursor_col + 1, 0, len(scrollback_buffer))
+                }
+                
                 continue
             }
             if cursor_row >= len(scrollback_buffer) {
