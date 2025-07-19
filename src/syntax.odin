@@ -98,6 +98,7 @@ LanguageServer :: struct {
     ),
 
     language: ^Language,
+    lsp_server_process: os2.Process,
 }
 
 Token :: struct {
@@ -115,52 +116,9 @@ lsp_request_id := 10
 active_language_server : ^LanguageServer
 active_language_servers : map[string]^LanguageServer = {}
 
+languages : map[string]Language = {}
 
-languages : map[string]Language = {
-/*    ".ts"=Language{
-        ts_query_src=ts_ts_query_src,
-
-        ts_colors=ts_ts_colors,
-        lsp_colors=ts_lsp_colors,
-
-        lsp_command=[]string{"typescript-language-server", "--stdio", "--log-level", "1"},
-        lsp_working_dir="", 
-        lsp_install_command="npm install -g typescript-language-server typescript",
-
-        override_node_type=ts_override_node_type,
-
-        parser_name="typescript",
-        parser_subpath="typescript",
-        parser_link="https://github.com/tree-sitter/tree-sitter-typescript",
-
-        language_symbol_name="tree_sitter_typescript",
-        
-        filler_color=TOKEN_COLOR_05,
-    }, */
-    ".odin"=Language{
-        ts_query_src=ts_odin_query_src,
-
-        ts_colors=ts_odin_colors,
-        lsp_colors=odin_lsp_colors,
-
-        lsp_command=[]string{"ols"},
-        lsp_working_dir="/usr/bin/ols",
-        lsp_install_command="https://github.com/DanielGavin/ols",
-
-        override_node_type=odin_override_node_type,
-        parser_name="odin",
-        parser_subpath="",
-        parser_link="https://github.com/tree-sitter-grammars/tree-sitter-odin",
-
-        language_symbol_name="tree_sitter_odin",
-        
-        project_root_markers={"ols.json"},
-        
-        filler_color=TOKEN_COLOR_05,
-    }
-}
-
-install_tree_sitter :: proc() -> os2.Error { 
+install_tree_sitter :: proc() -> (error: os2.Error = os2.ERROR_NONE) { 
     command : []string = {
         "git",
         "clone",
@@ -170,7 +128,7 @@ install_tree_sitter :: proc() -> os2.Error {
         "tree-sitter",
     } 
 
-    error := run_program(
+    error = run_program(
         command, 
         nil,
         data_dir,
@@ -246,7 +204,7 @@ install_tree_sitter :: proc() -> os2.Error {
         tree_sitter_dir,
     )
 
-    return os2.ERROR_NONE
+    return error
 }
 
 install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
@@ -1129,6 +1087,12 @@ init_language_server :: proc(ext: string) {
         do_refresh_buffer_tokens = true
     }
 
+    init_lsp_server(ext, server)
+}
+
+init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
+    language := &languages[ext]
+
     if len(language.lsp_command) == 0 do return
     
     stdin_r, stdin_w, _ := os2.pipe()
@@ -1146,11 +1110,12 @@ init_language_server :: proc(ext: string) {
         working_dir = language.lsp_working_dir,
         stdin  = stdin_r,
         stdout = stdout_w,
-        stderr = nil,
+        stderr = os2.stdout,
     }
 
     process, start_err := os2.process_start(desc)
     
+    server^.lsp_server_process = process
     server^.lsp_stdin_w = stdin_w
     server^.lsp_stdout_r = stdout_r
     server^.lsp_server_pid = process.pid
@@ -1173,8 +1138,14 @@ init_language_server :: proc(ext: string) {
     }
     
     if start_err != os2.ERROR_NONE {
-        fmt.println(start_err)
-        panic("Failed to start language server.")
+        fmt.println("Failed to start LSP:", start_err)
+        
+        create_alert(
+            "Could not start LSP.",
+            "Check the terminal for more information",
+            5,
+            context.allocator,
+        )
     }
     
     directory, ok := get_project_root(active_buffer.file_name, language.project_root_markers)
@@ -1183,8 +1154,6 @@ init_language_server :: proc(ext: string) {
         directory = cwd
     }
         
-    fmt.println(directory)
-
     msg := initialize_message(process.pid, directory)
     defer delete(msg)
 
@@ -1508,7 +1477,34 @@ notify_server_of_change :: proc(
 
     if active_language_server == nil {
         return
-    } 
+    }
+    
+    if buffer.previous_tree != nil {        
+        edit := ts.Input_Edit{
+            u32(start_byte),
+            u32(end_byte),
+            u32(new_end_byte),
+            ts.Point{},
+            ts.Point{},
+            ts.Point{},
+        }
+        
+        ts.tree_edit(buffer.previous_tree, &edit)
+    }
+    
+    set_buffer_tokens()
+    do_refresh_buffer_tokens = true
+    
+    if active_language_server.lsp_server_pid == 0 {
+        return
+    }
+    
+    status, _ := os2.process_wait(active_language_server.lsp_server_process, 0)
+    if status.exited == true {
+        handle_lsp_crash(active_language_server)
+        
+        return
+    }
     
     buffer^.version += 1
     
@@ -1525,24 +1521,10 @@ notify_server_of_change :: proc(
     )
 
     defer delete(msg)
-    
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-
-    if buffer.previous_tree != nil {        
-        edit := ts.Input_Edit{
-            u32(start_byte),
-            u32(end_byte),
-            u32(new_end_byte),
-            ts.Point{},
-            ts.Point{},
-            ts.Point{},
-        }
         
-        ts.tree_edit(buffer.previous_tree, &edit)
-    }
+    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
     
-    set_buffer_tokens()
-    do_refresh_buffer_tokens = true
+    fmt.println(write_err)
 }
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
@@ -2124,3 +2106,63 @@ is_delimiter_rune :: proc(r: rune) -> bool {
     return false
 }
 
+@(private="package")
+restart_lsp :: proc() {
+    if active_language_server == nil {
+        return
+    }
+    
+    create_alert(
+        "Reload!",
+        "Reloading LSP Server..",
+        5,
+        context.allocator,
+    )
+    
+    fmt.println(active_language_server)
+    
+    placeholder := new(LanguageServer)
+    placeholder^ = active_language_server^
+    
+    active_language_server = nil
+    
+    if placeholder.lsp_server_pid != 0 {
+        state,_ := os2.process_wait(placeholder.lsp_server_process, 0)
+        
+        error := os2.process_kill(placeholder.lsp_server_process)
+        _ = os2.process_close(placeholder.lsp_server_process)
+        
+        if error != os2.ERROR_NONE {
+            create_alert(
+                "Failed to reload LSP.",
+                "Could not kill LSP Server.",
+                5,
+                context.allocator,
+            )
+            
+            return
+        }
+        
+        os2.close(placeholder.lsp_stdin_w)
+        os2.close(placeholder.lsp_stdout_r)
+    }
+    
+    delete_key(&active_language_servers, active_buffer.ext)
+    
+    lsp_handle_file_open()
+}
+
+handle_lsp_crash :: proc(server: ^LanguageServer) {
+    create_alert(
+        "Crash",
+        "The LSP Server has crashed.",
+        5,
+        context.allocator,
+    )
+    
+    os2.close(server.lsp_stdin_w)
+    os2.close(server.lsp_stdout_r)
+    
+    server^.lsp_server_pid = 0
+    server^.lsp_server_process = os2.Process{}
+}

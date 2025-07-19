@@ -92,15 +92,6 @@ main :: proc() {
         local_frame_time := current_time - last_time
         local_fps_measurement_time := current_time - last_fps_measurement_time
 
-        /*
-        if local_frame_time < target_frame_time {
-            sleep_duration := (target_frame_time - local_frame_time) * f64(second)
-            time.sleep(time.Duration(sleep_duration))
-
-            continue
-        }
-        */
-        
         if local_fps_measurement_time >= target_fps_measurement_time {
             last_fps_measurement_time = current_time
             
@@ -141,23 +132,11 @@ main :: proc() {
             glfw.SwapBuffers(window)
         }
 
-        /*
-        when ODIN_OS == .Linux {
-            if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 &&
-               glfw.GetWindowAttrib(window, glfw.FOCUSED) == 1 
-            {
-                glfw.SwapBuffers(window)
+        if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 {
+            glfw.SwapBuffers(window)
 
-                continue
-            }
+            continue
         }
-        */
-            if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1
-            {
-                glfw.SwapBuffers(window)
-
-                continue
-            }
     }
 
     clear_fonts()
@@ -181,19 +160,11 @@ main :: proc() {
         }
 
         delete(buffer.content)
-
         delete(buffer.lines^)
-        //free(buffer.lines)
-
-        //free(buffer)
     }
 
     for dir in search_ignored_dirs {
         delete(dir)
-    }
-
-    for key,server in active_language_servers {
-        //free(server)
     }
 
     delete(default_cwd)
@@ -204,9 +175,9 @@ main :: proc() {
     delete(active_language_servers)
     
     for request in requests {
-        fmt.println(request)
-
-        fmt.println(request.id)
+        fmt.println("Cleanup: LSP did not respond to request with ID: ", request.id)
+        
+        delete(request.id)
     }
 
     delete(requests)

@@ -8,5 +8,3 @@ todo:
     - add is saved state to ui
     
 bugs:
-    - shift c on last line doesn't work
-    - ctrl + b is janky, goes to buffers that don't exist

@@ -68,7 +68,11 @@ message_loop :: proc(thread: ^thread.Thread) {
 
         defer delete(bytes)
 
-        if read_err != os2.ERROR_NONE && read_err != os.ERROR_EOF {
+        if read_err == os.ERROR_EOF {
+            return
+        }
+        
+        if read_err != os2.ERROR_NONE {
             fmt.println(read_err)
             panic("Failed to read LSP Message.")
         }
@@ -315,6 +319,13 @@ send_lsp_message :: proc(
         return
     }
     
+    status, _ := os2.process_wait(active_language_server.lsp_server_process, 0)
+    if status.exited == true {
+        handle_lsp_crash(active_language_server)
+        
+        return
+    }
+
     os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
 
     when ODIN_DEBUG {

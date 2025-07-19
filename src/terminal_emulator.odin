@@ -179,19 +179,21 @@ draw_terminal_emulator :: proc() {
     if input_mode == .TERMINAL {
         cursor_rect := rect{
             x=x_pos + (f32(cursor_col) * cell_width),
-            y=margin + (f32(cursor_row) * cell_height),
+            y=margin + (f32(cursor_row - start_row) * cell_height),
             width=cell_width,
             height=cell_height
         }
         
-        add_rect(
-            &rect_cache,
-            cursor_rect,
-            no_texture,
-            TEXT_MAIN,
-            vec2{},
-            z_index + 2,
-        )
+        if cursor_rect.y + cursor_rect.height < ((margin + padding) + height) {
+            add_rect(
+                &rect_cache,
+                cursor_rect,
+                no_texture,
+                TEXT_MAIN,
+                vec2{},
+                z_index + 2,
+            )
+        }
     }
 
     draw_rects(&text_rect_cache)
@@ -345,6 +347,7 @@ ensure_scrollback_row :: proc() {
             ordered_remove(&scrollback_buffer, 0)
             cursor_row -= 1
         }
+        scroll_terminal_down(1)
     }
 }
 

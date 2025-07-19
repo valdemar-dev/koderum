@@ -2267,6 +2267,10 @@ handle_buffer_input :: proc() -> bool {
 
         return false
     }
+    
+    if is_key_pressed(glfw.KEY_F5) {
+        restart_lsp()
+    }
 
     if is_key_pressed (glfw.KEY_R) {
         if key_store[glfw.KEY_R].modifiers == CTRL_SHIFT {
