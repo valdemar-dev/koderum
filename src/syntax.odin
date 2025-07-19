@@ -634,15 +634,18 @@ set_active_language_server :: proc(ext: string) {
         init_message_thread()
     }
     
-    exe_path := os2.args[0]
+    exe_path, _ := os2.get_executable_path(context.allocator)
     
     exe_dir := fp.dir(exe_path)
     defer delete(exe_dir)
+    defer delete(exe_path)
     
     languages_path := strings.concatenate({
         exe_dir,
         "/languages",
     })
+    
+    fmt.println("Attempting to get languaged from path:", languages_path, exe_path)
     
     defer delete(languages_path)
 
