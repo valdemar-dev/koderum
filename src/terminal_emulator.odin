@@ -369,8 +369,6 @@ terminal_loop :: proc(thread: ^thread.Thread) {
             return
         }
         
-        fmt.println("raw read:", read_buf[:n])
-        
         sanitized, escapes := sanitize_ansi_string(string(read_buf[:n]))
         
         for escape in escapes {

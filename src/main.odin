@@ -131,6 +131,12 @@ main :: proc() {
         when ODIN_OS == .Windows {
             glfw.SwapBuffers(window)
         }
+        
+        if (glfw.GetWindowAttrib(window, glfw.FOCUSED) == 0) {
+            glfw.SwapInterval(0)
+        } else {
+            glfw.SwapInterval(1)
+        }
 
         if glfw.GetWindowAttrib(window, glfw.VISIBLE) == 1 {
             glfw.SwapBuffers(window)

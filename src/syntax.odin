@@ -1523,8 +1523,6 @@ notify_server_of_change :: proc(
     defer delete(msg)
         
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
-    
-    fmt.println(write_err)
 }
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
