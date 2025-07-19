@@ -1452,13 +1452,18 @@ notify_server_of_change :: proc(
     new_text: []u8,
 
     do_update_buffer_content := true,
+    undo_stack_override : ^[dynamic]BufferChange = nil,
+    redo_stack_override : ^[dynamic]BufferChange = nil,
 ) {
     constrain_scroll_to_cursor()
     
     new_end_byte := start_byte + len(new_text)
 
     if do_update_buffer_content {
-        append(&active_buffer.undo_stack, BufferChange{
+        undo_stack := undo_stack_override == nil ? &active_buffer.undo_stack : undo_stack_override
+        redo_stack := redo_stack_override == nil ? &active_buffer.redo_stack : redo_stack_override
+        
+        append(undo_stack, BufferChange{
             u32(start_byte),
             u32(end_byte),
             start_line,
@@ -1467,9 +1472,11 @@ notify_server_of_change :: proc(
             end_char,
             transmute([]u8)(strings.clone(string(buffer.content[start_byte:end_byte]))),
             transmute([]u8)(strings.clone(string(new_text))),
+            0,
+            0,
         })
 
-        clear(&active_buffer.redo_stack)
+        clear(redo_stack)
 
         remove_range(&buffer.content, start_byte, end_byte)
         inject_at(&buffer.content, start_byte, ..new_text)        

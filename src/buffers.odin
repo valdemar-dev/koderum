@@ -17,6 +17,7 @@ import "core:time"
 import "core:math"
 import "core:thread"
 import "core:sync"
+import "core:sort"
 
 @(private="package")
 BufferLine :: struct {
@@ -108,6 +109,13 @@ Buffer :: struct {
     last_drawn_line: int,
 
     redo_stack: [dynamic]BufferChange,
+    
+    // i until esc every insert
+    insert_undo_stack: [dynamic]BufferChange,
+    
+    // stub
+    insert_redo_stack: [dynamic]BufferChange,
+    
     undo_stack: [dynamic]BufferChange,
     
     // Purely for display purposes.
@@ -127,6 +135,10 @@ BufferChange :: struct {
 
     original_content: []u8,
     new_content: []u8,
+    
+    // do x amount of y per command
+    undo_for: int,
+    redo_for: int,
 }
 
 @(private="package")
@@ -211,9 +223,15 @@ undo_change :: proc() {
     )
 
     set_buffer_cursor_pos(
-        change.start_line,
+        change.end_line,
         change.end_char,
     )
+    
+    if change.undo_for > 0 {
+        for i in 0..<change.undo_for {
+            undo_change()
+        }
+    }
 }
 
 redo_change :: proc() {
@@ -248,11 +266,24 @@ redo_change :: proc() {
         change.new_content,
         false
     )
+    
+    end,end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
+
+    end_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[end].characters[:]),
+        int(end_byte),
+    )
 
     set_buffer_cursor_pos(
         change.start_line,
-        change.end_char,
+        end_rune,
     )
+    
+    if change.redo_for > 0 {
+        for i in 0..<change.redo_for {
+            redo_change()
+        }
+    }
 }
 
 update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo:bool) {
@@ -1139,6 +1170,11 @@ insert_tab_as_spaces:: proc() {
         buffer_cursor_char_index,
 
         transmute([]u8)tab_string,
+        
+        true,
+        
+        &active_buffer.insert_undo_stack,
+        &active_buffer.insert_redo_stack,
     )    
 
     set_buffer_cursor_pos(
@@ -1200,6 +1236,11 @@ remove_char :: proc() {
             buffer_cursor_line,
             0,
             {},
+            
+            true,
+            
+            &active_buffer.insert_undo_stack,
+            &active_buffer.insert_redo_stack,
         )
  
         set_buffer_cursor_pos(buffer_cursor_line-1, prev_line_len)
@@ -1334,6 +1375,7 @@ determine_line_indent :: proc(line_num: int) -> int {
     return prev_line_indent_level*tab_spaces
 }
 
+
 @(private="package")
 handle_text_input :: proc() -> bool {
     line := &active_buffer.lines[buffer_cursor_line] 
@@ -1342,6 +1384,18 @@ handle_text_input :: proc() -> bool {
 
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
+        
+        if len(active_buffer.insert_undo_stack) > 0 {
+            active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
+            active_buffer.insert_undo_stack[0].redo_for = len(active_buffer.insert_undo_stack[:]) - 1
+            
+            append(&active_buffer.undo_stack, ..active_buffer.insert_undo_stack[:])
+            
+            clear(&active_buffer.redo_stack)
+            
+            clear(&active_buffer.insert_undo_stack)
+            clear(&active_buffer.insert_redo_stack)
+        }
     }
 
     if is_key_pressed(glfw.KEY_TAB) {
@@ -1469,7 +1523,10 @@ handle_text_input :: proc() -> bool {
             buffer_cursor_line,
             cur_line_end_char,
 
-            transmute([]u8)new_text
+            transmute([]u8)new_text,
+            true,
+            &active_buffer.insert_undo_stack,
+            &active_buffer.insert_redo_stack,
         )
         
         set_buffer_cursor_pos(
@@ -1534,7 +1591,12 @@ insert_into_buffer :: proc (key: rune) {
         buffer_cursor_line,
         buffer_cursor_char_index,
 
-        bytes[0:size]
+        bytes[0:size],
+        
+        true,
+        
+        &active_buffer.insert_undo_stack,
+        &active_buffer.insert_redo_stack,
     )
 
     set_buffer_cursor_pos(buffer_cursor_line, buffer_cursor_char_index+1)
@@ -2885,7 +2947,12 @@ insert_completion :: proc() {
         buffer_cursor_line,
         buffer_cursor_char_index,
 
-        transmute([]u8)insert_string
+        transmute([]u8)insert_string,
+        
+        true,
+        
+        &active_buffer.insert_undo_stack,
+        &active_buffer.insert_redo_stack,
     )
 
     count := utf8.rune_count(insert_string)
