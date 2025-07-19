@@ -24,6 +24,7 @@ Buffer Motions
 (Q) -> Toggle File Info View.
 (Ctrl + Shift + W) -> Close File.
 (Ctrl + Shift + R) -> Reload File.
+(F5) -> Reload LSP Server.
 
 Terminal
 (Ctrl + T) -> Toggle Persistent Terminal (if in command mode)
@@ -69,6 +70,8 @@ Yank Buffer
 (S) -> Toggle yank buffer history.
 (J-K) -> Select Index.
 (Enter) -> Set as recent yank.
+
+
 
 Configurations
 Configuration location depends on your platform.
