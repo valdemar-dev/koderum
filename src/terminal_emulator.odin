@@ -1,3 +1,16 @@
+/*
+    I WOULD JUST LIKE TO STATE.
+    This terminal emulator is very bad.
+    It can *barely* *almost* run some TUI apps.
+    It's probably not compliant, or secure.
+    I don't understand terminals.
+    
+    These archaic standards from when germany was still in twain...
+
+    Please rewrite this to be good.
+    Thank you.
+*/
+
 #+private file
 package main
 
