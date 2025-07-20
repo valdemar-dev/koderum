@@ -1,7 +1,8 @@
 today:
 
 high priority todo:
-
+    - make unfocus resize terminal
+    - make terminal support runes
 todo:
     - consolidate buffer insert changes into one change on ESC
     - add variable font weights

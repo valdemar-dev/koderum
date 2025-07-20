@@ -91,6 +91,12 @@ main :: proc() {
         local_frame_time := current_time - last_time
         local_fps_measurement_time := current_time - last_fps_measurement_time
 
+        if local_frame_time < target_frame_time {
+            time.sleep(time.Duration((target_frame_time - local_frame_time) * f64(time.Second)))
+            
+            continue
+        }
+        
         if local_fps_measurement_time >= target_fps_measurement_time {
             last_fps_measurement_time = current_time
             

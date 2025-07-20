@@ -206,7 +206,11 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
     context = runtime.default_context()
     
     if input_mode == .TERMINAL {
-        handle_terminal_emulator_input(key, scancode, action, mods)
+        do_continue := handle_terminal_emulator_input(key, scancode, action, mods)
+        
+        if do_continue == false {
+            return
+        }
     }
 
     handle_ui_input(key, scancode, action, mods)
@@ -253,9 +257,9 @@ scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) 
     
     if input_mode == .TERMINAL {
         if scroll_y > 0 {
-            scroll_terminal_up(1)
-        } else {
-            scroll_terminal_down(1)
+            scroll_terminal_up(2)
+        } else if scroll_y < 0 {
+            scroll_terminal_down(2)
         }
         
         return
