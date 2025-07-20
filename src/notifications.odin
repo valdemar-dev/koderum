@@ -98,7 +98,7 @@ draw_alerts :: proc() {
             no_texture,
             BG_MAIN_10,
             vec2{},
-            12,
+            1200,
         )
 
         border_rect := rect{
@@ -114,7 +114,7 @@ draw_alerts :: proc() {
             no_texture,
             BG_MAIN_30,
             vec2{},
-            12,
+            1200,
         )
 
         // Draw Content
@@ -128,7 +128,7 @@ draw_alerts :: proc() {
             TEXT_MAIN,
             normal_text,
             alert.title,
-            13,
+            1201,
         )
 
         error := ft.set_pixel_sizes(primary_font, 0, u32(small_text))
@@ -145,7 +145,7 @@ draw_alerts :: proc() {
             TEXT_DARKER,
             small_text,
             alert.content,
-            13,
+            1201,
             false,
             500,
             true,
@@ -167,7 +167,7 @@ draw_alerts :: proc() {
                 no_texture,
                 BG_ACCENT_00,
                 vec2{},
-                13,
+                1201,
             )
         }
     }

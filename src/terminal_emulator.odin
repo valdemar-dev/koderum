@@ -24,7 +24,6 @@ stored_cursor_row : int = 0
 
 scrollback_buffer := make([dynamic][dynamic]rune)
 scrollback_limit := 1000
-scroll_offset := 0
 
 cell_count_x: int
 cell_count_y: int
@@ -73,12 +72,10 @@ scroll_bottom : int
 
 @(private="package")
 scroll_terminal_up :: proc(lines: int) {
-    scroll_offset = min(scroll_offset + lines, max(0, len(scrollback_buffer) - cell_count_y))
 }
 
 @(private="package")
 scroll_terminal_down :: proc(lines: int) {
-    scroll_offset = max(scroll_offset - lines, 0)
 }
 
 when ODIN_OS == .Linux {
@@ -238,9 +235,9 @@ draw_terminal_emulator :: proc() {
     text := math.round_f32(font_base_px * normal_text_scale)
     error := ft.set_pixel_sizes(primary_font, 0, u32(text))
     assert(error == .Ok)
-
     ascender := f32(primary_font.size.metrics.ascender >> 6)
     descender := f32(primary_font.size.metrics.descender >> 6)
+    
     line_thickness := math.round_f32(font_base_px * line_thickness_em)
 
     small_text := math.round_f32(font_base_px * small_text_scale)
@@ -250,6 +247,47 @@ draw_terminal_emulator :: proc() {
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
     
+   
+    pen := vec2{x_pos, margin}
+    
+    // Draw Terminal Title
+    {
+        padding_sm := math.round_f32(padding * .5)
+        
+        title_pos := vec2{
+            x_pos,
+            font_base_px * 5 - (padding_sm * 2),
+        }
+                    
+        text := math.round_f32(font_base_px * normal_text_scale)
+        error := ft.set_pixel_sizes(primary_font, 0, u32(text))
+        assert(error == .Ok)
+        ascender := f32(primary_font.size.metrics.ascender >> 6)
+        descender := f32(primary_font.size.metrics.descender >> 6)
+        
+        
+        bg_rect := rect{
+            title_pos.x - padding - line_thickness,
+            title_pos.y - padding_sm - line_thickness,
+            width + padding * 2 + (line_thickness * 2),
+            ascender - descender + padding_sm*2 + (line_thickness * 2),
+        }
+        
+
+        add_text(
+            &text_rect_cache,
+            title_pos,
+            TEXT_MAIN,
+            small_text,
+            terminal_title,
+            z_index + 1,
+            true,
+            -1
+        )
+
+        add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_20, vec2{}, z_index)
+    }
+    
     {
         bg_rect := rect{
             x_pos - padding,
@@ -258,7 +296,7 @@ draw_terminal_emulator :: proc() {
             height + padding * 2,
         }
         
-        add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_10, vec2{}, z_index)
+        add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_10, vec2{}, z_index-2)
 
         border_rect := rect{
             bg_rect.x - line_thickness,
@@ -267,32 +305,10 @@ draw_terminal_emulator :: proc() {
             bg_rect.height + line_thickness * 2,
         }
         
-        add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 1)
+        add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 3)
     }
 
-    pen := vec2{x_pos, margin}
-    
-    // Draw Terminal Title
-    {
-        title_pos := vec2{
-            x_pos,
-            font_base_px * 5,
-        }
-        
-        add_text(
-            &text_rect_cache,
-            title_pos,
-            TEXT_MAIN,
-            text,
-            terminal_title,
-            z_index + 1,
-            true,
-            -1
-        )
-
-    }
-
-    start_row := max(0, len(scrollback_buffer) - cell_count_y - scroll_offset)
+    start_row := max(0, len(scrollback_buffer) - cell_count_y)
     end_row := min(len(scrollback_buffer), start_row + cell_count_y)
 
     for i in start_row..<end_row {
@@ -419,7 +435,6 @@ handle_terminal_input :: proc(key: rune) {
     clear(&input_accumulator)
 }
 
-
 @(private="package")
 terminal_loop :: proc(thread: ^thread.Thread) {
     for !glfw.WindowShouldClose(window) {
@@ -434,379 +449,18 @@ terminal_loop :: proc(thread: ^thread.Thread) {
             clear(&scrollback_buffer)
             close_shell(tty^)
             toggle_terminal_emulator()
+            
             tty = nil
+            
+            cursor_col = 0
+            cursor_row = 0
+            
             return
         }
         
         process_ansi_chunk(string(read_buf[:n]))
-        
-        /*
-        sanitized, escapes := sanitize_ansi_string(string(read_buf[:n]))
-        
-        /*
-        for escape in escapes {
-            switch escape {
-            case "\x07":
-                break
-            case "\x1B[H":
-                cursor_row = 0
-                cursor_col = 0
-            case "\x1B[2J":
-                cursor_row = 0
-                cursor_col = 0
-                clear(&scrollback_buffer)
-            case "\x1B[0J":
-                clear(&scrollback_buffer)
-            case "\x1B[3J":
-                clear(&scrollback_buffer)
-            case "\x1B[K":
-                for i in cursor_col..<cell_count_x {
-                    scrollback_buffer[cursor_row][i] = 0
-                }
-            case "\x1B[1K":
-                for i in 0..<cursor_col+1 {
-                    scrollback_buffer[cursor_row][i] = 0
-                }
-            case "\x1B[2K":
-                for i in 0..<cell_count_x {
-                    scrollback_buffer[cursor_row][i] = 0
-                }
-            case "\b", "\x7F":
-                if cursor_col > 0 {
-                    cursor_col -= 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
-                } else if cursor_row > 0 {
-                    cursor_row -= 1
-                    cursor_col = cell_count_x - 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
-                }
-                break
-            case "\x1b7":
-                stored_cursor_col = cursor_col
-                stored_cursor_row = cursor_row
-            case "\x1b8":
-                cursor_col = stored_cursor_col
-                cursor_row = stored_cursor_row
-            case:
-                fmt.println(transmute([]u8)escape)
-            }
-        }
-        */
-    
-        for char in sanitized {
-            switch char {
-            case '\r':
-                cursor_col = 0
-                continue
-            case '\n':
-                cursor_row += 1
-                
-                if cursor_row >= len(scrollback_buffer) {
-                    ensure_scrollback_row()
-                    cursor_row = len(scrollback_buffer) - 1
-                }
-                
-                cursor_col = 0
-                
-                continue
-            case '\t':
-                for i in 0..<8 {
-                    cursor_col = clamp(cursor_col + 1, 0, len(scrollback_buffer))
-                }
-                
-                continue
-            }
-            if cursor_row >= len(scrollback_buffer) {
-                ensure_scrollback_row()
-                cursor_row = len(scrollback_buffer) - 1
-            }
-    
-            if cursor_col >= cell_count_x {
-                cursor_col = 0
-                cursor_row += 1
-                if cursor_row >= len(scrollback_buffer) {
-                    ensure_scrollback_row()
-                    cursor_row = len(scrollback_buffer) - 1
-                }
-            }
-    
-            scrollback_buffer[cursor_row][cursor_col] = char
-            cursor_col += 1
-        }
-        
-        */
     }
 }
-
-/*
-Ansi_State :: enum{
-    Normal,
-    Esc,
-    Csi,
-    Osc,
-}
-
-ansi_state := Ansi_State.Normal
-
-ansi_buf : [dynamic]u8
-
-process_ansi_chunk :: proc(input: string) {
-    for i := 0; i < len(input); i += 1 {
-        b := input[i]
-
-        switch ansi_state {
-        // --------------------------------------------------------
-        case .Normal:
-            if b == 0x1B { // ESC
-                ansi_state = .Esc
-                clear(&ansi_buf)
-                append(&ansi_buf, b)
-                continue
-            }
-            
-            if b == 0x08 { // Backspace
-                if cursor_col > 0 {
-                    cursor_col -= 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
-                } else if cursor_row > 0 {
-                    cursor_row -= 1
-                    cursor_col = cell_count_x - 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
-                }
-                return
-            }
-        
-            if b == 0x07 { // BEL
-                return
-            }
-        
-            if b == '\n' {
-                cursor_row += 1
-                ensure_scrollback_row()
-                cursor_col = 0
-                return
-            }
-        
-            if b == '\r' {
-                cursor_col = 0
-                return
-            }
-            
-            r := utf8.rune_at(input, i)
-            size := utf8.rune_size(r)
-            
-            handle_normal_char(r)
-            
-            // -1 because for loop
-            i += size-1
-            continue
-
-        // --------------------------------------------------------
-        case .Esc:
-            append(&ansi_buf, b)
-            if b == '[' {
-                ansi_state = .Csi
-                continue
-            } else if b == ']' {
-                ansi_state = .Osc
-                continue
-            } else {
-                handle_simple_escape(ansi_buf[:])
-                ansi_state = .Normal
-            }
-
-        // --------------------------------------------------------
-        case .Csi:
-            append(&ansi_buf, b)
-            if b >= 0x40 && b <= 0x7E {
-                handle_csi_seq(string(ansi_buf[:]))
-                ansi_state = .Normal
-            }
-
-        // --------------------------------------------------------
-        case .Osc:
-            append(&ansi_buf, b)
-            if b == 0x07 { // BEL terminator
-                handle_osc_seq(string(ansi_buf[:]))
-                ansi_state = .Normal
-            } else if b == 0x1B && i+1 < len(input) && input[i+1] == '\\' {
-                append(&ansi_buf, input[i+1])
-                i += 1
-                handle_osc_seq(string(ansi_buf[:]))
-                ansi_state = .Normal
-            }
-        }
-    }
-}
-
-handle_simple_escape :: proc(seq: []u8) {
-    // seq includes ESC + one byte
-    if len(seq) < 2 {
-        return
-    }
-
-    switch seq[1] {
-    case '7': // Save cursor
-        stored_cursor_row = cursor_row
-        stored_cursor_col = cursor_col
-    case '8': // Restore cursor
-        cursor_row = stored_cursor_row
-        cursor_col = stored_cursor_col
-    case '=':
-        // Application Keypad Mode Enable (optional)
-    case '>':
-        // Normal Keypad Mode Enable (optional)
-    case:
-        // fmt.println("Unhandled simple ESC sequence: ", string(seq))
-    }
-}
-
-
-handle_osc_seq :: proc(seq: string) {
-    // Strip leading ESC ]
-    if len(seq) < 3 { return }
-    body := seq[2:] // after ESC ]
-    // Trim final BEL or ESC \
-    if body[len(body)-1] == 0x07 {
-        body = body[:len(body)-1]
-    } else if len(body) >= 2 && body[len(body)-2:] == "\x1B\\" {
-        body = body[:len(body)-2]
-    }
-
-    // OSC format: "number;data"
-    parts := strings.split(body, ";")
-    defer delete(parts)
-    if len(parts) < 2 { return }
-    code := parts[0]
-    data := parts[1]
-
-    switch code {
-    case "0", "2": // Set window title
-        // TODO: add this
-        // set_window_title(data)
-    case:
-    }
-}
-
-handle_normal_char :: proc(r: rune) {
-    if cursor_row >= len(scrollback_buffer) {
-        ensure_scrollback_row()
-        cursor_row = len(scrollback_buffer) - 1
-    }
-
-    if cursor_col >= len(scrollback_buffer[0]) {
-        cursor_col = 0
-        cursor_row += 1
-        if cursor_row >= len(scrollback_buffer) {
-            ensure_scrollback_row()
-            cursor_row = len(scrollback_buffer) - 1
-        }
-    }
-
-    scrollback_buffer[cursor_row][cursor_col] = r
-    cursor_col += 1
-}
-
-
-handle_csi_seq :: proc(seq: string) {
-    // seq includes ESC [ ... final
-    if len(seq) < 2 { return }
-
-    final := seq[len(seq)-1]
-    params_str := ""
-    if len(seq) > 2 {
-        params_str = seq[2:len(seq)-1] // everything between '[' and final
-    }
-
-    params := parse_csi_params(params_str)
-
-    switch final {
-    case 'H', 'f':
-        row := len(params) >= 1 && params[0] > 0 ? params[0] - 1 : 0
-        col := len(params) >= 2 && params[1] > 0 ? params[1] - 1 : 0
-        cursor_row = clamp(row, 0, cell_count_y - 1)
-        cursor_col = clamp(col, 0, cell_count_x - 1)
-
-    case 'A':
-        delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row - delta, 0, cell_count_y - 1)
-
-    case 'B':
-        delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row + delta, 0, cell_count_y - 1)
-
-    case 'C':
-        delta := len(params) > 0 ? params[0] : 1
-        cursor_col = clamp(cursor_col + delta, 0, cell_count_x - 1)
-
-    case 'D':
-        delta := len(params) > 0 ? params[0] : 1
-        cursor_col = clamp(cursor_col - delta, 0, cell_count_x - 1)
-
-    case 'J':
-        erase_screen(params)
-
-    case 'K':
-        fmt.println("erasing entire line")
-        erase_line(params)
-
-    case 'm': // SGR (colors, bold, etc.)
-        set_graphics_rendition(params)
-
-    case:
-    }
-}
-
-parse_csi_params :: proc(s: string) -> [dynamic]int {
-    params: [dynamic]int = nil
-    parts := strings.split(s, ";")
-    for p in parts {
-        if len(p) == 0 {
-            append(&params, 0)
-        } else {
-            val, ok := strconv.parse_int(p, 10)
-            append(&params, ok ? int(val) : 0)
-        }
-    }
-    return params
-}
-
-erase_screen :: proc(params: [dynamic]int) {
-    mode := len(params) > 0 ? params[0] : 0
-
-    switch mode {
-    case 0:
-        for r in cursor_row..<len(scrollback_buffer) {
-            start_col := r == cursor_row ? cursor_col : 0
-            for c in start_col..<len(scrollback_buffer[cursor_row]) {
-                scrollback_buffer[r][c] = 0
-            }
-        }
-    case 1:
-        for r in 0..=cursor_row {
-            end_col := r == cursor_row ? cursor_col : cell_count_x - 1
-            for c in 0..=end_col {
-                scrollback_buffer[r][c] = 0
-            }
-            
-            fmt.println(scrollback_buffer[r])
-        }
-    case 2:
-        for &row in scrollback_buffer {
-            clear(&row)
-            resize(&row, len(scrollback_buffer))
-        }
-        
-        scroll_offset = 0
-
-        resize_terminal()
-    }
-}
-
-set_graphics_rendition :: proc(params: [dynamic]int) {
-    // TODO: Implement colors/bold/etc. if needed
-}
-*/
 
 erase_line :: proc(params: [dynamic]int) {
     mode := len(params) > 0 ? params[0] : 0
@@ -843,7 +497,6 @@ erase_screen :: proc(params: [dynamic]int) {
             for c in 0..=end_col {
                 scrollback_buffer[r][c] = 0
             }
-            
         }
     case 2:
         for &row in scrollback_buffer {
@@ -852,7 +505,8 @@ erase_screen :: proc(params: [dynamic]int) {
             }
         }
         
-        scroll_offset = 0
+        cursor_row = 0
+        cursor_col = 0
     }
 }
 
@@ -908,6 +562,21 @@ process_ansi_chunk :: proc(input: string) {
                 continue
             }
             
+            if b == 0x09 {
+                for i in 0..<8 {                    
+                    if cursor_row >= len(scrollback_buffer) {
+                        ensure_scrollback_row()
+                        cursor_row = len(scrollback_buffer) - 1
+                    }
+                
+                    if cursor_col >= cell_count_x {
+                        cursor_col = 0
+                        newline()
+                    }
+                    cursor_col += 1
+                }
+            }
+            
             if b < 0x20 {
                 continue
             }
@@ -960,20 +629,17 @@ newline :: proc() {
         scroll_region_up()
         cursor_row = scroll_bottom
     }
-    cursor_col = 0
-    
 }
-
 
 scroll_region_up :: proc() {
     for r in scroll_top..<scroll_bottom {
-        if r < scroll_bottom {
-            clear(&scrollback_buffer[r])
-            append(&scrollback_buffer[r], ..scrollback_buffer[r+1][:])
-        } else {
-            clear(&scrollback_buffer[r])
-            resize(&scrollback_buffer[r], cell_count_x)
-        }
+        clear(&scrollback_buffer[r])
+        append(&scrollback_buffer[r], ..scrollback_buffer[r+1][:])
+    }
+
+    last_row := scroll_bottom
+    for c in 0..<cell_count_x {
+        scrollback_buffer[last_row][c] = 0
     }
 }
 

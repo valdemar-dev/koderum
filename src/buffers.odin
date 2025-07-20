@@ -186,16 +186,8 @@ undo_change :: proc() {
         return
     }
 
-    idx := len(active_buffer.undo_stack)-1
+    idx := len(active_buffer.undo_stack) - 1
     change := active_buffer.undo_stack[idx]
-
-    // gotta recompute
-    end,end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
-
-    end_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[end].characters[:]),
-        int(end_byte),
-    )
 
     remove_range(
         &active_buffer.content,
@@ -203,7 +195,15 @@ undo_change :: proc() {
         change.start_byte + u32(len(change.new_content)),
     )
 
-    inject_at(&active_buffer.content, change.start_byte, ..change.original_content) 
+    inject_at(&active_buffer.content, change.start_byte, ..change.original_content)
+
+    // Recompute end position based on original_content
+    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
+
+    end_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[end].characters[:]),
+        int(end_byte),
+    )
 
     ordered_remove(&active_buffer.undo_stack, idx)
     append(&active_buffer.redo_stack, change)
@@ -213,20 +213,20 @@ undo_change :: proc() {
     notify_server_of_change(
         active_buffer,
         int(change.start_byte),
-        int(change.start_byte + u32(len(change.new_content))),
+        int(change.start_byte + u32(len(change.original_content))),
         change.start_line,
         change.start_char,
         end,
         end_rune,
         change.original_content,
-        false
+        false,
     )
 
     set_buffer_cursor_pos(
-        change.end_line,
-        change.end_char,
+        end,
+        end_rune,
     )
-    
+
     if change.undo_for > 0 {
         for i in 0..<change.undo_for {
             undo_change()
@@ -239,7 +239,7 @@ redo_change :: proc() {
         return
     }
 
-    idx := len(active_buffer.redo_stack)-1
+    idx := len(active_buffer.redo_stack) - 1
     change := active_buffer.redo_stack[idx]
 
     remove_range(
@@ -248,7 +248,15 @@ redo_change :: proc() {
         change.start_byte + u32(len(change.original_content)),
     )
 
-    inject_at(&active_buffer.content, change.start_byte, ..change.new_content) 
+    inject_at(&active_buffer.content, change.start_byte, ..change.new_content)
+
+    // Recompute end position based on new_content
+    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
+
+    end_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[end].characters[:]),
+        int(end_byte),
+    )
 
     ordered_remove(&active_buffer.redo_stack, idx)
     append(&active_buffer.undo_stack, change)
@@ -258,33 +266,29 @@ redo_change :: proc() {
     notify_server_of_change(
         active_buffer,
         int(change.start_byte),
-        int(change.end_byte),
+        int(change.start_byte + u32(len(change.new_content))),
         change.start_line,
         change.start_char,
-        change.end_line,
-        change.end_char,
+        end,
+        end_rune,
         change.new_content,
-        false
+        false,
     )
     
-    end,end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
-
-    end_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[end].characters[:]),
-        int(end_byte),
-    )
-
     set_buffer_cursor_pos(
-        change.start_line,
+        end,
         end_rune,
     )
-    
+
+
     if change.redo_for > 0 {
         for i in 0..<change.redo_for {
             redo_change()
         }
     }
 }
+
+
 
 update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo:bool) {
     start_byte := change.start_byte
@@ -1631,6 +1635,10 @@ constrain_scroll_to_cursor :: proc() {
     if amnt_right_offscreen >= 0 {
         scroll_target_x += amnt_right_offscreen 
     }
+    
+    if scroll_target_x > 0 {
+        scroll_target_x = 0
+    }
 }
 
 constrain_cursor_to_scroll :: proc() {
@@ -2824,7 +2832,7 @@ buffer_go_to_cursor_pos :: proc() {
     if active_buffer == nil do return
     
     click_pos_y := mouse_pos.y + active_buffer.scroll_y
-    click_pos_x := mouse_pos.x - active_buffer.scroll_x - active_buffer.offset_x
+    click_pos_x := mouse_pos.x + active_buffer.scroll_x - active_buffer.offset_x
         
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     

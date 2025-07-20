@@ -297,6 +297,11 @@ tick_smooth_scroll :: proc() {
         frame_time,
     )
     
+    scroll_target_x = max(
+        scroll_target_x,
+        0
+    )
+
     /*
     active_buffer.scroll_x = clamp(
         active_buffer.scroll_x,
