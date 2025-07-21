@@ -206,7 +206,6 @@ resize_terminal :: proc () {
     width = f32(cell_width) * f32(cell_count_x)
     height = f32(cell_height) * f32(cell_count_y)
     
-    clear(&scrollback_buffer)
     resize(&scrollback_buffer, cell_count_y)
     
     for &row in scrollback_buffer {
@@ -227,14 +226,10 @@ toggle_terminal_emulator :: proc() {
         if tty == nil {
             spawn_shell()
         }
-        
-        resize_terminal()
     } else {
         is_terminal_open = false
         
         input_mode = .COMMAND
-        
-        resize_terminal()
     }
 }
 
@@ -298,7 +293,7 @@ draw_terminal_emulator :: proc() {
             -1
         )
 
-        add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_20, vec2{}, z_index)
+        add_rect(&rect_cache, bg_rect, no_texture, border_color, vec2{}, z_index)
     }
     
     {
@@ -392,6 +387,21 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
 }
 
 @(private="package")
+handle_terminal_input :: proc(key: rune) {
+    if tty == nil do return
+    
+    bytes, n := utf8.encode_rune(key)
+    
+    append(&input_accumulator, ..bytes[:n])
+    
+    string_val := string(input_accumulator[:])
+    
+    write_to_shell(tty^, string_val)
+    
+    clear(&input_accumulator)
+}
+
+@(private="package")
 tick_terminal_emulator :: proc() {
     if suppress {
         return
@@ -432,20 +442,6 @@ ensure_scrollback_row :: proc() {
         
         scroll_terminal_down(2)
     }
-}
-
-@(private="package")
-handle_terminal_input :: proc(key: rune) {
-    if tty == nil do return
-    
-    bytes, len := utf8.encode_rune(key)
-    
-    append(&input_accumulator, ..bytes[:len])
-
-    cmd := string(input_accumulator[:])
-    write_to_shell(tty^, cmd)
- 
-    clear(&input_accumulator)
 }
 
 @(private="package")

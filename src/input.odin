@@ -37,6 +37,7 @@ InputMode :: enum {
     DEBUG,
     YANK_HISTORY,
     TERMINAL,
+    TERMINAL_TEXT_INPUT,
 }
 
 @(private="package")
@@ -208,7 +209,7 @@ key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods
     if input_mode == .TERMINAL {
         do_continue := handle_terminal_emulator_input(key, scancode, action, mods)
         
-        if do_continue == false {
+        if do_continue == false && action == glfw.PRESS {
             return
         }
     }

@@ -197,8 +197,7 @@ undo_change :: proc() {
 
     inject_at(&active_buffer.content, change.start_byte, ..change.original_content)
 
-    // Recompute end position based on original_content
-    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
+    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
 
     end_rune := byte_offset_to_rune_index(
         string(active_buffer.lines[end].characters[:]),
@@ -213,7 +212,7 @@ undo_change :: proc() {
     notify_server_of_change(
         active_buffer,
         int(change.start_byte),
-        int(change.start_byte + u32(len(change.original_content))),
+        int(change.start_byte + u32(len(change.new_content))),
         change.start_line,
         change.start_char,
         end,
@@ -222,9 +221,16 @@ undo_change :: proc() {
         false,
     )
 
+    // buffer curosr
+    line, char_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
+    char_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[line].characters[:]),
+        int(char_byte),
+    )
+    
     set_buffer_cursor_pos(
-        end,
-        end_rune,
+        line,
+        char_rune,
     )
 
     if change.undo_for > 0 {
@@ -250,8 +256,7 @@ redo_change :: proc() {
 
     inject_at(&active_buffer.content, change.start_byte, ..change.new_content)
 
-    // Recompute end position based on new_content
-    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
+    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
 
     end_rune := byte_offset_to_rune_index(
         string(active_buffer.lines[end].characters[:]),
@@ -266,7 +271,7 @@ redo_change :: proc() {
     notify_server_of_change(
         active_buffer,
         int(change.start_byte),
-        int(change.start_byte + u32(len(change.new_content))),
+        int(change.start_byte + u32(len(change.original_content))),
         change.start_line,
         change.start_char,
         end,
@@ -275,11 +280,18 @@ redo_change :: proc() {
         false,
     )
     
-    set_buffer_cursor_pos(
-        end,
-        end_rune,
+    
+    // Buffer Cursor    
+    line, char_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
+    char_rune := byte_offset_to_rune_index(
+        string(active_buffer.lines[line].characters[:]),
+        int(char_byte),
     )
-
+    
+    set_buffer_cursor_pos(
+        line,
+        char_rune,
+    )
 
     if change.redo_for > 0 {
         for i in 0..<change.redo_for {
