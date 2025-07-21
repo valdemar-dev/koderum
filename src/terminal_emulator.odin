@@ -513,15 +513,13 @@ erase_screen :: proc(params: [dynamic]int) {
                 (&char)^ = 0
             }
         }
-        
-        cursor_row = 0
-        cursor_col = 0
     }
 }
 
 parse_csi_params :: proc(s: string) -> [dynamic]int {
-    params: [dynamic]int = nil
+    params := make([dynamic]int)
     parts := strings.split(s, ";")
+    
     for p in parts {
         if len(p) == 0 {
             append(&params, 0)
@@ -608,6 +606,8 @@ process_ansi_chunk :: proc(input: string) {
             } else {
                 handle_simple_escape(ansi_buf[:])
                 ansi_state = .Normal
+                
+                clear(&ansi_buf)
             }
 
         case .Csi:
@@ -615,18 +615,25 @@ process_ansi_chunk :: proc(input: string) {
             if b >= 0x40 && b <= 0x7E {
                 handle_csi_seq(string(ansi_buf[:]))
                 ansi_state = .Normal
+                
+                clear(&ansi_buf)
             }
+            
 
         case .Osc:
             append(&ansi_buf, b)
             if b == 0x07 { // BEL terminator
                 handle_osc_seq(string(ansi_buf[:]))
                 ansi_state = .Normal
+                
+                clear(&ansi_buf)
             } else if b == 0x1B && i + 1 < len(input) && input[i+1] == '\\' {
                 append(&ansi_buf, input[i+1])
                 i += 1
                 handle_osc_seq(string(ansi_buf[:]))
                 ansi_state = .Normal
+                
+                clear(&ansi_buf)
             }
         }
     }
@@ -859,4 +866,5 @@ disable_alt_buffer :: proc() {
 }
 
 set_graphics_rendition :: proc(params: [dynamic]int) {
+    fmt.println(params)
 }

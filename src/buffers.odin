@@ -1295,6 +1295,11 @@ remove_char :: proc() {
             buffer_cursor_char_index + tab_spaces,
 
             {},
+            
+            true,
+            
+            &active_buffer.insert_undo_stack,
+            &active_buffer.insert_redo_stack,
         )
 
         return
@@ -1328,6 +1333,11 @@ remove_char :: proc() {
         buffer_cursor_char_index,
 
         {},
+        
+        true,
+        
+        &active_buffer.insert_undo_stack,
+        &active_buffer.insert_redo_stack,
     ) 
 
     set_buffer_cursor_pos(buffer_cursor_line, char_index - 1)
