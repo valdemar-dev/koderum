@@ -65,6 +65,8 @@ check_inputs :: proc() -> bool {
     handle_global_input() or_return
     
     #partial switch input_mode {
+    case .TERMINAL:
+        handle_terminal_control_input() or_return
     case .COMMAND:
         handle_command_input() or_return
     case .BUFFER_INPUT:
@@ -197,7 +199,7 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         break
     case .GO_TO_LINE:
         append_to_go_to_line_input_string(key)
-    case .TERMINAL:
+    case .TERMINAL_TEXT_INPUT:
         handle_terminal_input(key)
     }
 }
@@ -206,7 +208,7 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
 key_callback :: proc "c" (handle: glfw.WindowHandle, key, scancode, action, mods: i32) {
     context = runtime.default_context()
     
-    if input_mode == .TERMINAL {
+    if input_mode == .TERMINAL_TEXT_INPUT {
         do_continue := handle_terminal_emulator_input(key, scancode, action, mods)
         
         if do_continue == false && action == glfw.PRESS {

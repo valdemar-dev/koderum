@@ -190,11 +190,9 @@ resize_terminal :: proc () {
     char := get_char_with_char_map(char_map, text, ' ')
     if char == nil do return
     
-    desired_width := (fb_size.x / 100) * width_percentage    
-    
     margin = font_base_px * 6
     
-    width = max(desired_width, input_mode == .TERMINAL ? fb_size.x-300 : 500)
+    width = fb_size.x-300
     height = fb_size.y - margin * 2
     
     cell_width = char.advance.x
@@ -338,7 +336,7 @@ draw_terminal_emulator :: proc() {
         pen.y += (ascender - descender)
     }
     
-    if input_mode == .TERMINAL {
+    if (input_mode == .TERMINAL_TEXT_INPUT) && cursor_visible {
         cursor_rect := rect{
             x=x_pos + (f32(cursor_col) * cell_width),
             y=margin + (f32(cursor_row - start_row) * cell_height),
@@ -366,13 +364,12 @@ draw_terminal_emulator :: proc() {
 handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_continue: bool) {
     if action == glfw.RELEASE do return
     
-    if key == (glfw.KEY_D) {
-        if mods == CTRL {
-            input_mode = .COMMAND
-            return false
-        }
+    if key == glfw.KEY_ESCAPE {
+        input_mode = .TERMINAL
+        
+        return false
     }
-    
+        
     seq, did_allocate := map_glfw_key_to_escape_sequence(key, mods)
     
     if seq != "" {
@@ -381,6 +378,38 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
     
     if did_allocate {
         delete(seq)
+    }
+    
+    return true
+}
+
+@(private="package")
+handle_terminal_control_input :: proc() -> bool {
+    /*
+    if is_key_pressed(glfw.KEY_D) {
+        key := key_store[glfw.KEY_D]
+        
+        if key.modifiers == CTRL {
+            input_mode = .COMMAND
+            
+            return false
+        }
+    }*/
+    
+    if is_key_pressed(glfw.KEY_T) {
+        key := key_store[glfw.KEY_T]
+        
+        if key.modifiers == CTRL {
+            toggle_terminal_emulator()
+            
+            return false
+        }
+    }
+    
+    if is_key_pressed(glfw.KEY_I) {
+        set_mode(.TERMINAL_TEXT_INPUT, glfw.KEY_I, 'i')
+        
+        return false
     }
     
     return true
@@ -409,7 +438,7 @@ tick_terminal_emulator :: proc() {
     
     small_text := math.round_f32(font_base_px * small_text_scale)
 
-    if input_mode == .TERMINAL {
+    if input_mode == .TERMINAL || input_mode == .TERMINAL_TEXT_INPUT {
         border_color = smooth_lerp_vec4(border_color, BG_MAIN_40, 30, frame_time)
     } else {
         border_color = smooth_lerp_vec4(border_color, BG_MAIN_20, 30, frame_time)
