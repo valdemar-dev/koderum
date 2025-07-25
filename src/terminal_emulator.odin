@@ -29,13 +29,7 @@ import ft "../../alt-odin-freetype"
 
 suppress := true
 
-cursor_row : int
-cursor_col : int
 
-stored_cursor_col : int = 0
-stored_cursor_row : int = 0
-
-scrollback_buffer := make([dynamic][dynamic]rune)
 scrollback_limit := 1000
 
 cell_count_x: int
@@ -47,13 +41,28 @@ terminal_title : string
 is_terminal_open := false
 
 TtyHandle :: struct {
-    pid: int,
-    master_fd: posix.FD, // posix
-    h_input: uintptr, // windows
-    h_output: uintptr, // windows
+    pid : int,
+    master_fd : posix.FD, // posix
+    h_input : uintptr, // windows
+    h_output : uintptr, // windows
+    
+    scrollback_buffer : [dynamic][dynamic]rune,
+    alt_buffer : [dynamic][dynamic]rune,
+    
+    cursor_row : int,
+    cursor_col : int,
+    
+    stored_cursor_col : int,
+    stored_cursor_row : int,
+    
+    using_alt_buffer : bool,
+    scroll_top : int,
+    scroll_bottom : int,
 }
 
-tty : ^TtyHandle = nil
+current_terminal_idx : int
+terminals : [10]^TtyHandle = {}
+
 input_accumulator : [dynamic]u8 = {}
 
 width_percentage : f32 = 20
@@ -77,11 +86,8 @@ Ansi_State :: enum {
 
 ansi_state := Ansi_State.Normal
 ansi_buf   : [dynamic]u8
-alt_buffer: [dynamic][dynamic]rune
-using_alt_buffer := false
+
 cursor_visible := true
-scroll_top := 0
-scroll_bottom : int
 
 @(private="package")
 scroll_terminal_up :: proc(lines: int) {
@@ -95,7 +101,7 @@ when ODIN_OS == .Linux {
     TIOCSCTTY: u64 = 0x540E
     TCSANOW: int = 0
     
-    spawn_shell :: proc() {
+    spawn_shell :: proc() -> TtyHandle {
         cwd_string := strings.clone_to_cstring(cwd)
         
         posix.chdir(cwd_string)
@@ -146,11 +152,33 @@ when ODIN_OS == .Linux {
             posix._exit(1)
         }
         
-        tty = new(TtyHandle)
-        tty^ = TtyHandle{int(pid), master_fd, 0, 0}
+        tty := TtyHandle{
+            int(pid),
+            master_fd,
+            0, 
+            0, 
+            make([dynamic][dynamic]rune), 
+            make([dynamic][dynamic]rune),
+            0,
+            0,
+            0,
+            0,
+            false,
+            0,
+            0,
+        }
         
         terminal_title = "Terminal"
-        init_terminal_thread()
+        
+        fmt.println("new tty",tty)
+        
+        if terminal_thread == nil {
+            init_terminal_thread()
+            
+            fmt.println("created terminal thread")
+        }
+        
+        return tty
     }
     
     write_to_shell :: proc(h: TtyHandle, data: string) {
@@ -204,13 +232,16 @@ resize_terminal :: proc () {
     width = f32(cell_width) * f32(cell_count_x)
     height = f32(cell_height) * f32(cell_count_y)
     
-    resize(&scrollback_buffer, cell_count_y)
+    terminal := terminals[current_terminal_idx]
+    if terminal == nil do return
     
-    for &row in scrollback_buffer {
+    resize(&terminal^.scrollback_buffer, cell_count_y)
+    
+    for &row in terminal^.scrollback_buffer {
         resize(&row, cell_count_x)
     }
     
-    scroll_bottom = cell_count_y - 1
+    terminal^.scroll_bottom = cell_count_y - 1
 }
 
 @(private="package")
@@ -221,9 +252,17 @@ toggle_terminal_emulator :: proc() {
         
         input_mode = .TERMINAL
         
-        if tty == nil {
-            spawn_shell()
+        terminal := terminals[current_terminal_idx]
+        if terminal == nil {
+            new_shell := new(TtyHandle)
+            
+            new_shell ^= spawn_shell()
+            
+            terminals[current_terminal_idx] = new_shell
+            
+            resize_terminal()
         }
+        
     } else {
         is_terminal_open = false
         
@@ -253,7 +292,9 @@ draw_terminal_emulator :: proc() {
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
     
-   
+    terminal := terminals[current_terminal_idx]
+    if terminal == nil do return
+    
     pen := vec2{x_pos, margin}
     
     // Draw Terminal Title
@@ -314,11 +355,11 @@ draw_terminal_emulator :: proc() {
         add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 3)
     }
 
-    start_row := max(0, len(scrollback_buffer) - cell_count_y)
-    end_row := min(len(scrollback_buffer), start_row + cell_count_y)
+    start_row := max(0, len(terminal^.scrollback_buffer) - cell_count_y)
+    end_row := min(len(terminal^.scrollback_buffer), start_row + cell_count_y)
 
     for i in start_row..<end_row {
-        row := scrollback_buffer[i]
+        row := terminal^.scrollback_buffer[i]
         
         str := utf8.runes_to_string(row[:])
         defer delete(str)
@@ -338,8 +379,8 @@ draw_terminal_emulator :: proc() {
     
     if (input_mode == .TERMINAL_TEXT_INPUT) && cursor_visible {
         cursor_rect := rect{
-            x=x_pos + (f32(cursor_col) * cell_width),
-            y=margin + (f32(cursor_row - start_row) * cell_height),
+            x=x_pos + (f32(terminal^.cursor_col) * cell_width),
+            y=margin + (f32(terminal^.cursor_row - start_row) * cell_height),
             width=cell_width,
             height=cell_height
         }
@@ -373,7 +414,10 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
     seq, did_allocate := map_glfw_key_to_escape_sequence(key, mods)
     
     if seq != "" {
-        write_to_shell(tty^, seq)
+        terminal := terminals[current_terminal_idx]
+        if terminal == nil do return true
+        
+        write_to_shell(terminal^, seq)
     }
     
     if did_allocate {
@@ -411,13 +455,84 @@ handle_terminal_control_input :: proc() -> bool {
         
         return false
     }
+
+    if is_key_pressed(glfw.KEY_1) {
+        swap_terminal(0)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_2) {
+        swap_terminal(1)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_3) {
+        swap_terminal(2)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_4) {
+        swap_terminal(3)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_5) {
+        swap_terminal(4)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_6) {
+        swap_terminal(5)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_7) {
+        swap_terminal(6)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_8) {
+        swap_terminal(7)
+        
+        return false
+    }
+    if is_key_pressed(glfw.KEY_9) {
+        swap_terminal(8)
+        
+        return false
+    }
+        
+    if is_key_pressed(glfw.KEY_0) {
+        swap_terminal(9)
+        
+        return false
+    }
     
     return true
 }
 
 @(private="package")
+swap_terminal :: proc(index: int) {
+    index := clamp(index, 0, 9)
+    
+    terminal := terminals[index]
+        
+    if terminal == nil {
+        new_term := new(TtyHandle, context.allocator)
+        new_term ^= spawn_shell()
+        
+        terminals[index] = new_term
+        
+        resize_terminal()
+    }
+    
+    current_terminal_idx = index
+}
+
+@(private="package")
 handle_terminal_input :: proc(key: rune) {
-    if tty == nil do return
+    terminal := terminals[current_terminal_idx]
+    if terminal == nil do return
     
     bytes, n := utf8.encode_rune(key)
     
@@ -425,7 +540,7 @@ handle_terminal_input :: proc(key: rune) {
     
     string_val := string(input_accumulator[:])
     
-    write_to_shell(tty^, string_val)
+    write_to_shell(terminal^, string_val)
     
     clear(&input_accumulator)
 }
@@ -457,16 +572,18 @@ tick_terminal_emulator :: proc() {
 
 @(private="package")
 ensure_scrollback_row :: proc() {
-    if cursor_row >= len(scrollback_buffer) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+
+    if terminal^.cursor_row >= len(terminal.scrollback_buffer) {
         row := make([dynamic]rune, cell_count_x)
         
-        append(&scrollback_buffer, row)
+        append(&terminal.scrollback_buffer, row)
 
-        if len(scrollback_buffer) > scrollback_limit {
-            ordered_remove(&scrollback_buffer, 0)
-            cursor_row -= 1
-            
-            fmt.println(cursor_row)
+        if len(terminal.scrollback_buffer) > scrollback_limit {
+            ordered_remove(&terminal.scrollback_buffer, 0)
+            terminal^.cursor_row -= 1
         }
         
         scroll_terminal_down(2)
@@ -474,25 +591,29 @@ ensure_scrollback_row :: proc() {
 }
 
 @(private="package")
-terminal_loop :: proc(thread: ^thread.Thread) {
+terminal_loop :: proc(thread: ^thread.Thread) {    
+    defer fmt.println("Terminal loop exited.")
+    
     for !glfw.WindowShouldClose(window) {
-        if tty == nil do continue
+        terminal := terminals[current_terminal_idx]
+        
+        if terminal == nil do continue
+        if terminal.pid == 0 do continue
     
         read_buf := make([dynamic]u8, 1024)
         defer delete(read_buf)
     
-        n := posix.read(tty.master_fd, raw_data(read_buf), len(read_buf))
+        n := posix.read(terminal.master_fd, raw_data(read_buf), len(read_buf))
         
         if n == -1 {
-            clear(&scrollback_buffer)
-            close_shell(tty^)
+            clear(&terminal.scrollback_buffer)
+            close_shell(terminal^)
             toggle_terminal_emulator()
             
-            tty = nil
+            temp := terminals[current_terminal_idx]^
+            terminals[current_terminal_idx] = new(TtyHandle, context.allocator)
             
-            cursor_col = 0
-            cursor_row = 0
-            
+            fmt.println("terminal process exited")
             return
         }
         
@@ -501,43 +622,51 @@ terminal_loop :: proc(thread: ^thread.Thread) {
 }
 
 erase_line :: proc(params: [dynamic]int) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
     mode := len(params) > 0 ? params[0] : 0
     switch mode {
     case 0:
-        for c in cursor_col..<cell_count_x {
-            scrollback_buffer[cursor_row][c] = 0
+        for c in terminal^.cursor_col..<cell_count_x {
+            terminal^.scrollback_buffer[terminal^.cursor_row][c] = 0
         }
     case 1:
-        for c in 0..=cursor_col {
-            scrollback_buffer[cursor_row][c] = 0
+        for c in 0..=terminal^.cursor_col {
+            terminal^.scrollback_buffer[terminal^.cursor_row][c] = 0
         }
     case 2:
         for c in 0..<cell_count_x {
-            scrollback_buffer[cursor_row][c] = 0
+            terminal^.scrollback_buffer[terminal^.cursor_row][c] = 0
         }
     }
 }
 
 erase_screen :: proc(params: [dynamic]int) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
     mode := len(params) > 0 ? params[0] : 0
 
     switch mode {
     case 0:
-        for r in cursor_row..<cell_count_y {
-            start_col := r == cursor_row ? cursor_col : 0
+        for r in terminal^.cursor_row..<cell_count_y {
+            start_col := r == terminal^.cursor_row ? terminal^.cursor_col : 0
             for c in start_col..<cell_count_x {
-                scrollback_buffer[r][c] = 0
+                terminal^.scrollback_buffer[r][c] = 0
             }
         }
     case 1:
-        for r in 0..=cursor_row {
-            end_col := r == cursor_row ? cursor_col : cell_count_x - 1
+        for r in 0..=terminal^.cursor_row {
+            end_col := r == terminal^.cursor_row ? terminal^.cursor_col : cell_count_x - 1
             for c in 0..=end_col {
-                scrollback_buffer[r][c] = 0
+                terminal^.scrollback_buffer[r][c] = 0
             }
         }
     case 2:
-        for &row in scrollback_buffer {
+        for &row in terminal.scrollback_buffer {
             for &char in row {
                 (&char)^ = 0
             }
@@ -560,6 +689,10 @@ parse_csi_params :: proc(s: string) -> [dynamic]int {
     return params
 }
 process_ansi_chunk :: proc(input: string) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
     for i := 0; i < len(input); i += 1 {
         b := input[i]
 
@@ -573,13 +706,13 @@ process_ansi_chunk :: proc(input: string) {
             }
 
             if b == 0x08 { // backk spacuhhh
-                if cursor_col > 0 {
-                    cursor_col -= 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
-                } else if cursor_row > 0 {
-                    cursor_row -= 1
-                    cursor_col = cell_count_x - 1
-                    scrollback_buffer[cursor_row][cursor_col] = 0
+                if terminal^.cursor_col > 0 {
+                    terminal^.cursor_col -= 1
+                    terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
+                } else if terminal^.cursor_row > 0 {
+                    terminal^.cursor_row -= 1
+                    terminal^.cursor_col = cell_count_x - 1
+                    terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
                 }
                 return
             }
@@ -594,22 +727,23 @@ process_ansi_chunk :: proc(input: string) {
             }
 
             if b == 0x0D {
-                cursor_col = 0
+                terminal^.cursor_col = 0
                 continue
             }
             
             if b == 0x09 {
                 for i in 0..<8 {                    
-                    if cursor_row >= len(scrollback_buffer) {
+                    if terminal^.cursor_row >= len(terminal^.scrollback_buffer) {
                         ensure_scrollback_row()
-                        cursor_row = len(scrollback_buffer) - 1
+                        terminal^.cursor_row = len(terminal^.scrollback_buffer) - 1
                     }
                 
-                    if cursor_col >= cell_count_x {
-                        cursor_col = 0
+                    if terminal^.cursor_col >= cell_count_x {
+                        terminal^.cursor_col = 0
                         newline()
                     }
-                    cursor_col += 1
+                    
+                    terminal^.cursor_col += 1
                 }
             }
             
@@ -669,34 +803,49 @@ process_ansi_chunk :: proc(input: string) {
 }
 
 newline :: proc() {
-    cursor_row += 1
-    if cursor_row > scroll_bottom {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
+    row := &terminal.cursor_row
+    
+    row^ += 1
+    
+    if terminal^.cursor_row > terminal^.scroll_bottom {
         scroll_region_up()
-        cursor_row = scroll_bottom
+        row^ = terminal^.scroll_bottom
     }
 }
 
 scroll_region_up :: proc() {
-    for r in scroll_top..<scroll_bottom {
-        clear(&scrollback_buffer[r])
-        append(&scrollback_buffer[r], ..scrollback_buffer[r+1][:])
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
+    for r in terminal^.scroll_top..<terminal^.scroll_bottom {
+        clear(&terminal.scrollback_buffer[r])
+        append(&terminal.scrollback_buffer[r], ..terminal.scrollback_buffer[r+1][:])
     }
 
-    last_row := scroll_bottom
+    last_row := terminal^.scroll_bottom
     for c in 0..<cell_count_x {
-        scrollback_buffer[last_row][c] = 0
+        terminal^.scrollback_buffer[last_row][c] = 0
     }
 }
 
 handle_simple_escape :: proc(seq: []u8) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+    
     if len(seq) < 2 { return }
     switch seq[1] {
     case '7':
-        stored_cursor_row = cursor_row
-        stored_cursor_col = cursor_col
+        terminal^.stored_cursor_row = terminal^.cursor_row
+        terminal^.stored_cursor_col = terminal^.cursor_col
     case '8':
-        cursor_row = stored_cursor_row
-        cursor_col = stored_cursor_col
+        terminal^.cursor_row = terminal^.stored_cursor_row
+        terminal^.cursor_col = terminal^.stored_cursor_col
     case '=': // application Keypad Mode Enable
     case '>': // normal Keypad Mode Enable
     case 'c': // full reset (RIS)
@@ -744,22 +893,30 @@ handle_osc_seq :: proc(seq: string) {
 }
 
 handle_normal_char :: proc(r: rune) {
-    if cursor_row >= len(scrollback_buffer) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+
+    if terminal^.cursor_row >= len(terminal.scrollback_buffer) {
         ensure_scrollback_row()
-        cursor_row = len(scrollback_buffer) - 1
+        terminal^.cursor_row = len(terminal.scrollback_buffer) - 1
     }
 
-    if cursor_col >= cell_count_x {
-        cursor_col = 0
+    if terminal^.cursor_col >= cell_count_x {
+        terminal^.cursor_col = 0
         newline()
     }
 
-    scrollback_buffer[cursor_row][cursor_col] = r
-    cursor_col += 1
+    terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = r
+    terminal^.cursor_col += 1
 }
 
 handle_csi_seq :: proc(seq: string) {
     if len(seq) < 2 { return }
+    
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
 
     final := seq[len(seq)-1]
     params_str := len(seq) > 2 ? seq[2:len(seq)-1] : ""
@@ -769,41 +926,41 @@ handle_csi_seq :: proc(seq: string) {
     case 'H', 'f':
         row := len(params) >= 1 && params[0] > 0 ? params[0] - 1 : 0
         col := len(params) >= 2 && params[1] > 0 ? params[1] - 1 : 0
-        cursor_row = clamp(row, 0, cell_count_y - 1)
+        terminal^.cursor_row = clamp(row, 0, cell_count_y - 1)
         
-        cursor_col = clamp(col, 0, cell_count_x - 1)
+        terminal^.cursor_col = clamp(col, 0, cell_count_x - 1)
 
     case 'A':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row - delta, 0, cell_count_y - 1)
+        terminal^.cursor_row = clamp(terminal^.cursor_row - delta, 0, cell_count_y - 1)
 
     case 'B':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row + delta, 0, cell_count_y - 1)
+        terminal^.cursor_row = clamp(terminal^.cursor_row + delta, 0, cell_count_y - 1)
 
     case 'C':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_col = clamp(cursor_col + delta, 0, cell_count_x - 1)
+        terminal^.cursor_col = clamp(terminal^.cursor_col + delta, 0, cell_count_x - 1)
 
     case 'D':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_col = clamp(cursor_col - delta, 0, cell_count_x - 1)
+        terminal^.cursor_col = clamp(terminal^.cursor_col - delta, 0, cell_count_x - 1)
 
     case 'E':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row + delta, 0, cell_count_y - 1)
+        terminal^.cursor_row = clamp(terminal^.cursor_row + delta, 0, cell_count_y - 1)
         
-        cursor_col = 0
+        terminal^.cursor_col = 0
 
     case 'F':
         delta := len(params) > 0 ? params[0] : 1
-        cursor_row = clamp(cursor_row - delta, 0, cell_count_y - 1)
+        terminal^.cursor_row = clamp(terminal^.cursor_row - delta, 0, cell_count_y - 1)
         
-        cursor_col = 0
+        terminal^.cursor_col = 0
 
     case 'G':
         col := len(params) > 0 ? params[0] - 1 : 0
-        cursor_col = clamp(col, 0, cell_count_x - 1)
+        terminal^.cursor_col = clamp(col, 0, cell_count_x - 1)
 
     case 'J':
         erase_screen(params)
@@ -830,12 +987,12 @@ handle_csi_seq :: proc(seq: string) {
         set_scroll_region(params)
 
     case 's':
-        stored_cursor_row = cursor_row
-        stored_cursor_col = cursor_col
+        terminal^.stored_cursor_row = terminal^.cursor_row
+        terminal^.stored_cursor_col = terminal^.cursor_col
 
     case 'u':
-        cursor_row = stored_cursor_row
-        cursor_col = stored_cursor_col
+        terminal^.cursor_row = terminal^.stored_cursor_row
+        terminal^.cursor_col = terminal^.stored_cursor_col
 
     case 'c':
         // respond("\x1b[?1;0c") // "VT100"
@@ -858,11 +1015,15 @@ handle_private_mode :: proc(seq: string) {
 }
 
 set_scroll_region :: proc(params: [dynamic]int) {
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+
     t := len(params) > 0 ? params[0] - 1 : 0
     b := len(params) > 1 ? params[1] - 1 : cell_count_y - 1
-    scroll_top = clamp(t, 0, cell_count_y - 1)
-    scroll_bottom = clamp(b, scroll_top, cell_count_y - 1)
-    cursor_row = scroll_top
+    terminal^.scroll_top = clamp(t, 0, cell_count_y - 1)
+    terminal^.scroll_bottom = clamp(b, terminal^.scroll_top, cell_count_y - 1)
+    terminal^.cursor_row = terminal^.scroll_top
 }
 
 insert_lines :: proc(n: int) { }
@@ -871,27 +1032,42 @@ insert_chars :: proc(n: int) { }
 delete_chars :: proc(n: int) { }
 
 enable_alt_buffer :: proc() {
-    resize(&alt_buffer, len(scrollback_buffer))
-    for i in 0..<len(scrollback_buffer) {
-        alt_buffer[i] = make([dynamic]rune, cell_count_x)
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+
+    resize(&terminal.alt_buffer, len(terminal.scrollback_buffer))
+    
+    for i in 0..<len(terminal.scrollback_buffer) {
+        terminal^.alt_buffer[i] = make([dynamic]rune, cell_count_x)
+        
         for j in 0..<cell_count_x {
-            alt_buffer[i][j] = scrollback_buffer[i][j]
+            terminal^.alt_buffer[i][j] = terminal.scrollback_buffer[i][j]
         }
     }
-    clear(&scrollback_buffer)
-    using_alt_buffer = true
+    
+    clear(&terminal.scrollback_buffer)
+    
+    terminal^.using_alt_buffer = true
 }
 
 disable_alt_buffer :: proc() {
-    clear(&scrollback_buffer)
-    resize(&scrollback_buffer, len(alt_buffer))
-    for i in 0..<len(alt_buffer) {
-        scrollback_buffer[i] = make([dynamic]rune, cell_count_x)
+    terminal := terminals[current_terminal_idx]
+    
+    if terminal == nil do return
+
+    clear(&terminal.scrollback_buffer)
+    resize(&terminal.scrollback_buffer, len(terminal.alt_buffer))
+    
+    for i in 0..<len(terminal.alt_buffer) {
+        terminal^.scrollback_buffer[i] = make([dynamic]rune, cell_count_x)
+        
         for j in 0..<cell_count_x {
-            scrollback_buffer[i][j] = alt_buffer[i][j]
+            terminal^.scrollback_buffer[i][j] = terminal^.alt_buffer[i][j]
         }
     }
-    using_alt_buffer = false
+    
+    terminal^.using_alt_buffer = false
 }
 
 set_graphics_rendition :: proc(params: [dynamic]int) {
