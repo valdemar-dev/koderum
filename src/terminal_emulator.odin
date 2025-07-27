@@ -26,6 +26,7 @@ import "core:unicode/utf8"
 import "core:sys/linux"
 import "core:strings"
 import ft "../../alt-odin-freetype"
+import "base:runtime"
 
 suppress := true
 
@@ -34,8 +35,6 @@ scrollback_limit := 1000
 
 cell_count_x: int
 cell_count_y: int
-
-terminal_title : string
 
 @(private="package")
 is_terminal_open := false
@@ -58,6 +57,8 @@ TtyHandle :: struct {
     using_alt_buffer : bool,
     scroll_top : int,
     scroll_bottom : int,
+    
+    title: string,
 }
 
 current_terminal_idx : int
@@ -169,15 +170,12 @@ when ODIN_OS == .Linux {
             false,
             0,
             0,
+            "Terminal",
         }
         
-        terminal_title = "Terminal"
-        
-        fmt.println("new tty",tty)
-        
-        init_terminal_thread()
-        
-        fmt.println("created terminal thread")
+        if terminal_thread != nil {
+            init_terminal_thread()
+        }
         
         return tty
     }
@@ -195,9 +193,13 @@ when ODIN_OS == .Linux {
         return posix.read(h.master_fd, raw_data(buf), len(buf))
     }
     
-    close_shell :: proc(h: TtyHandle) {
-        posix.kill(posix.pid_t(h.pid), posix.Signal.SIGKILL)
-        posix.close(h.master_fd)
+    close_shell :: proc(terminal: TtyHandle) {
+        posix.kill(posix.pid_t(terminal.pid), posix.Signal.SIGKILL)
+        //posix.close(terminal.master_fd)
+        
+        delete(terminal.scrollback_buffer)
+        delete(terminal.alt_buffer)
+        delete(terminal.title)
     }
 } else when ODIN_OS == .Windows {
     spawn_shell :: proc() {
@@ -247,6 +249,8 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
 
 @(private="package")
 toggle_terminal_emulator :: proc() {
+    context = runtime.default_context()
+    
     if is_terminal_open == false {
         suppress = false
         is_terminal_open = true
@@ -255,13 +259,12 @@ toggle_terminal_emulator :: proc() {
         
         terminal := terminals[current_terminal_idx]
         if terminal == nil {
-            new_shell := new(TtyHandle)
+            new_shell := new(TtyHandle, context.allocator)
             
             new_shell ^= spawn_shell()
             
             terminals[current_terminal_idx] = new_shell
             resize_terminal(current_terminal_idx)
-
         }
         
     } else {
@@ -306,13 +309,12 @@ draw_terminal_emulator :: proc() {
             x_pos,
             font_base_px * 5 - (padding_sm * 2),
         }
-                    
+        
         text := math.round_f32(font_base_px * normal_text_scale)
         error := ft.set_pixel_sizes(primary_font, 0, u32(text))
         assert(error == .Ok)
         ascender := f32(primary_font.size.metrics.ascender >> 6)
         descender := f32(primary_font.size.metrics.descender >> 6)
-        
         
         bg_rect := rect{
             title_pos.x - padding - line_thickness,
@@ -321,21 +323,30 @@ draw_terminal_emulator :: proc() {
             ascender - descender + padding_sm*2 + (line_thickness * 2),
         }
         
-
+        sb := strings.builder_make()
+        
+        strings.write_string(&sb, "Term:")
+        strings.write_int(&sb, current_terminal_idx)
+        strings.write_string(&sb, " - ")
+        strings.write_string(&sb, terminal.title)
+        
+        defer strings.builder_destroy(&sb)
+        
         add_text(
             &text_rect_cache,
             title_pos,
             TEXT_MAIN,
             small_text,
-            terminal_title,
+            strings.to_string(sb),
             z_index + 1,
             true,
             -1
         )
-
+        
         add_rect(&rect_cache, bg_rect, no_texture, border_color, vec2{}, z_index)
     }
     
+    // Draw Terminal Content
     {
         bg_rect := rect{
             x_pos - padding,
@@ -514,6 +525,8 @@ handle_terminal_control_input :: proc() -> bool {
 
 @(private="package")
 swap_terminal :: proc(index: int) {
+    context = runtime.default_context()
+    
     index := clamp(index, 0, 9)
     
     terminal := terminals[index]
@@ -591,25 +604,51 @@ ensure_scrollback_row :: proc(index: int) {
     }
 }
 
-@(private="package")
-terminal_loop :: proc(thread: ^thread.Thread) {    
-    defer fmt.println("Terminal loop exited.")
-    
-    for !glfw.WindowShouldClose(window) {
-        for terminal, index in terminals {
-            if terminal == nil do continue
-            if terminal.pid == 0 do continue
+when ODIN_OS == .Windows {
+    @(private="package")
+    terminal_loop :: proc(thread: ^thread.Thread) {
+    }
+} else {
+    @(private="package")
+    terminal_loop :: proc(thread: ^thread.Thread) {    
+        context = runtime.default_context()
         
-            read_buf := make([dynamic]u8, 1024)
-            defer delete(read_buf)
+        defer fmt.println("Terminal loop exited.")
         
-            n := posix.read(terminal.master_fd, raw_data(read_buf), len(read_buf))
+        for !glfw.WindowShouldClose(window) {
+            for &terminal, index in terminals {
+                if terminal == nil do continue
+                if terminal.pid == 0 do continue
             
-            if n == -1 {
-                continue
+                read_buf := make([dynamic]u8, 1024)
+                defer delete(read_buf)
+            
+                n := posix.read(terminal.master_fd, raw_data(read_buf), len(read_buf))
+                
+                if n == -1 {
+                    status : i32
+                    
+                    result := posix.waitpid(
+                        posix.pid_t(terminal.pid), 
+                        &status, 
+                        {.NOHANG}
+                    )
+                    
+                    if result != 0 {
+                        close_shell(terminal^)
+                        free(terminal, context.allocator)
+                        
+                        terminal = nil
+                        terminal = new(TtyHandle, context.allocator)
+                        
+                        terminal^ = spawn_shell()
+                    }
+                    
+                    continue
+                }
+                
+                process_ansi_chunk(string(read_buf[:n]), index)
             }
-            
-            process_ansi_chunk(string(read_buf[:n]), index)
         }
     }
 }
@@ -879,7 +918,7 @@ handle_osc_seq :: proc(seq: string, index: int) {
     case "0", "2":
         sanitized := sanitize_title(data)
         
-        terminal_title = utf8.runes_to_string(sanitized[:])
+        terminals[index].title = utf8.runes_to_string(sanitized[:])
         
         delete(sanitized)
     }
