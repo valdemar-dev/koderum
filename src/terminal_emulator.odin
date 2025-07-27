@@ -173,9 +173,7 @@ when ODIN_OS == .Linux {
             "Terminal",
         }
         
-        if terminal_thread != nil {
-            init_terminal_thread()
-        }
+        init_terminal_thread()
         
         return tty
     }
