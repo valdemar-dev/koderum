@@ -259,9 +259,9 @@ toggle_terminal_emulator :: proc() {
             
             new_shell ^= spawn_shell()
             
-            resize_terminal(current_terminal_idx)
-            
             terminals[current_terminal_idx] = new_shell
+            resize_terminal(current_terminal_idx)
+
         }
         
     } else {

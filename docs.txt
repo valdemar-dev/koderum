@@ -27,9 +27,10 @@ Buffer Motions
 (F5) -> Reload LSP Server.
 
 Terminal
-(Ctrl + T) -> Toggle Persistent Terminal (if in command mode)
-(Ctrl + D) -> Commmand Mode.
-(Ctrl + F) -> Terminal Mode (if in command mode, and terminal exists).
+(Ctrl + T) -> Toggle Persistent Terminal (if in command mode).
+(I) -> Terminal Text Insert Mode.
+(Esc) -> Terminal Control Mode.
+(1-0) -> Swap To Other Terminal Instance.
 
 LSP Motions
 (.) -> Go to definition.
