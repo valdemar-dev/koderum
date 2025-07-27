@@ -90,11 +90,11 @@ ansi_buf   : [dynamic]u8
 cursor_visible := true
 
 @(private="package")
-scroll_terminal_up :: proc(lines: int) {
+scroll_terminal_up :: proc(lines: int, index: int = current_terminal_idx) {
 }
 
 @(private="package")
-scroll_terminal_down :: proc(lines: int) {
+scroll_terminal_down :: proc(lines: int, index: int = current_terminal_idx) {
 }
 
 when ODIN_OS == .Linux {
@@ -116,6 +116,9 @@ when ODIN_OS == .Linux {
         if master_fd < 0 {
             panic("Failed to open PTY master")
         }
+        
+        flags := posix.fcntl(master_fd, posix.FCNTL_Cmd.GETFL, 0)
+        posix.fcntl(master_fd, posix.FCNTL_Cmd.SETFL, flags | posix.O_NONBLOCK)
         
         posix.grantpt(master_fd)
         posix.unlockpt(master_fd)
@@ -172,11 +175,9 @@ when ODIN_OS == .Linux {
         
         fmt.println("new tty",tty)
         
-        if terminal_thread == nil {
-            init_terminal_thread()
-            
-            fmt.println("created terminal thread")
-        }
+        init_terminal_thread()
+        
+        fmt.println("created terminal thread")
         
         return tty
     }
@@ -205,7 +206,7 @@ when ODIN_OS == .Linux {
 }
 
 @(private="package")
-resize_terminal :: proc () {
+resize_terminal :: proc (index: int = current_terminal_idx) {
     text := math.round_f32(font_base_px * normal_text_scale)
 
     error := ft.set_pixel_sizes(primary_font, 0, u32(text))
@@ -232,7 +233,7 @@ resize_terminal :: proc () {
     width = f32(cell_width) * f32(cell_count_x)
     height = f32(cell_height) * f32(cell_count_y)
     
-    terminal := terminals[current_terminal_idx]
+    terminal := terminals[index]
     if terminal == nil do return
     
     resize(&terminal^.scrollback_buffer, cell_count_y)
@@ -258,9 +259,9 @@ toggle_terminal_emulator :: proc() {
             
             new_shell ^= spawn_shell()
             
-            terminals[current_terminal_idx] = new_shell
+            resize_terminal(current_terminal_idx)
             
-            resize_terminal()
+            terminals[current_terminal_idx] = new_shell
         }
         
     } else {
@@ -523,7 +524,7 @@ swap_terminal :: proc(index: int) {
         
         terminals[index] = new_term
         
-        resize_terminal()
+        resize_terminal(index)
     }
     
     current_terminal_idx = index
@@ -571,8 +572,8 @@ tick_terminal_emulator :: proc() {
 }
 
 @(private="package")
-ensure_scrollback_row :: proc() {
-    terminal := terminals[current_terminal_idx]
+ensure_scrollback_row :: proc(index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
 
@@ -586,7 +587,7 @@ ensure_scrollback_row :: proc() {
             terminal^.cursor_row -= 1
         }
         
-        scroll_terminal_down(2)
+        scroll_terminal_down(2, index)
     }
 }
 
@@ -595,34 +596,26 @@ terminal_loop :: proc(thread: ^thread.Thread) {
     defer fmt.println("Terminal loop exited.")
     
     for !glfw.WindowShouldClose(window) {
-        terminal := terminals[current_terminal_idx]
+        for terminal, index in terminals {
+            if terminal == nil do continue
+            if terminal.pid == 0 do continue
         
-        if terminal == nil do continue
-        if terminal.pid == 0 do continue
-    
-        read_buf := make([dynamic]u8, 1024)
-        defer delete(read_buf)
-    
-        n := posix.read(terminal.master_fd, raw_data(read_buf), len(read_buf))
+            read_buf := make([dynamic]u8, 1024)
+            defer delete(read_buf)
         
-        if n == -1 {
-            clear(&terminal.scrollback_buffer)
-            close_shell(terminal^)
-            toggle_terminal_emulator()
+            n := posix.read(terminal.master_fd, raw_data(read_buf), len(read_buf))
             
-            temp := terminals[current_terminal_idx]^
-            terminals[current_terminal_idx] = new(TtyHandle, context.allocator)
+            if n == -1 {
+                continue
+            }
             
-            fmt.println("terminal process exited")
-            return
+            process_ansi_chunk(string(read_buf[:n]), index)
         }
-        
-        process_ansi_chunk(string(read_buf[:n]))
     }
 }
 
-erase_line :: proc(params: [dynamic]int) {
-    terminal := terminals[current_terminal_idx]
+erase_line :: proc(params: [dynamic]int, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -643,8 +636,8 @@ erase_line :: proc(params: [dynamic]int) {
     }
 }
 
-erase_screen :: proc(params: [dynamic]int) {
-    terminal := terminals[current_terminal_idx]
+erase_screen :: proc(params: [dynamic]int, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -674,7 +667,7 @@ erase_screen :: proc(params: [dynamic]int) {
     }
 }
 
-parse_csi_params :: proc(s: string) -> [dynamic]int {
+parse_csi_params :: proc(s: string, index: int) -> [dynamic]int {
     params := make([dynamic]int)
     parts := strings.split(s, ";")
     
@@ -688,8 +681,8 @@ parse_csi_params :: proc(s: string) -> [dynamic]int {
     }
     return params
 }
-process_ansi_chunk :: proc(input: string) {
-    terminal := terminals[current_terminal_idx]
+process_ansi_chunk :: proc(input: string, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -722,7 +715,7 @@ process_ansi_chunk :: proc(input: string) {
             }
 
             if b == 0x0A {
-                newline()
+                newline(index)
                 continue
             }
 
@@ -734,13 +727,13 @@ process_ansi_chunk :: proc(input: string) {
             if b == 0x09 {
                 for i in 0..<8 {                    
                     if terminal^.cursor_row >= len(terminal^.scrollback_buffer) {
-                        ensure_scrollback_row()
+                        ensure_scrollback_row(index)
                         terminal^.cursor_row = len(terminal^.scrollback_buffer) - 1
                     }
                 
                     if terminal^.cursor_col >= cell_count_x {
                         terminal^.cursor_col = 0
-                        newline()
+                        newline(index)
                     }
                     
                     terminal^.cursor_col += 1
@@ -753,7 +746,7 @@ process_ansi_chunk :: proc(input: string) {
 
             r := utf8.rune_at(input, i)
             size := utf8.rune_size(r)
-            handle_normal_char(r)
+            handle_normal_char(r, index)
             i += size - 1
             
             continue
@@ -767,7 +760,7 @@ process_ansi_chunk :: proc(input: string) {
                 ansi_state = .Osc
                 continue
             } else {
-                handle_simple_escape(ansi_buf[:])
+                handle_simple_escape(ansi_buf[:], index)
                 ansi_state = .Normal
                 
                 clear(&ansi_buf)
@@ -776,7 +769,7 @@ process_ansi_chunk :: proc(input: string) {
         case .Csi:
             append(&ansi_buf, b)
             if b >= 0x40 && b <= 0x7E {
-                handle_csi_seq(string(ansi_buf[:]))
+                handle_csi_seq(string(ansi_buf[:]), index)
                 ansi_state = .Normal
                 
                 clear(&ansi_buf)
@@ -786,14 +779,14 @@ process_ansi_chunk :: proc(input: string) {
         case .Osc:
             append(&ansi_buf, b)
             if b == 0x07 { // BEL terminator
-                handle_osc_seq(string(ansi_buf[:]))
+                handle_osc_seq(string(ansi_buf[:]), index)
                 ansi_state = .Normal
                 
                 clear(&ansi_buf)
             } else if b == 0x1B && i + 1 < len(input) && input[i+1] == '\\' {
                 append(&ansi_buf, input[i+1])
                 i += 1
-                handle_osc_seq(string(ansi_buf[:]))
+                handle_osc_seq(string(ansi_buf[:]), index)
                 ansi_state = .Normal
                 
                 clear(&ansi_buf)
@@ -802,8 +795,8 @@ process_ansi_chunk :: proc(input: string) {
     }
 }
 
-newline :: proc() {
-    terminal := terminals[current_terminal_idx]
+newline :: proc(index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -812,13 +805,13 @@ newline :: proc() {
     row^ += 1
     
     if terminal^.cursor_row > terminal^.scroll_bottom {
-        scroll_region_up()
+        scroll_region_up(index)
         row^ = terminal^.scroll_bottom
     }
 }
 
-scroll_region_up :: proc() {
-    terminal := terminals[current_terminal_idx]
+scroll_region_up :: proc(index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -833,8 +826,8 @@ scroll_region_up :: proc() {
     }
 }
 
-handle_simple_escape :: proc(seq: []u8) {
-    terminal := terminals[current_terminal_idx]
+handle_simple_escape :: proc(seq: []u8, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
     
@@ -868,7 +861,7 @@ sanitize_title :: proc(s: string) -> [dynamic]rune {
     return result
 }
 
-handle_osc_seq :: proc(seq: string) {
+handle_osc_seq :: proc(seq: string, index: int) {
     if len(seq) < 3 { return }
     body := seq[2:]
     if body[len(body)-1] == 0x07 {
@@ -892,35 +885,35 @@ handle_osc_seq :: proc(seq: string) {
     }
 }
 
-handle_normal_char :: proc(r: rune) {
-    terminal := terminals[current_terminal_idx]
+handle_normal_char :: proc(r: rune, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
 
     if terminal^.cursor_row >= len(terminal.scrollback_buffer) {
-        ensure_scrollback_row()
+        ensure_scrollback_row(index)
         terminal^.cursor_row = len(terminal.scrollback_buffer) - 1
     }
 
     if terminal^.cursor_col >= cell_count_x {
         terminal^.cursor_col = 0
-        newline()
+        newline(index)
     }
 
     terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = r
     terminal^.cursor_col += 1
 }
 
-handle_csi_seq :: proc(seq: string) {
+handle_csi_seq :: proc(seq: string, index: int) {
     if len(seq) < 2 { return }
     
-    terminal := terminals[current_terminal_idx]
+    terminal := terminals[index]
     
     if terminal == nil do return
 
     final := seq[len(seq)-1]
     params_str := len(seq) > 2 ? seq[2:len(seq)-1] : ""
-    params := parse_csi_params(params_str)
+    params := parse_csi_params(params_str, index)
 
     switch final {
     case 'H', 'f':
@@ -963,28 +956,28 @@ handle_csi_seq :: proc(seq: string) {
         terminal^.cursor_col = clamp(col, 0, cell_count_x - 1)
 
     case 'J':
-        erase_screen(params)
+        erase_screen(params, index)
 
     case 'K':
-        erase_line(params)
+        erase_line(params, index)
 
     case 'L':
-        insert_lines(len(params) > 0 ? params[0] : 1)
+        insert_lines(len(params) > 0 ? params[0] : 1, index)
 
     case 'M':
-        delete_lines(len(params) > 0 ? params[0] : 1)
+        delete_lines(len(params) > 0 ? params[0] : 1, index)
 
     case 'P':
-        delete_chars(len(params) > 0 ? params[0] : 1)
+        delete_chars(len(params) > 0 ? params[0] : 1, index)
 
     case '@':
-        insert_chars(len(params) > 0 ? params[0] : 1)
+        insert_chars(len(params) > 0 ? params[0] : 1, index)
 
     case 'm':
-        set_graphics_rendition(params)
+        set_graphics_rendition(params, index)
 
     case 'r':
-        set_scroll_region(params)
+        set_scroll_region(params, index)
 
     case 's':
         terminal^.stored_cursor_row = terminal^.cursor_row
@@ -998,15 +991,15 @@ handle_csi_seq :: proc(seq: string) {
         // respond("\x1b[?1;0c") // "VT100"
 
     case '?':
-        handle_private_mode(seq)
+        handle_private_mode(seq, index)
     }
 }
 
-handle_private_mode :: proc(seq: string) {
+handle_private_mode :: proc(seq: string, index: int) {
     if strings.contains(seq, "?1049h") {
-        enable_alt_buffer()
+        enable_alt_buffer(index)
     } else if strings.contains(seq, "?1049l") {
-        disable_alt_buffer()
+        disable_alt_buffer(index)
     } else if strings.contains(seq, "?25l") {
         cursor_visible = false
     } else if strings.contains(seq, "?25h") {
@@ -1014,8 +1007,8 @@ handle_private_mode :: proc(seq: string) {
     }
 }
 
-set_scroll_region :: proc(params: [dynamic]int) {
-    terminal := terminals[current_terminal_idx]
+set_scroll_region :: proc(params: [dynamic]int, index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
 
@@ -1026,13 +1019,13 @@ set_scroll_region :: proc(params: [dynamic]int) {
     terminal^.cursor_row = terminal^.scroll_top
 }
 
-insert_lines :: proc(n: int) { }
-delete_lines :: proc(n: int) { }
-insert_chars :: proc(n: int) { }
-delete_chars :: proc(n: int) { }
+insert_lines :: proc(n: int, index: int) { }
+delete_lines :: proc(n: int, index: int) { }
+insert_chars :: proc(n: int, index: int) { }
+delete_chars :: proc(n: int, index: int) { }
 
-enable_alt_buffer :: proc() {
-    terminal := terminals[current_terminal_idx]
+enable_alt_buffer :: proc(index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
 
@@ -1051,8 +1044,8 @@ enable_alt_buffer :: proc() {
     terminal^.using_alt_buffer = true
 }
 
-disable_alt_buffer :: proc() {
-    terminal := terminals[current_terminal_idx]
+disable_alt_buffer :: proc(index: int) {
+    terminal := terminals[index]
     
     if terminal == nil do return
 
@@ -1070,6 +1063,6 @@ disable_alt_buffer :: proc() {
     terminal^.using_alt_buffer = false
 }
 
-set_graphics_rendition :: proc(params: [dynamic]int) {
+set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
     fmt.println(params)
 }
