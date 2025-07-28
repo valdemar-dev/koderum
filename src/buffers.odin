@@ -1657,10 +1657,6 @@ constrain_scroll_to_cursor :: proc() {
     if amnt_right_offscreen >= 0 {
         scroll_target_x += amnt_right_offscreen 
     }
-    
-    if scroll_target_x > 0 {
-        scroll_target_x = 0
-    }
 }
 
 constrain_cursor_to_scroll :: proc() {
