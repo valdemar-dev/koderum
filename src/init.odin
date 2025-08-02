@@ -52,6 +52,7 @@ size_callback :: proc "c" (
     gl.Viewport(0,0,width,height)
     
     context = runtime.default_context()
+        
     resize_terminal()
 }
 

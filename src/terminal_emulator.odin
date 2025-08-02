@@ -243,6 +243,24 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
     }
     
     terminal^.scroll_bottom = cell_count_y - 1
+    
+    when ODIN_OS == .Linux {
+        TIOCSWINSZ :: 0x5414
+        
+        winsize :: struct {
+            ws_row: u16,
+            ws_col: u16,
+            ws_xpixel: u16,
+            ws_ypixel: u16,
+        }
+        
+        size := winsize{
+            ws_col=u16(cell_count_x),
+            ws_row=u16(cell_count_y),
+        }
+        
+        linux.ioctl(linux.Fd(terminal.master_fd), TIOCSWINSZ, uintptr(&size))
+    }
 }
 
 @(private="package")
@@ -847,7 +865,6 @@ newline :: proc(index: int) {
     if terminal == nil do return
     
     row := &terminal.cursor_row
-    
     row^ += 1
     
     if terminal^.cursor_row > terminal^.scroll_bottom {
@@ -935,16 +952,17 @@ handle_normal_char :: proc(r: rune, index: int) {
     terminal := terminals[index]
     
     if terminal == nil do return
-
+    
+    if terminal^.cursor_col >= len(terminal.scrollback_buffer[terminal.cursor_row]) {
+        terminal^.cursor_col = 0
+        newline(index)
+    }
+    
     if terminal^.cursor_row >= len(terminal.scrollback_buffer) {
         ensure_scrollback_row(index)
         terminal^.cursor_row = len(terminal.scrollback_buffer) - 1
     }
 
-    if terminal^.cursor_col >= cell_count_x {
-        terminal^.cursor_col = 0
-        newline(index)
-    }
 
     terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = r
     terminal^.cursor_col += 1
