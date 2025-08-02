@@ -423,9 +423,12 @@ draw_ui :: proc() {
             
             strings.write_string(&sb, " - ")
             
-            // FRAME_TIME
-            strings.write_string(&sb, "Frame Time: ")
-            strings.write_f32(&sb, frame_time, 'f')
+            when ODIN_DEBUG {
+                if do_log_performance_metrics {
+                    strings.write_string(&sb, "Tracked Memory: ")
+                    strings.write_i64(&sb, track.current_memory_allocated)
+                }
+            }
             
             left_text := strings.to_string(sb)
             
@@ -440,7 +443,6 @@ draw_ui :: proc() {
                 left_text,
                 ui_z_index + 5,     
             )
-            
         }
         
         // Draw Right

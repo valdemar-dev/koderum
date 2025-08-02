@@ -183,7 +183,7 @@ when ODIN_OS == .Linux {
         
         if count != len(data) {
             err_code := posix.errno()
-            fmt.println(err_code)
+            fmt.println("Failed to write to shell, posix err: ", err_code)
         }
     }
     
@@ -422,6 +422,7 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
     }
         
     seq, did_allocate := map_glfw_key_to_escape_sequence(key, mods)
+    
     
     if seq != "" {
         terminal := terminals[current_terminal_idx]
@@ -744,7 +745,8 @@ process_ansi_chunk :: proc(input: string, index: int) {
                     terminal^.cursor_col = cell_count_x - 1
                     terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
                 }
-                return
+                
+                continue
             }
 
             if b == 0x07 { // bell
@@ -762,7 +764,7 @@ process_ansi_chunk :: proc(input: string, index: int) {
             }
             
             if b == 0x09 {
-                for i in 0..<8 {                    
+                for i := terminal.cursor_col; i % 8 != 0; i += 1 {
                     if terminal^.cursor_row >= len(terminal^.scrollback_buffer) {
                         ensure_scrollback_row(index)
                         terminal^.cursor_row = len(terminal^.scrollback_buffer) - 1
@@ -775,6 +777,8 @@ process_ansi_chunk :: proc(input: string, index: int) {
                     
                     terminal^.cursor_col += 1
                 }
+                
+                continue
             }
             
             if b < 0x20 {
@@ -806,7 +810,12 @@ process_ansi_chunk :: proc(input: string, index: int) {
         case .Csi:
             append(&ansi_buf, b)
             if b >= 0x40 && b <= 0x7E {
-                handle_csi_seq(string(ansi_buf[:]), index)
+                handled := handle_csi_seq(string(ansi_buf[:]), index)
+                
+                if !handled {
+                    fmt.println("csi was not handled!!")
+                }
+                
                 ansi_state = .Normal
                 
                 clear(&ansi_buf)
@@ -941,12 +950,12 @@ handle_normal_char :: proc(r: rune, index: int) {
     terminal^.cursor_col += 1
 }
 
-handle_csi_seq :: proc(seq: string, index: int) {
-    if len(seq) < 2 { return }
+handle_csi_seq :: proc(seq: string, index: int) -> (handled: bool) {
+    if len(seq) < 2 { return false }
     
     terminal := terminals[index]
     
-    if terminal == nil do return
+    if terminal == nil do return false
 
     final := seq[len(seq)-1]
     params_str := len(seq) > 2 ? seq[2:len(seq)-1] : ""
@@ -959,77 +968,106 @@ handle_csi_seq :: proc(seq: string, index: int) {
         terminal^.cursor_row = clamp(row, 0, cell_count_y - 1)
         
         terminal^.cursor_col = clamp(col, 0, cell_count_x - 1)
-
+        
+        return true
     case 'A':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_row = clamp(terminal^.cursor_row - delta, 0, cell_count_y - 1)
+        
+        return true
 
     case 'B':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_row = clamp(terminal^.cursor_row + delta, 0, cell_count_y - 1)
 
+        return true
     case 'C':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_col = clamp(terminal^.cursor_col + delta, 0, cell_count_x - 1)
 
+        return true
     case 'D':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_col = clamp(terminal^.cursor_col - delta, 0, cell_count_x - 1)
 
+        return true
     case 'E':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_row = clamp(terminal^.cursor_row + delta, 0, cell_count_y - 1)
         
         terminal^.cursor_col = 0
 
+        return true
     case 'F':
         delta := len(params) > 0 ? params[0] : 1
         terminal^.cursor_row = clamp(terminal^.cursor_row - delta, 0, cell_count_y - 1)
         
         terminal^.cursor_col = 0
 
+        return true
     case 'G':
         col := len(params) > 0 ? params[0] - 1 : 0
         terminal^.cursor_col = clamp(col, 0, cell_count_x - 1)
 
+        return true
     case 'J':
         erase_screen(params, index)
 
+        return true
     case 'K':
         erase_line(params, index)
 
+        return true
     case 'L':
         insert_lines(len(params) > 0 ? params[0] : 1, index)
 
+        return true
     case 'M':
         delete_lines(len(params) > 0 ? params[0] : 1, index)
 
+        return true
     case 'P':
         delete_chars(len(params) > 0 ? params[0] : 1, index)
 
+        return true
     case '@':
         insert_chars(len(params) > 0 ? params[0] : 1, index)
 
+        return true
     case 'm':
         set_graphics_rendition(params, index)
 
+        return true
     case 'r':
         set_scroll_region(params, index)
 
+        return true
     case 's':
         terminal^.stored_cursor_row = terminal^.cursor_row
         terminal^.stored_cursor_col = terminal^.cursor_col
 
+        return true
     case 'u':
         terminal^.cursor_row = terminal^.stored_cursor_row
         terminal^.cursor_col = terminal^.stored_cursor_col
 
+        return true
     case 'c':
         // respond("\x1b[?1;0c") // "VT100"
 
+        return true
     case '?':
         handle_private_mode(seq, index)
+        
+        return true
+    case:
+        fmt.println("CSI, unhandled final rune.", final)
+        
+        return false
     }
+    
+    
+    return false
 }
 
 handle_private_mode :: proc(seq: string, index: int) {
@@ -1101,5 +1139,5 @@ disable_alt_buffer :: proc(index: int) {
 }
 
 set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
-    fmt.println(params)
+    fmt.println("GRAPHICS RENDITION PARAMS: ", params)
 }

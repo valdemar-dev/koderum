@@ -22,9 +22,8 @@ fps : int
 second := time.Duration(1_000_000_000)
 
 do_print_frame_time : bool
+do_log_performance_metrics : bool
 
-// NOTE:
-// this is very silly, but it's fine - val 10th of June 2025.
 parse_args :: proc() {
     for arg in os.args {
         if arg == "-save_logs" {
@@ -43,15 +42,18 @@ parse_args :: proc() {
             log_unhandled_treesitter_cases = true
         } else if arg == "-print_frame_time" {
             do_print_frame_time = true
+        } else if arg == "-log_performance_metrics" {
+            do_log_performance_metrics = true
         }
     }
 }
+
+track: mem.Tracking_Allocator
 
 main :: proc() {
     fmt.println("Loading..")
 
     when ODIN_DEBUG {
-		track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)
 		context.allocator = mem.tracking_allocator(&track)
 
@@ -104,6 +106,7 @@ main :: proc() {
         }
 
         if do_print_frame_time do fmt.println(frame_time)
+        
 
         last_time = current_time
 
@@ -130,6 +133,7 @@ main :: proc() {
         render()
 
         free_all(context.temp_allocator)
+        cleanup()
         
         glfw.PollEvents()
 
@@ -195,4 +199,10 @@ main :: proc() {
     
     delete(data_dir)
     delete(config_dir)
+}
+
+cleanup :: proc() {
+    if lsp_request_id > 5000 {
+        lsp_request_id = 10
+    }
 }
