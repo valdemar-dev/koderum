@@ -59,7 +59,6 @@ main :: proc() {
     when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track, context.allocator)
 		context.allocator = mem.tracking_allocator(&track)
-        global_context = context
 
 		defer {
 			if len(track.allocation_map) > 0 {
@@ -79,6 +78,9 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
+
+    global_context = context
+
 	
     parse_args()
     

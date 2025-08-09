@@ -450,8 +450,8 @@ create_alert :: proc(
     alert := new(Alert, allocator)
 
     alert^ = Alert{
-        content = strings.clone(content),
-        title = strings.clone(title),
+        content = strings.clone(content, allocator),
+        title = strings.clone(title, allocator),
 
         show_seconds = show_seconds,
         remaining_seconds = show_seconds,
@@ -468,28 +468,9 @@ edit_alert :: proc(
     title: string,
     content: string,
 ) {
-    delete(alert.title)
-    delete(alert.content)
+    delete(alert.title, alert.allocator)
+    delete(alert.content, alert.allocator)
 
     alert^.title = strings.clone(title)
     alert^.content = strings.clone(content)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

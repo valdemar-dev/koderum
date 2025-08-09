@@ -155,6 +155,7 @@ error_alert : ^Alert
 
 @(private="package")
 get_info_under_cursor :: proc() {
+    context = global_context 
     if active_buffer == nil {
         return
     } 
