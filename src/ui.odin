@@ -393,7 +393,6 @@ draw_ui :: proc() {
         )
     }
     
-    
     // Draw Bottom Status Bar
     {
         left_size : vec2
@@ -421,13 +420,9 @@ draw_ui :: proc() {
             strings.write_string(&sb, "FPS: ")
             strings.write_int(&sb, fps)
             
-            strings.write_string(&sb, " - ")
-            
             when ODIN_DEBUG {
-                if do_log_performance_metrics {
-                    strings.write_string(&sb, "Tracked Memory: ")
-                    strings.write_i64(&sb, track.current_memory_allocated)
-                }
+                strings.write_string(&sb, " - Tracked Memory: ")
+                strings.write_i64(&sb, track.current_memory_allocated)
             }
             
             left_text := strings.to_string(sb)

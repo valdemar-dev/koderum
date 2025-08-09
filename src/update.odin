@@ -39,7 +39,9 @@ update_state :: proc(current_time: f64) {
 @(private="package")
 message_loop :: proc(thread: ^thread.Thread) {
     last_time := glfw.GetTime()
-
+    
+    context = global_context
+    
     for !glfw.WindowShouldClose(window) {
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
@@ -99,7 +101,7 @@ message_loop :: proc(thread: ^thread.Thread) {
 
             for &request,index in requests {
                 if request.id == id {
-                    delete(request.id)
+                    delete(request.id, global_context.allocator)
 
                     request.response_proc(obj, request.data)
                     
@@ -340,7 +342,7 @@ send_lsp_message :: proc(
 
     append(&requests, LSPRequest{
         data=data,
-        id=strings.clone(id),
+        id=strings.clone(id, global_context.allocator),
         response_proc=response_proc,
     })
 }

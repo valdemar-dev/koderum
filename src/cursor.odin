@@ -59,8 +59,9 @@ draw_cursor :: proc() {
 
 set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     defer {
-        clear(&completion_hits)
+        reset_completion_hits()
         constrain_scroll_to_cursor()
+        get_info_under_cursor()
     }
     
     line := min(line, len(active_buffer.lines)-1)

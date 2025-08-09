@@ -1557,6 +1557,8 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
     header_buf: [dynamic]u8
     header_buf.allocator = allocator
+    
+    defer delete(header_buf)
 
     temp: [1]u8
     delimiter := "\r\n\r\n"
@@ -1582,7 +1584,11 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
 
     header_str := string(header_buf[:])
     content_len := 0
-    for line in strings.split_lines(header_str) {
+    
+    split_head := strings.split_lines(header_str)
+    defer delete(split_head)
+    
+    for line in split_head {
         if strings.starts_with(line, "Content-Length:") {
             suffix := strings.trim(strings.trim_prefix(line, "Content-Length:"), " ")
             content_len = strconv.atoi(suffix)
@@ -1643,6 +1649,8 @@ attempt_resolve_request :: proc(idx: int) {
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) { 
+        context = global_context
+        
         hit_ptr := cast(^CompletionHit)data
 
         if hit_ptr == nil {
@@ -1664,6 +1672,8 @@ get_autocomplete_hits :: proc(
     trigger_kind: string,
     trigger_character: string,
 ) {
+    context = global_context
+    
     if active_language_server == nil {
         return
     }
@@ -1698,10 +1708,10 @@ get_autocomplete_hits :: proc(
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        context = global_context
+        
         result,result_ok := response["result"].(json.Object)
         items,ok := result["items"].(json.Array)
-
-        new_hits := make([dynamic]CompletionHit)
 
         cur_line := active_buffer.lines[buffer_cursor_line]
         line_string := string(cur_line.characters[:])
@@ -1722,7 +1732,11 @@ get_autocomplete_hits :: proc(
                 last_delimiter_byte = byte+1
             }
         }
-
+        
+        reset_completion_hits()
+        
+        sync.lock(&completion_mutex)
+        
         completion_filter_token = line_string[last_delimiter_byte:byte_offset]
         for item in items {
             label, label_ok := item.(json.Object)["label"].(string)
@@ -1733,42 +1747,33 @@ get_autocomplete_hits :: proc(
             if marshal_error != io.Error.None {
                 panic("marshalling error")
             }
-
-            hit := CompletionHit{
-                label=strings.clone(label),
-                raw_data=strings.clone(string(buf)),
-            }
-
-            if documentation_ok {
-                hit.documentation = strings.clone(documentation)
-            }
+            
+            hit : CompletionHit
 
             if len(completion_filter_token) > 0 {
                 if strings.contains(label, completion_filter_token) == false {
                     continue
                 }
-
-                if label == completion_filter_token {
-                    inject_at(&new_hits, 0, hit)
-
-                    continue
-                }
+            }
+                        
+            hit = CompletionHit{
+                label = strings.clone(label, global_context.allocator),
+                raw_data = strings.clone(string(buf), global_context.allocator),
             }
 
-            append(&new_hits, hit)
-        }
+            if documentation_ok {
+                hit.documentation = strings.clone(documentation, global_context.allocator)
+            }
+            
+            
+            if label == completion_filter_token && len(completion_filter_token) > 0 {
+                inject_at(&completion_hits, 0, hit)
 
-        for &hit in completion_hits {
-            delete(hit.documentation)
-            delete(hit.insertText)
-            delete(hit.label)
-            delete(hit.raw_data)
-            delete(hit.detail)
+                continue
+            }
+
+            append(&completion_hits, hit)
         }
-        
-        sync.lock(&completion_mutex)
-        
-        completion_hits = new_hits
 
         if len(completion_hits) > 0 {
             attempt_resolve_request(selected_completion_hit)
@@ -1776,6 +1781,24 @@ get_autocomplete_hits :: proc(
 
         sync.unlock(&completion_mutex)
     }
+}
+
+reset_completion_hits :: proc() {
+    sync.lock(&completion_mutex)
+        
+    context = global_context
+    
+    for &hit in completion_hits {
+        delete_string(hit.documentation)
+        delete_string(hit.insertText)
+        delete_string(hit.label)
+        delete_string(hit.raw_data)
+        delete_string(hit.detail)
+    }
+    
+    clear(&completion_hits)
+    
+    sync.unlock(&completion_mutex)
 }
 
 go_to_definition :: proc() {

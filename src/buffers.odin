@@ -407,7 +407,7 @@ byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
 
 
 next_buffer :: proc() {
-    clear(&completion_hits)
+    reset_completion_hits()
     
     set_next_as_current := false
 
@@ -430,14 +430,14 @@ set_buffer :: proc(number: int) {
         return
     }
     
-    clear(&completion_hits)
+    reset_completion_hits()
 
     buf := buffers[idx]
     open_file(buf.file_name)
 }
 
 prev_buffer :: proc() {
-    clear(&completion_hits)
+    reset_completion_hits()
     
     set_next_as_current := false
 
@@ -1742,7 +1742,7 @@ move_down :: proc() {
 }
 
 move_back_word :: proc() {
-    defer clear(&completion_hits)
+    defer reset_completion_hits()
     current_line := active_buffer.lines[buffer_cursor_line]
 
     line_str := string(current_line.characters[:])
@@ -1790,7 +1790,7 @@ move_back_word :: proc() {
 }
 
 move_forward_word :: proc() {
-    defer clear(&completion_hits)
+    defer reset_completion_hits()
 
     current_line := active_buffer.lines[buffer_cursor_line]
 

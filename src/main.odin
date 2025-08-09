@@ -49,6 +49,9 @@ parse_args :: proc() {
 }
 
 track: mem.Tracking_Allocator
+global_context: runtime.Context
+
+cleanup_procedures : [dynamic]proc()
 
 main :: proc() {
     fmt.println("Loading..")
@@ -56,6 +59,7 @@ main :: proc() {
     when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track, context.allocator)
 		context.allocator = mem.tracking_allocator(&track)
+        global_context = context
 
 		defer {
 			if len(track.allocation_map) > 0 {
@@ -167,6 +171,23 @@ main :: proc() {
 
     reset_rect_cache(&rect_cache)
     
+    reset_completion_hits()
+    delete(completion_hits)
+       
+    for key, server in active_language_servers {
+        for type in server.token_types {
+            delete(type)
+        }
+        
+        for mod in server.token_modifiers {
+            delete(mod)
+        }
+        
+        delete(server.completion_trigger_runes)
+        delete(server.token_types)
+        delete(server.token_modifiers)
+    }
+    
     for buffer in buffers {
         for &line in buffer.lines {
             delete(line.characters)
@@ -187,6 +208,7 @@ main :: proc() {
     delete(delimiter_runes)
     delete(search_ignored_dirs)
     delete(buffers)
+    
     delete(active_language_servers)
     
     for request in requests {
@@ -199,6 +221,10 @@ main :: proc() {
     
     delete(data_dir)
     delete(config_dir)
+    
+    for cleanup_proc in cleanup_procedures {
+        cleanup_proc()
+    }
 }
 
 cleanup :: proc() {
