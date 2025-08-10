@@ -137,7 +137,9 @@ max_h : rp.Coord
 
 @(private="package")
 add_missing_characters :: proc() {
-    clear(&atlas)
+    context = global_context
+    
+    clear(&atlas)    
 
     if len(missing_characters) < 1 {
         return
@@ -281,6 +283,8 @@ add_missing_characters :: proc() {
 }
 
 try_adding_character :: proc(missing_char: MissingCharacter) -> ^Character {
+    context = global_context
+
     index := known_non_existing_char_maps[missing_char.font_height]
     known_non_existing_chars := known_non_existing_char_maps_array[index]
 
@@ -312,6 +316,8 @@ try_adding_character :: proc(missing_char: MissingCharacter) -> ^Character {
 }
 
 find_char_in_faces :: proc(charcode: u64) -> (u32, ft.Face) {
+    context = global_context
+
     glyph_index : u32 = 0
     face : ft.Face
 
@@ -335,6 +341,8 @@ find_char_in_faces :: proc(charcode: u64) -> (u32, ft.Face) {
 }
 
 gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Character, error_msg: string) {
+    context = global_context
+
     glyph_index, face := find_char_in_faces(charcode)
 
     if glyph_index == 0 && charcode != 0 {
@@ -403,6 +411,8 @@ gen_glyph_bitmap :: proc(charcode: u64, font_size: f32) -> (character: ^Characte
 
 @(private="package")
 report_missing_character :: proc(char_code: u64, font_height: f32) {
+    context = global_context
+
     index := known_non_existing_char_maps[font_height]
    
     if font_height in known_non_existing_char_maps == false {
@@ -453,6 +463,8 @@ free_character_buffers :: proc() {
 
 @(private="package")
 clear_fonts :: proc() {
+    context = global_context
+    
     for size,index in character_maps {
         character_map := character_maps_array[index]
 
@@ -493,6 +505,8 @@ clear_fonts :: proc() {
 
 @(private="package")
 get_char :: proc(font_height: f32, char_code: u64) -> ^Character {
+    context = global_context
+
     index := character_maps[font_height]
 
     if font_height in character_maps == false {
@@ -521,6 +535,8 @@ get_char :: proc(font_height: f32, char_code: u64) -> ^Character {
 
 @(private="package")
 get_char_map :: proc(font_height: f32) -> ^CharacterMap {
+    context = global_context
+
     index := character_maps[font_height]
 
     if font_height in character_maps == false {
@@ -545,6 +561,8 @@ get_char_with_char_map :: proc(
     font_height: f32,
     char_code: u64,
 ) -> ^Character {
+    context = global_context
+
     character, ok := char_map^[char_code]
 
     if character == nil || ok == false {

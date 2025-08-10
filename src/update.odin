@@ -18,6 +18,8 @@ LSPRequest :: struct {
     id: string,
     response_proc: proc(response: json.Object, data: rawptr),
     data: rawptr,
+    version: int,
+    buffer: ^Buffer,
 }
 
 @(private="package")
@@ -99,10 +101,14 @@ message_loop :: proc(thread: ^thread.Thread) {
                 if request.id == id {
                     delete(request.id, global_context.allocator)
 
+                    defer unordered_remove(&requests, index)
+                    
+                    if request.buffer.version != request.version {
+                        break
+                    }
+                    
                     request.response_proc(obj, request.data)
                     
-                    unordered_remove(&requests, index)
-
                     break
                 }
             }
@@ -303,10 +309,19 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
                Idk how to do multi line tokens in a goodly way.
                So, we're doing this.
             */
-            clear(&buf_line.errors)
+            reset_buffer_errors(buf_line)
             append(&buf_line.errors, error)
         }
     }
+}
+
+reset_buffer_errors :: proc(buf_line: ^BufferLine) {
+    for err in buf_line.errors {
+        if err.source != "" do delete(err.source)
+        if err.message != "" do delete(err.message)
+    }
+    
+    clear(&buf_line.errors)
 }
 
 @(private="package")
@@ -315,12 +330,20 @@ send_lsp_message :: proc(
     id: string,
     response_proc: proc(response: json.Object, data: rawptr) = nil,
     data: rawptr = nil,
+    version: int,
+    buffer: ^Buffer,
 ) {
     if active_language_server == nil {
         return
     }
     
     if active_language_server.lsp_server_pid == 0 {
+        return
+    }
+    
+    if buffer.version != version {
+        fmt.println("Lagged! Won't spam.")
+        
         return
     }
     
@@ -331,11 +354,11 @@ send_lsp_message :: proc(
         return
     }
 
-    os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
-
     when ODIN_DEBUG {
-        fmt.println("LSP Message: Adding a message with ID", id)
+        fmt.println("LSP Message: Adding a message with ID", id, content)
     }
+    
+    os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
     
     // fmt.println(content)
     
@@ -347,6 +370,8 @@ send_lsp_message :: proc(
         data=data,
         id=strings.clone(id, global_context.allocator),
         response_proc=response_proc,
+        buffer=buffer,
+        version=version,
     })
 }
 

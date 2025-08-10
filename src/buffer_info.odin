@@ -16,7 +16,6 @@ suppress := true
 
 padding :: 20
 
-sb := strings.builder_make()
 sb_string : string
 
 @(private="package")
@@ -111,6 +110,10 @@ draw_buffer_info_view :: proc() {
     
         pen.y += small_text + padding
     }
+    
+    sb := strings.builder_make()
+    
+    defer strings.builder_destroy(&sb)
     
     // Draw File Size
     {        

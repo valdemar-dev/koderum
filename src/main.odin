@@ -113,7 +113,6 @@ main :: proc() {
 
         if do_print_frame_time do fmt.println(frame_time)
         
-
         last_time = current_time
 
         process_input()
@@ -192,9 +191,7 @@ main :: proc() {
     
     for buffer in buffers {
         for &line in buffer.lines {
-            delete(line.characters)
-            delete(line.ts_tokens)
-            delete(line.lsp_tokens)
+            clean_line(&line)
         }
 
         delete(buffer.content)
@@ -224,9 +221,20 @@ main :: proc() {
     delete(data_dir)
     delete(config_dir)
     
+    {
+        for alert in alert_queue {
+            delete(alert.title, alert.allocator)
+            delete(alert.content, alert.allocator)
+    
+            free(alert)
+        }
+        clear(&alert_queue)
+    }
+    
     for cleanup_proc in cleanup_procedures {
         cleanup_proc()
     }
+    
 }
 
 cleanup :: proc() {

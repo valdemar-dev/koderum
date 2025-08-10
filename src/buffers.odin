@@ -161,8 +161,6 @@ active_buffer : ^Buffer
 @(private="package")
 do_refresh_buffer_tokens := false
 
-sb := strings.builder_make()
-
 SearchHit :: struct{
     line: int,
     start_char: int,
@@ -706,6 +704,10 @@ draw_text_buffer :: proc() {
     descender := f32(primary_font.size.metrics.descender >> 6)
     
     line_height := (ascender - descender)
+    
+    sb := strings.builder_make()
+    
+    defer strings.builder_destroy(&sb)
 
     strings.builder_reset(&sb)
     strings.write_int(&sb, len(buffer_lines))
@@ -1092,7 +1094,7 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     msg := did_close_message(file_uri)
     defer delete(msg)
     
-    send_lsp_message(msg, "", nil, nil)
+    send_lsp_message(msg, "", nil, nil, buffer.version, buffer)
     
     buffer_index := get_buffer_index(buffer)
     
@@ -1150,7 +1152,7 @@ save_buffer :: proc() {
         }, context.temp_allocator),
     )
     
-    send_lsp_message(msg, "", nil, nil)
+    send_lsp_message(msg, "", nil, nil,  active_buffer.version, active_buffer)
 
     active_buffer^.is_saved = true
 }
@@ -1234,6 +1236,7 @@ remove_char :: proc() {
 
             prev_line^.characters = new_bytes
 
+            clean_line(&active_buffer.lines[buffer_cursor_line])
             ordered_remove(active_buffer.lines, buffer_cursor_line)
         }
 
@@ -2991,10 +2994,23 @@ insert_completion :: proc() {
     get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
 }
 
-builder := strings.builder_make()
+@(private="package")
+clean_line :: proc(line: ^BufferLine) {
+    delete(line.characters)
+    delete(line.ts_tokens)
+    delete(line.lsp_tokens)
+    
+    reset_buffer_errors(line)
+    
+    delete(line.errors)
+}
 
 @(private="package")
 escape_json :: proc(text: string) -> string {
+    builder := strings.builder_make()
+    
+    defer strings.builder_destroy(&builder)
+
     strings.builder_reset(&builder)
 
     for c in text {

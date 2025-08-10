@@ -156,6 +156,7 @@ error_alert : ^Alert
 @(private="package")
 get_info_under_cursor :: proc() {
     context = global_context 
+    
     if active_buffer == nil {
         return
     } 
@@ -196,16 +197,14 @@ get_info_under_cursor :: proc() {
 
     switch highlighted_error.severity {
     case 1:
-        error_alert^.title = strings.clone("Error:")
+        edit_alert(error_alert, ("Error:"), (highlighted_error.message))
     case 2:
-        error_alert^.title = strings.clone("Warning:")
+        edit_alert(error_alert, ("Warning:"), (highlighted_error.message))
     case 3:
-        error_alert^.title = strings.clone("Info:")
+        edit_alert(error_alert, ("Info:"), (highlighted_error.message))
     case 4:
-        error_alert^.title = strings.clone("Hint:")
+        edit_alert(error_alert, ("Hint:"), (highlighted_error.message))
     }
-
-    error_alert^.content = strings.clone(highlighted_error.message)
 }
 
 

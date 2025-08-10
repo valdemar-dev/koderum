@@ -1162,7 +1162,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 
     id := "1"
 
-    send_lsp_message(msg, id, set_capabilities, rawptr(server))
+    send_lsp_message(msg, id, set_capabilities, rawptr(server), active_buffer.version, active_buffer)
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
         result_obj, _ := response["result"].(json.Object)
@@ -1243,7 +1243,7 @@ lsp_handle_file_open :: proc() {
 
     defer delete(msg)
 
-    send_lsp_message(msg, "") 
+    send_lsp_message(msg, "", nil, nil, active_buffer.version, active_buffer) 
     
     sync.lock(&tree_mutex)
 
@@ -1379,6 +1379,7 @@ set_buffer_tokens_threaded :: proc() {
         req_id_string,
         handle_response,
         rawptr(start_version),
+        active_buffer.version, active_buffer
     )
 
     sync.lock(&tree_mutex)
@@ -1451,6 +1452,8 @@ notify_server_of_change :: proc(
     undo_stack_override : ^[dynamic]BufferChange = nil,
     redo_stack_override : ^[dynamic]BufferChange = nil,
 ) {
+    buffer^.version += 1
+    
     constrain_scroll_to_cursor()
     
     new_end_byte := start_byte + len(new_text)
@@ -1508,8 +1511,6 @@ notify_server_of_change :: proc(
         
         return
     }
-    
-    buffer^.version += 1
     
     escaped := escape_json(string(new_text))
     defer delete(escaped)
@@ -1634,28 +1635,55 @@ attempt_resolve_request :: proc(idx: int) {
     defer delete(msg)
     defer delete(id)
 
+    Data :: struct {
+        hit_ptr: ^CompletionHit,
+        version: int,
+    }
+    
+    data := Data{
+        hit,
+        active_buffer.version,
+    }
+    
     send_lsp_message(
         msg,
         id,
         handle_response,
-        hit,
+        &data,
+        active_buffer.version, active_buffer
     )
 
-    handle_response :: proc(response: json.Object, data: rawptr) { 
+    handle_response :: proc(response: json.Object, data_ptr: rawptr) { 
         context = global_context
         
-        hit_ptr := cast(^CompletionHit)data
+        data := cast(^Data)data_ptr
+        
+        version := data.version
+        
+        if active_buffer.version != version {
+            return
+        }
+        
+        hit_ptr := data.hit_ptr
 
         if hit_ptr == nil {
             return
         }
 
         result,_ := response["result"].(json.Object)
-        data,_ := result["data"].(json.Object)
-
-        detail,_ := result["detail"].(string)
-
-        hit_ptr^.detail = strings.clone(detail)
+        detail,detail_ok := result["detail"].(string)
+        
+        sync.lock(&completion_mutex)
+        
+        if detail_ok {
+            if (hit_ptr^.detail != "") {
+                delete(hit_ptr^.detail)
+            }
+            
+            hit_ptr^.detail = strings.clone(detail)
+        }
+        
+        sync.unlock(&completion_mutex)
     }
 }
 
@@ -1698,6 +1726,7 @@ get_autocomplete_hits :: proc(
         req_id_string,
         handle_response,
         nil,
+        active_buffer.version, active_buffer
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
@@ -1726,9 +1755,8 @@ get_autocomplete_hits :: proc(
             }
         }
         
-        reset_completion_hits()
         
-        sync.lock(&completion_mutex)
+        new_hits := make([dynamic]CompletionHit)
         
         completion_filter_token = line_string[last_delimiter_byte:byte_offset]
         for item in items {
@@ -1748,10 +1776,13 @@ get_autocomplete_hits :: proc(
                     continue
                 }
             }
-                        
+            
             hit = CompletionHit{
-                label = strings.clone(label, global_context.allocator),
                 raw_data = strings.clone(string(buf), global_context.allocator),
+            }
+            
+            if label_ok {
+                hit.label = strings.clone(label, global_context.allocator)
             }
 
             if documentation_ok {
@@ -1760,19 +1791,28 @@ get_autocomplete_hits :: proc(
             
             
             if label == completion_filter_token && len(completion_filter_token) > 0 {
-                inject_at(&completion_hits, 0, hit)
+                inject_at(&new_hits, 0, hit)
 
                 continue
             }
 
-            append(&completion_hits, hit)
+            append(&new_hits, hit)
         }
+        
+        sync.lock(&completion_mutex)
+        
+        reset_completion_hits()
+        
+        delete(completion_hits)
+        
+        completion_hits = new_hits
+        
+        sync.unlock(&completion_mutex)
+
 
         if len(completion_hits) > 0 {
             attempt_resolve_request(selected_completion_hit)
         }
-
-        sync.unlock(&completion_mutex)
     }
 }
 
@@ -1780,11 +1820,11 @@ reset_completion_hits :: proc() {
     context = global_context
     
     for &hit in completion_hits {
-        delete_string(hit.documentation)
-        delete_string(hit.insertText)
-        delete_string(hit.label)
-        delete_string(hit.raw_data)
-        delete_string(hit.detail)
+        if hit.documentation != "" do delete_string(hit.documentation)
+        if hit.insertText != "" do delete_string(hit.insertText)
+        if hit.label != "" do delete_string(hit.label)
+        if hit.raw_data != "" do delete_string(hit.raw_data)
+        if hit.detail != "" do delete_string(hit.detail)
     }
     
     clear(&completion_hits)
@@ -1815,6 +1855,7 @@ go_to_definition :: proc() {
         id,
         handle_response,
         nil,
+        active_buffer.version, active_buffer,
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
