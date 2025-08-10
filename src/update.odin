@@ -95,10 +95,6 @@ message_loop :: proc(thread: ^thread.Thread) {
         if id_value != nil {
             id, ok := id_value^.(string)
 
-            when ODIN_DEBUG {
-                fmt.println("LSP Message Loop: Processing Request Response with ID", id)
-            }
-
             for &request,index in requests {
                 if request.id == id {
                     delete(request.id, global_context.allocator)
@@ -114,12 +110,19 @@ message_loop :: proc(thread: ^thread.Thread) {
             continue
         } 
 
-        when ODIN_DEBUG {
-            fmt.println("Received Notification: ",parsed)
-        }
-
         process_lsp_notification(obj)
     }
+}
+
+@(private="package")
+clear_lsp_requests :: proc() {
+    for &request,index in requests {
+        delete(request.id, global_context.allocator)
+
+        unordered_remove(&requests, index)
+    }
+    
+    clear(&requests)
 }
 
 process_lsp_notification :: proc (parsed: json.Object) {

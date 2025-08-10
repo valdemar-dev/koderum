@@ -1298,13 +1298,6 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
         color := &active_language_server.language.lsp_colors[type^]
 
         if color == nil {
-            when ODIN_DEBUG {
-                fmt.println(
-                    "Warning: Missing LSP-Token Colour for Node Type",
-                    type^, 
-                )
-            }
-
             continue
         }
 
@@ -1784,8 +1777,6 @@ get_autocomplete_hits :: proc(
 }
 
 reset_completion_hits :: proc() {
-    sync.lock(&completion_mutex)
-        
     context = global_context
     
     for &hit in completion_hits {
@@ -1797,8 +1788,6 @@ reset_completion_hits :: proc() {
     }
     
     clear(&completion_hits)
-    
-    sync.unlock(&completion_mutex)
 }
 
 go_to_definition :: proc() {
@@ -2142,6 +2131,8 @@ restart_lsp :: proc() {
     if active_language_server == nil {
         return
     }
+    
+    clear_lsp_requests()
     
     create_alert(
         "Reload!",
