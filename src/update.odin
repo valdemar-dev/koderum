@@ -132,6 +132,8 @@ clear_lsp_requests :: proc() {
 }
 
 process_lsp_notification :: proc (parsed: json.Object) {
+    context = global_context
+    
     method, ok := parsed["method"].(json.String)
 
     if !ok {
@@ -146,6 +148,7 @@ process_lsp_notification :: proc (parsed: json.Object) {
 
         url := uri[7:]
         decoded, decoded_ok := net.percent_decode(url)
+        defer delete(decoded)
 
         buffer := get_buffer_by_name(decoded)
         
