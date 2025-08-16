@@ -189,6 +189,18 @@ main :: proc() {
         delete(server.token_modifiers)
     }
     
+    for notification in notification_queue {
+        delete(notification.title)
+        delete(notification.content)
+        delete(notification.copy_text)
+        
+        free(notification)
+    }
+    
+    delete(notification_queue)
+    
+    
+    
     for buffer in buffers {
         for &line in buffer.lines {
             clean_line(&line)
@@ -208,6 +220,8 @@ main :: proc() {
     delete(search_ignored_dirs)
     delete(buffers)
     
+    delete(program_dir)
+    
     delete(active_language_servers)
     
     for request in requests {
@@ -226,7 +240,7 @@ main :: proc() {
             delete(alert.title, alert.allocator)
             delete(alert.content, alert.allocator)
     
-            free(alert)
+            free(alert, alert.allocator)
         }
         clear(&alert_queue)
     }

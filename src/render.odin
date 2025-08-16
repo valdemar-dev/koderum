@@ -667,6 +667,17 @@ add_code_text :: proc(
         if font_height in char_uv_maps == false {
             continue
         }
+        
+        if pen.x + character.advance.x > fb_size.x {
+            break
+        }
+        
+        if pen.y < 0 {
+            pen.x += character.advance.x
+            pen.y += character.advance.y
+        
+            continue
+        }
 
         index := char_uv_maps[font_height]
         char_uv_map := char_uv_maps_array[index]

@@ -187,12 +187,7 @@ get_info_under_cursor :: proc() {
     }
 
     if error_alert == nil {
-        error_alert = new(Alert)
-
-        error_alert^.show_seconds = -1
-        error_alert^.allocator = context.allocator
-
-        append(&alert_queue, error_alert)
+        error_alert = create_alert("", "", -1, context.allocator)
     }
 
     switch highlighted_error.severity {

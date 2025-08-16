@@ -152,6 +152,7 @@ handle_browser_input :: proc() {
             attempting_rename = false
 
             dir := fp.dir(search_term)
+            defer delete(dir)
 
             delete_key(&cached_dirs, dir)
 
@@ -338,7 +339,7 @@ set_found_files :: proc() {
 
     glob := fp.base(search_term)
 
-    if strings.ends_with(search_term, "/") /*os.is_dir(search_term)*/ {
+    if strings.ends_with(search_term, "/") {
         glob = "."
 
         search_dir = strings.clone(search_term)
@@ -369,7 +370,7 @@ set_found_files :: proc() {
         
         for hit in hits {
             if strings.contains(hit.name, glob) || glob == "" {
-                if hit.fullpath == search_term /*hit.name == glob*/ {
+                if hit.fullpath == search_term {
                     inject_at(&found_files, 0, hit.fullpath)
                 } else {
                     append_elem(&found_files, hit.fullpath)
@@ -398,13 +399,6 @@ set_found_files :: proc() {
             break
         }
     }
-}
-
-initial_dir :: proc() -> string {
-    if os.is_dir(search_term) {
-        return strings.clone(search_term)
-    }
-    return fp.dir(search_term)
 }
 
 @(private="package")

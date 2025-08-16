@@ -412,11 +412,11 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
     
     if ctrl && key >= glfw.KEY_A && key <= glfw.KEY_Z {
     	builder := strings.builder_make()
-    	strings.write_rune(&builder, rune(u64(key - glfw.KEY_A + 1)))
-    
         defer strings.builder_destroy(&builder)
         
-        ch: string = strings.to_string(builder)
+    	strings.write_rune(&builder, rune(u64(key - glfw.KEY_A + 1)))
+        
+        ch := strings.to_string(builder)
         
         return strings.clone(ch), true
     }
@@ -484,11 +484,10 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
 
     // Alt + printable key → ESC + char
     if alt && key >= glfw.KEY_SPACE && key <= glfw.KEY_Z {
-    
     	builder := strings.builder_make()
-    	strings.write_rune(&builder, rune(key))
-    
         defer strings.builder_destroy(&builder)
+        
+    	strings.write_rune(&builder, rune(key))
         
         ch: string = strings.to_string(builder)
         
@@ -497,7 +496,6 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
         } else {
             ch = strings.to_lower(ch)
         }
-        
         
         return strings.concatenate({ "\x1B", ch }), true
     }

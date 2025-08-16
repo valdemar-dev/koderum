@@ -340,6 +340,11 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
     } else {
         remove_range(&last_line.characters, 0, b_char_byte)
         inject_at(&last_line.characters, 0, ..first_line.characters[:a_char_byte])
+        
+        for line_idx in a_line..<b_line {
+            line := &buffer.lines[line_idx]
+            clean_line(line)
+        }
 
         remove_range(active_buffer.lines, a_line, b_line)
     }
@@ -1086,21 +1091,32 @@ open_file :: proc(file_name: string) {
 }
 
 close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
+    context = global_context
+    
     file_uri := strings.concatenate({
         "file://",
         buffer.file_name,
     }, context.temp_allocator)
     
-    msg := did_close_message(file_uri)
-    defer delete(msg)
-    
-    send_lsp_message(msg, "", nil, nil, buffer.version, buffer)
+    if active_language_server != nil {
+        msg := text_document_did_close_message(
+            file_uri,
+        )
+        
+        defer delete(msg)
+        
+        send_lsp_message(msg, "", nil, nil,  active_buffer.version, active_buffer)
+    }
     
     buffer_index := get_buffer_index(buffer)
     
     cached_buffer_index = -1
     cached_buffer_cursor_char_index = -1
     cached_buffer_cursor_line = -1
+    
+    for &line in buffer.lines {
+        clean_line(&line)
+    }
     
     ordered_remove(&buffers, buffer_index)
     
@@ -2061,6 +2077,12 @@ remove_selection :: proc(
         remove_range(&last_line.characters, 0, b_char_byte)
         inject_at(&last_line.characters, 0, ..first_line.characters[:a_char_byte])
 
+        for i in a_line..<b_line {
+            line := &active_buffer.lines[i]
+            
+            clean_line(line)
+        }
+
         remove_range(active_buffer.lines, a_line, b_line)
     }
 
@@ -2088,6 +2110,7 @@ delete_line :: proc(line: int) {
         {},
     )
 
+    clean_line(&active_buffer.lines[line])
     ordered_remove(active_buffer.lines, line)
  
     if len(active_buffer.lines) == 0 {
@@ -2332,7 +2355,11 @@ reload_buffer :: proc(buffer: ^Buffer) {
         old_line_count, old_last_line_char_count,
         
         data,
-    )
+    ) 
+    
+    for &line in buffer.lines {
+        clean_line(&line)
+    }
     
     buffer^ = new_buffer^
     lsp_handle_file_open()
@@ -2996,12 +3023,13 @@ insert_completion :: proc() {
 
 @(private="package")
 clean_line :: proc(line: ^BufferLine) {
+    context = global_context
+    
     delete(line.characters)
     delete(line.ts_tokens)
     delete(line.lsp_tokens)
     
-    reset_buffer_errors(line)
-    
+    reset_buffer_errors(line)    
     delete(line.errors)
 }
 

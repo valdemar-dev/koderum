@@ -635,10 +635,10 @@ set_active_language_server :: proc(ext: string) {
     }
     
     exe_path, _ := os2.get_executable_path(context.allocator)
+    defer delete(exe_path)
     
     exe_dir := fp.dir(exe_path)
     defer delete(exe_dir)
-    defer delete(exe_path)
     
     languages_path := strings.concatenate({
         exe_dir,
@@ -710,10 +710,12 @@ get_project_root :: proc(
     }
     
 	root := fp.dir(file_path)
+    defer delete(root)
 
 	for {
 		for target in target_files {
             marker_path := fp.join({root, target})
+            defer delete(marker_path)
             
             if os.exists(marker_path) {
                 return strings.concatenate({root, "/"}), true
@@ -725,6 +727,7 @@ get_project_root :: proc(
             break
 		}
 
+        delete(root)        
 		root = parent
 	}
 
@@ -1094,6 +1097,8 @@ init_language_server :: proc(ext: string) {
 }
 
 init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
+    context = global_context
+
     language := &languages[ext]
 
     if len(language.lsp_command) == 0 do return
@@ -1127,12 +1132,12 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
         notification := new(Notification)
 
         notification^ = Notification{
-            title="Server Missing",
+            title=strings.clone("Server Missing"),
             content=strings.concatenate({
                 "Please install the LSP Server for ",
                 language.parser_name, ".",
             }),
-            copy_text=language.lsp_install_command,
+            copy_text=strings.clone(language.lsp_install_command),
         }
 
         append(&notification_queue, notification)
@@ -1153,6 +1158,10 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
     
     directory, ok := get_project_root(active_buffer.file_name, language.project_root_markers)
     
+    defer if ok {
+        delete(directory)
+    }
+    
     if !ok {
         directory = cwd
     }
@@ -1165,6 +1174,8 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
     send_lsp_message(msg, id, set_capabilities, rawptr(server), active_buffer.version, active_buffer)
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
+        context = global_context
+        
         result_obj, _ := response["result"].(json.Object)
 
         when ODIN_DEBUG {
@@ -1975,6 +1986,8 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
     if tree_ptr == nil {
         return
     }
+    
+    buffer := active_buffer
 
     tree := tree_ptr^
 
@@ -2040,11 +2053,11 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
         end_row := int(end_point.row)
 
         for row in start_row..=end_row {
-            if row >= len(active_buffer.lines) {
+            if row >= len(buffer.lines) {
                 break
             }
 
-            line := &active_buffer.lines[row]
+            line := &buffer.lines[row]
 
             if row > line_number {
                 line_number = row

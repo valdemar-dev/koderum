@@ -371,6 +371,8 @@ draw_notification :: proc() {
 
 @(private="package")
 tick_notifications :: proc() {
+    context = global_context
+    
     if len(notification_queue) == 0 {
         suppress = true
 
@@ -404,6 +406,11 @@ tick_notifications :: proc() {
 
         if int(x_pos) >= int(fb_size.x - 1) {
             suppress = true
+            
+            delete(notification.title)
+            delete(notification.content)
+            delete(notification.copy_text)
+            
             free(notification)
             ordered_remove(&notification_queue, 0)
         }
@@ -450,6 +457,7 @@ create_alert :: proc(
     alert := new(Alert, allocator)
 
     alert^ = Alert{
+        allocator = allocator,
         content = strings.clone(content, allocator),
         title = strings.clone(title, allocator),
 
@@ -471,6 +479,6 @@ edit_alert :: proc(
     delete(alert.title, alert.allocator)
     delete(alert.content, alert.allocator)
 
-    alert^.title = strings.clone(title)
-    alert^.content = strings.clone(content)
+    alert^.title = strings.clone(title, alert.allocator)
+    alert^.content = strings.clone(content, alert.allocator)
 }

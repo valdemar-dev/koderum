@@ -37,7 +37,7 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
         "    }\n",
         "  }\n",
         "}\n",
-    })
+    }, context.temp_allocator)
 
     buf = make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -51,6 +51,33 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
     delete(buf)
     return header
 }
+
+text_document_did_close_message :: proc(doc_uri: string) -> string {
+    json := strings.concatenate({
+        "{\n",
+        "  \"jsonrpc\": \"2.0\",\n",
+        "  \"method\": \"textDocument/didClose\",\n",
+        "  \"params\": {\n",
+        "    \"textDocument\": {\n",
+        "      \"uri\": \"", doc_uri, "\"\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    }, context.temp_allocator)
+
+    buf := make([dynamic]u8, 32)
+    length := strconv.itoa(buf[:], len(json))
+
+    header := strings.concatenate({
+        "Content-Length: ", length, "\r\n",
+        "\r\n",
+        json,
+    })
+
+    delete(buf)
+    return header
+}
+
 
 text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
     buf := make([dynamic]u8, 32)
@@ -219,39 +246,6 @@ text_document_document_symbol_message :: proc(doc_uri: string, id: int) -> strin
     delete(buf)
     return header
 }
-
-/*
-initialize_message :: proc(pid: int, project_dir: string) -> string {
-    buf := make([dynamic]u8, 32)
-    str_pid := strconv.itoa(buf[:], pid)
-
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"id\": \"1\",\n",
-        "  \"method\": \"initialize\",\n",
-        "  \"params\": {\n",
-        "    \"processId\": ", str_pid, ",\n",
-        "    \"rootUri\": \"file://", project_dir, "\",\n",
-        "    \"capabilities\": {}\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    len_buf := make([dynamic]u8, 32)
-
-    length := (strconv.itoa(len_buf[:], len(json)))
-
-    defer delete(buf)
-    defer delete(len_buf)
-
-    return strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-}
-*/
 
 initialize_message :: proc(pid: int, project_dir: string) -> string {
     buf := make([dynamic]u8, 32)

@@ -4,6 +4,7 @@ high priority todo:
 todo:
     - add variable font weights
     - add is saved state to ui
+    - add grep -Rn with "go to file and line" support
     
 bugs:
     - sometimes hangs in termianl when switching to terminal (2?). appears at first glance to happen randomly

@@ -163,6 +163,8 @@ process_lsp_notification :: proc (parsed: json.Object) {
 }
 
 set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
+    context = global_context
+    
     sort_proc :: proc(error_a, error_b: json.Value) -> int {
         error_obj, ok := error_a.(json.Object)
 
@@ -317,8 +319,8 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
 reset_buffer_errors :: proc(buf_line: ^BufferLine) {
     for err in buf_line.errors {
-        if err.source != "" do delete(err.source)
-        if err.message != "" do delete(err.message)
+        delete(err.source)
+        delete(err.message)
     }
     
     clear(&buf_line.errors)
