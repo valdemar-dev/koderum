@@ -52,33 +52,6 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
     return header
 }
 
-text_document_did_close_message :: proc(doc_uri: string) -> string {
-    json := strings.concatenate({
-        "{\n",
-        "  \"jsonrpc\": \"2.0\",\n",
-        "  \"method\": \"textDocument/didClose\",\n",
-        "  \"params\": {\n",
-        "    \"textDocument\": {\n",
-        "      \"uri\": \"", doc_uri, "\"\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    }, context.temp_allocator)
-
-    buf := make([dynamic]u8, 32)
-    length := strconv.itoa(buf[:], len(json))
-
-    header := strings.concatenate({
-        "Content-Length: ", length, "\r\n",
-        "\r\n",
-        json,
-    })
-
-    delete(buf)
-    return header
-}
-
-
 text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
     buf := make([dynamic]u8, 32)
 
@@ -311,31 +284,31 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
         json,
     })
 }
-
-did_close_message :: proc(uri: string) -> string {
+text_document_did_close_message :: proc(doc_uri: string) -> string {
     json := strings.concatenate({
         "{\n",
         "  \"jsonrpc\": \"2.0\",\n",
         "  \"method\": \"textDocument/didClose\",\n",
         "  \"params\": {\n",
         "    \"textDocument\": {\n",
-        "      \"uri\": \"", uri, "\"\n",
+        "      \"uri\": \"", doc_uri, "\"\n",
         "    }\n",
         "  }\n",
         "}\n",
     }, context.temp_allocator)
 
     buf := make([dynamic]u8, 32)
-    defer delete(buf)
     length := strconv.itoa(buf[:], len(json))
 
-    return strings.concatenate({
+    header := strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
     })
-}
 
+    delete(buf)
+    return header
+}
 
 completion_request_message :: proc(
     id: int,

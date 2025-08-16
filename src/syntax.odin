@@ -624,14 +624,18 @@ init_parser :: proc(language: ^Language) {
 set_active_language_server :: proc(ext: string) {
     active_language_server = nil
     
+    defer {
+        init_message_thread()
+    }
+    
     if ext in active_language_servers {
         active_language_server = active_language_servers[ext]
         
+        when ODIN_DEBUG {
+            fmt.println("Reusing existing language server.")
+        }
+        
         return   
-    }
-
-    defer {
-        init_message_thread()
     }
     
     exe_path, _ := os2.get_executable_path(context.allocator)
@@ -1560,8 +1564,8 @@ compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int 
 }
 
 read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]u8, os2.Error) {
+    context = global_context
     header_buf: [dynamic]u8
-    header_buf.allocator = allocator
     
     defer delete(header_buf)
 
@@ -1602,11 +1606,10 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
     }
 
     if content_len == 0 {
-        return nil, os2.ERROR_NONE // malformed
+        return nil, os2.ERROR_NONE
     }
 
     body_buf: [dynamic]u8
-    body_buf.allocator = allocator
     left := content_len
 
     for left > 0 {

@@ -56,23 +56,29 @@ message_loop :: proc(thread: ^thread.Thread) {
         }
 
         if active_language_server == nil {
+            fmt.println("server is nil")
             return
         }
         
         if active_language_server.lsp_server_pid == 0 {
+            fmt.println("server has a pid of 0")
             return
         }
 
         last_time = current_time
+        
+        fmt.println("Reading from LSP")
 
         bytes, read_err := read_lsp_message(
             active_language_server.lsp_stdout_r,
             context.allocator,
         )
+        fmt.println("Read from LSP")
 
         defer delete(bytes)
 
         if read_err == os.ERROR_EOF {
+            fmt.println("ran into end of file?")
             return
         }
         

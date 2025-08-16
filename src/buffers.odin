@@ -1013,7 +1013,7 @@ open_file :: proc(file_name: string) {
             existing_file.cursor_char_index,
         )
         
-        lsp_handle_file_open()
+        thread.run(lsp_handle_file_open)
 
         return
     }
@@ -1099,8 +1099,15 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     }, context.temp_allocator)
     
     if active_language_server != nil {
+        encoded := encode_uri_component(active_buffer.file_name)
+        defer delete(encoded)
+    
+        uri := strings.concatenate(
+            {"file://", encoded}, context.temp_allocator,
+        )
+        
         msg := text_document_did_close_message(
-            file_uri,
+            uri,
         )
         
         defer delete(msg)
@@ -1113,6 +1120,10 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     cached_buffer_index = -1
     cached_buffer_cursor_char_index = -1
     cached_buffer_cursor_line = -1
+    
+    delete(buffer.content)
+    delete(buffer.redo_stack)
+    delete(buffer.undo_stack)
     
     for &line in buffer.lines {
         clean_line(&line)
