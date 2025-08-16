@@ -11,6 +11,7 @@ import "core:io"
 import "core:encoding/json"
 import "core:sort"
 import ts "../../odin-tree-sitter"
+import ft "../../alt-odin-freetype"
 import "core:time"
 import "core:thread"
 import "core:dynlib"
@@ -635,7 +636,7 @@ set_active_language_server :: proc(ext: string) {
             fmt.println("Reusing existing language server.")
         }
         
-        return   
+        return
     }
     
     exe_path, _ := os2.get_executable_path(context.allocator)
@@ -1921,11 +1922,8 @@ go_to_definition :: proc() {
 
         handle_file_open :: proc(data: PolyData) {
             open_file(data.name)
-
-            set_buffer_cursor_pos(
-                int(data.line),
-                int(data.char),
-            )
+            
+            go_to_line(int(data.line), int(data.char))
         }
 
         thread.run_with_poly_data(data, handle_file_open) 

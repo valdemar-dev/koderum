@@ -485,7 +485,23 @@ find_search_hits :: proc() {
     }
 
     if len(search_hits) > 0 {
-        set_hit_index(0)
+        best_index := 0
+        best_dist  := cast(int)((1 << u64(int(size_of(int)) * 8 - 1)) - 1)
+
+        for hit,idx in search_hits {
+            line_delta := hit.line - buffer_cursor_line
+            char_delta := hit.start_char - buffer_cursor_char_index
+
+            // weight line distance higher than char distance
+            dist := abs(line_delta) * 10_000 + abs(char_delta)
+
+            if dist < best_dist {
+                best_dist  = dist
+                best_index = idx
+            }
+        }
+        
+        set_hit_index(best_index)
     } else {
         create_alert(
             "Not Found!",
@@ -516,13 +532,25 @@ set_hit_index :: proc(index: int) {
 
     selected_hit = &search_hits[idx]
 
-    set_buffer_cursor_pos(
+    go_to_line(
         selected_hit.line,
         selected_hit.start_char,
     )
 
     hit_index = idx
 }
+
+get_new_hit_index :: proc(selected: ^SearchHit) -> int {
+    for hit, i in search_hits {
+        if hit.line == selected.line &&
+           hit.start_char == selected.start_char &&
+           hit.end_char == selected.end_char {
+            return i
+        }
+    }
+    return 0
+}
+
 
 @(private="package")
 draw_buffers :: proc() {
@@ -2471,6 +2499,7 @@ handle_buffer_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_N) {
         set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
         
+        cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
         cached_buffer_cursor_char_index = buffer_cursor_char_index
         
@@ -2753,8 +2782,6 @@ append_to_go_to_line_input_string :: proc(key: rune) {
 @(private="package")
 handle_search_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) {
-        buffer_search_term = ""
-
         selected_hit = nil
 
         clear(&search_hits)
@@ -2765,6 +2792,14 @@ handle_search_input :: proc() {
     }
 
     if is_key_pressed(glfw.KEY_BACKSPACE) {
+        key := key_store[glfw.KEY_BACKSPACE]
+        
+        if key.modifiers == CTRL {
+            buffer_search_term = ""
+            
+            return
+        }
+        
         runes := utf8.string_to_runes(buffer_search_term)
 
         end_idx := len(runes)-1        
@@ -2780,7 +2815,7 @@ handle_search_input :: proc() {
         selected_hit = nil
 
         find_search_hits()
-
+        
         return
     }
     
@@ -3076,3 +3111,21 @@ escape_json :: proc(text: string) -> string {
     return strings.clone(strings.to_string(builder))
 }
 
+@(private="package")
+go_to_line :: proc(line, char: int) {
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_base_px * buffer_text_scale))
+    if error != .Ok do return
+
+    asc := primary_font.size.metrics.ascender >> 6
+    desc := primary_font.size.metrics.descender >> 6
+    
+    line_height := asc - desc
+
+    set_buffer_cursor_pos(
+        line,
+        char,
+    )
+    
+    scroll_target_y = f32(int(line_height) * line) - (fb_size.y / 2)
+    
+}

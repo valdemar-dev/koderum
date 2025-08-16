@@ -286,7 +286,7 @@ draw_ui :: proc() {
     if input_mode == .SEARCH {
         ui_z_index : f32 = ui_z_index + 10
         
-        title := "Type to Search"
+        title := "Type to Search - (Clear: Ctrl + Backspace)"
         
         term_size := measure_text(small_text, buffer_search_term)
         title_size := measure_text(small_text, title)
