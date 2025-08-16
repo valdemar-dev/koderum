@@ -359,38 +359,80 @@ draw_ui :: proc() {
                 ui_z_index + 4,
             )       
         }
-    } else if input_mode == .GO_TO_LINE {
-        term := go_to_line_input_string == "" ? "Type a line number." : go_to_line_input_string
+    } else if input_mode == .GO_TO_LINE {        
+        title := "Enter Line Number"
+        
+        term_size := measure_text(small_text, go_to_line_input_string)
+        title_size := measure_text(small_text, title)
 
-        size := measure_text(normal_text, term)
+        padding := small_text
+                
+        width := max(term_size.x, title_size.x)
+        height := term_size.y + title_size.y + padding
+        
+        middle := fb_size.x / 2 - width / 2
+        
+        y_pos := fb_size.y - (small_text * 3) - (height + padding * 2)
+        
+        // Draw Background
+        {
+            bg_rect := rect{
+                middle - (padding),
+                y_pos,
+                width + padding * 2,
+                height + padding * 2,
+            }
+            
+            line_thickness := math.round_f32(font_base_px * line_thickness_em)
+            
+            padding_rect := rect{
+                bg_rect.x - line_thickness,
+                bg_rect.y - line_thickness,
+                bg_rect.width + line_thickness * 2,
+                bg_rect.height + line_thickness * 2,
+            }
 
-        middle := fb_size.x / 2 - size.x / 2
+            add_rect(&rect_cache,
+                bg_rect,
+                no_texture,
+                BG_MAIN_10,
+                vec2{},
+                ui_z_index + 3,
+            )
+            
+            add_rect(&rect_cache,
+                padding_rect,
+                no_texture,
+                BG_MAIN_30,
+                vec2{},
+                ui_z_index + 2,
+            )
+        }
+        
+        // Add Content
+        {
+            add_text(&text_rect_cache,
+                vec2{
+                    middle,
+                    y_pos + padding,
+                },
+                TEXT_MAIN,
+                small_text,
+                title,
+                ui_z_index + 4,
+            )
 
-        padding :: 10
-
-        add_rect(&rect_cache,
-            rect{
-                middle - (padding * 1.5),
-                fb_size.y - padding - 20 - size.y,
-                size.x + padding * 3,
-                size.y + padding * 2,
-            },
-            no_texture,
-            BG_MAIN_20,
-            vec2{},
-            ui_z_index + 3,
-        )
-
-        add_text(&text_rect_cache,
-            vec2{
-                middle,
-                fb_size.y - 20 - size.y,
-            },
-            TEXT_MAIN,
-            normal_text,
-            term,
-            ui_z_index + 4,
-        )
+            add_text(&text_rect_cache,
+                vec2{
+                    middle,
+                    y_pos + padding * 2 + title_size.y,
+                },
+                TEXT_DARKER,
+                small_text,
+                go_to_line_input_string,
+                ui_z_index + 4,
+            )       
+        }
     }
     
     // Draw Bottom Status Bar

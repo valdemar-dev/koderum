@@ -2801,14 +2801,17 @@ handle_search_input :: proc() {
         }
         
         runes := utf8.string_to_runes(buffer_search_term)
-
-        end_idx := len(runes)-1        
+        defer delete(runes)
+        
+        end_idx := len(runes)-1
+        
+        if end_idx == -1 {
+            return
+        }
 
         runes = runes[:end_idx]
 
         buffer_search_term = utf8.runes_to_string(runes)
-
-        delete(runes)
     }
 
     if is_key_pressed(glfw.KEY_ENTER) {
