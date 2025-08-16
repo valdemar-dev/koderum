@@ -1188,13 +1188,15 @@ save_buffer :: proc() {
     if !ok {
         create_alert(
             "Failed to save file.",
-            "This is most likely due to missing permissions.",
+            "This is most likely due to missing permissions, or the file not existing.",
             5,
             context.allocator,
         )
         
         return
     }
+    
+    active_buffer^.is_saved = true
     
     if active_language_server == nil {
         return
@@ -1208,8 +1210,6 @@ save_buffer :: proc() {
     )
     
     send_lsp_message(msg, "", nil, nil,  active_buffer.version, active_buffer)
-
-    active_buffer^.is_saved = true
 }
 
 
@@ -3064,7 +3064,7 @@ insert_completion :: proc() {
 
     set_buffer_cursor_pos(
         buffer_cursor_line,
-        buffer_cursor_char_index + count
+        (buffer_cursor_char_index - utf8.rune_count(completion_filter_token)) + utf8.rune_count(insert_string)
     )
 
     get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")

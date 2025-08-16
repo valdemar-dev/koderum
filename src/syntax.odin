@@ -1469,6 +1469,7 @@ notify_server_of_change :: proc(
     redo_stack_override : ^[dynamic]BufferChange = nil,
 ) {
     buffer^.version += 1
+    buffer^.is_saved = false
     
     constrain_scroll_to_cursor()
     

@@ -67,13 +67,10 @@ message_loop :: proc(thread: ^thread.Thread) {
 
         last_time = current_time
         
-        fmt.println("Reading from LSP")
-
         bytes, read_err := read_lsp_message(
             active_language_server.lsp_stdout_r,
             context.allocator,
         )
-        fmt.println("Read from LSP")
 
         defer delete(bytes)
 

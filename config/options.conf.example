@@ -47,6 +47,7 @@ token_color_11 = D9FF87ff
 token_color_12 = 394357ff
 token_color_13 = ff008cff
 token_color_14 = 57ff9dff
+token_color_15 = ffffffff
 
 [lsp error colors]
 lsp_color_error = F04E48ff

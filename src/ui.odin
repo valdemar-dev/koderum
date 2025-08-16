@@ -225,7 +225,7 @@ draw_ui :: proc() {
     
     // Draw Current File
     if active_buffer != nil {
-        file_name := active_buffer.info.name
+        file_name := active_buffer.is_saved ? active_buffer.info.name : strings.concatenate({ active_buffer.info.name, " - Unsaved", }, context.temp_allocator)
 
         file_name_size := measure_text(normal_text, file_name)
 
