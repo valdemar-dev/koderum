@@ -242,17 +242,19 @@ discord :: proc() {
         if discord_socket_fd != -1 {
             for {
                 if active_buffer != nil {
-                    file := strings.concatenate({ "In: ", active_buffer.info.name, })
+                    file := strings.concatenate({ "Editing: ", active_buffer.info.name, })
                     defer delete(file)
                     
                     sb := strings.builder_make()
                     defer strings.builder_destroy(&sb)
                     
-                    strings.write_string(&sb, "Line ")
-                    strings.write_int(&sb, active_buffer.cursor_line)
-                    strings.write_string(&sb, " of ")
+                    strings.write_string(&sb, "Line: ")
+                    strings.write_int(&sb, buffer_cursor_line+1)
+                    strings.write_string(&sb, "/")
                     strings.write_int(&sb, len(active_buffer.lines))
-                    strings.write_string(&sb, ". - Diagnostics: ")
+                    strings.write_string(&sb, " | Char: ")
+                    strings.write_int(&sb, buffer_cursor_char_index)
+                    strings.write_string(&sb, " | Diagnostics: ")
                     strings.write_int(&sb, active_buffer.error_count)
                     
                     line := strings.to_string(sb)
