@@ -115,6 +115,9 @@ draw_ui :: proc() {
     case .TERMINAL_TEXT_INPUT:
         mode_string = "Terminal Text Input"
         mode_text_color = TOKEN_COLOR_11
+    case .GREP_SEARCH:
+        mode_string = "Grep Search"
+        mode_text_color = TOKEN_COLOR_09
     }
     
     // Draw Input Mode

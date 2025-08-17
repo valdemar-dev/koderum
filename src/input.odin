@@ -38,6 +38,7 @@ InputMode :: enum {
     YANK_HISTORY,
     TERMINAL,
     TERMINAL_TEXT_INPUT,
+    GREP_SEARCH,
 }
 
 @(private="package")
@@ -83,6 +84,8 @@ check_inputs :: proc() -> bool {
         handle_debug_input()
     case .YANK_HISTORY:
         handle_yank_history_input()
+    case .GREP_SEARCH:
+        handle_grep_input()
     }
 
     return false
@@ -201,6 +204,8 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         append_to_go_to_line_input_string(key)
     case .TERMINAL_TEXT_INPUT:
         handle_terminal_input(key)
+    case .GREP_SEARCH:
+        grep_append_to_search_term(key)
     }
 }
 
@@ -397,6 +402,14 @@ handle_command_input :: proc() -> bool {
     }
     
     if is_key_pressed(glfw.KEY_O) {
+        key := key_store[glfw.KEY_O]
+        
+        if key.modifiers == CTRL {
+            toggle_grep_view()
+            
+            return false
+        }
+        
         toggle_browser_view()
 
         return false

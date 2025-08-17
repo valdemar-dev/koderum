@@ -48,6 +48,7 @@ render :: proc() {
 
     draw_buffer_info_view()
     draw_browser_view()
+    draw_grep_view()
     
     draw_yank_history()
     

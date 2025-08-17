@@ -125,6 +125,7 @@ main :: proc() {
         tick_buffer_info_view()
 
         tick_browser_view()
+        tick_grep_view()
 
         tick_notifications()
         tick_alerts()

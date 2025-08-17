@@ -10,3 +10,5 @@ todo:
 bugs:
     - sometimes hangs in termianl when switching to terminal (2?). appears at first glance to happen randomly
     - deleting search term can go -1 causing a segfault
+    
+    - mem leak in grep, fix later
