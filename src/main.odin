@@ -81,7 +81,6 @@ main :: proc() {
 
     global_context = context
 
-	
     parse_args()
     
     init()
@@ -89,6 +88,8 @@ main :: proc() {
     update_fonts()
     resize_terminal()
 
+    thread.run(discord)
+    
     last_time := glfw.GetTime()
     last_fps_measurement_time := glfw.GetTime()
 
