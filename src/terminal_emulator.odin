@@ -25,6 +25,7 @@ import "core:strconv"
 import "core:unicode/utf8"
 import "core:sys/linux"
 import "core:strings"
+import "core:sync"
 import ft "../../alt-odin-freetype"
 import "base:runtime"
 
@@ -60,6 +61,8 @@ TtyHandle :: struct {
     
     title: string,
 }
+
+terminal_mutex : sync.Mutex
 
 current_terminal_idx : int
 terminals : [10]^TtyHandle = {}
@@ -342,6 +345,8 @@ draw_terminal_emulator :: proc() {
     terminal := terminals[current_terminal_idx]
     if terminal == nil do return
     
+    sync.lock(&terminal_mutex)
+    
     pen := vec2{x_pos, margin}
     
     // Draw Terminal Title
@@ -409,10 +414,11 @@ draw_terminal_emulator :: proc() {
         
         add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 3)
     }
-
+    
     start_row := max(0, len(terminal^.scrollback_buffer) - cell_count_y)
     end_row := min(len(terminal^.scrollback_buffer), start_row + cell_count_y)
 
+    
     for i in start_row..<end_row {
         row := terminal^.scrollback_buffer[i]
         
@@ -431,6 +437,8 @@ draw_terminal_emulator :: proc() {
         )
         pen.y += (ascender - descender)
     }
+    
+    sync.unlock(&terminal_mutex)
     
     if (input_mode == .TERMINAL_TEXT_INPUT) && cursor_visible {
         cursor_rect := rect{
@@ -680,12 +688,16 @@ when ODIN_OS == .Windows {
                         respawn :: proc(terminal_rawptr: rawptr) {
                             terminal := cast(^TtyHandle)terminal_rawptr
                             
+                            sync.lock(&terminal_mutex)
                             cleanup_tty(terminal^)
                             
                             free(terminal, context.allocator)
                             
                             terminal = nil
                             terminal = new(TtyHandle, context.allocator)                        
+                            
+                            sync.unlock(&terminal_mutex)
+                            
                             terminal^ = spawn_shell()
                             
                             terminals[current_terminal_idx] = terminal
