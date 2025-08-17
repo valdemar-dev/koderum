@@ -102,25 +102,53 @@ when ODIN_OS == .Linux {
     TIOCSCTTY: u64 = 0x540E
     TCSANOW: int = 0
     
-    spawn_shell :: proc() -> TtyHandle {
-        cwd_string := strings.clone_to_cstring(cwd)
-        
-        posix.chdir(cwd_string)
-        
-        delete(cwd_string)
-        
-        master_fd := posix.posix_openpt({
-            posix.O_Flag_Bits.RDWR, 
-            posix.O_Flag_Bits.NOCTTY,
-        })
-        
-        if master_fd < 0 {
-            panic("Failed to open PTY master")
+    save_parent_termios :: proc() -> posix.termios {
+        termios := posix.termios{}
+        err := posix.tcgetattr(0, &termios)
+        if err != posix.result.OK {
+            fmt.println("Failed to save parent termios")
         }
         
+        fmt.println("saved parent")
+        return termios
+    }
+    
+    restore_parent_termios :: proc(termios: ^posix.termios) {
+        err := posix.tcsetattr(0, posix.TC_Optional_Action.TCSANOW, termios)
+        if err != posix.result.OK {
+            fmt.println("Failed to restore parent termios")
+        }
+        
+        fmt.println("restored parent")
+    }
+    
+    cleanup_tty :: proc(tty: TtyHandle) {
+        posix.close(tty.master_fd)
+        posix.waitpid(posix.pid_t(tty.pid), nil, {})
+        
+        delete(tty.scrollback_buffer)
+        delete(tty.alt_buffer)
+        delete(tty.title)
+    }
+    
+    spawn_shell :: proc() -> TtyHandle {
+        fmt.println("Spawning shell..")
+    
+        parent_termios := save_parent_termios()
+    
+        cwd_string := strings.clone_to_cstring(cwd)
+        posix.chdir(cwd_string)
+        delete(cwd_string)
+    
+        master_fd := posix.posix_openpt({posix.O_Flag_Bits.RDWR, posix.O_Flag_Bits.NOCTTY})
+        if master_fd < 3 {
+            restore_parent_termios(&parent_termios)
+            panic("Failed to open PTY master")
+        }
+    
         flags := posix.fcntl(master_fd, posix.FCNTL_Cmd.GETFL, 0)
         posix.fcntl(master_fd, posix.FCNTL_Cmd.SETFL, flags | posix.O_NONBLOCK)
-        
+    
         posix.grantpt(master_fd)
         posix.unlockpt(master_fd)
     
@@ -130,38 +158,45 @@ when ODIN_OS == .Linux {
         if pid == 0 {
             posix.setsid()
             slave_fd := posix.open(slave_name, {posix.O_Flag_Bits.RDWR})
-        
+    
             linux.ioctl(linux.Fd(slave_fd), u32(TIOCSCTTY), 0)
-            posix.setpgid(0, 0) // set child as its own process group leader
-            posix.tcsetpgrp(slave_fd, posix.getpgrp()) // set foreground pgrp
-
+            posix.setpgid(0, 0)
+            posix.tcsetpgrp(slave_fd, posix.getpgrp())
+    
             posix.dup2(slave_fd, 0) // stdin
             posix.dup2(slave_fd, 1) // stdout
             posix.dup2(slave_fd, 2) // stderr
-        
+    
             termios := posix.termios{}
             _ = posix.tcgetattr(slave_fd, &termios)
             termios.c_lflag |= {.ICANON, .ECHO, .ECHOE, .ECHOK, .ECHONL}
             termios.c_cc[posix.Control_Char.VERASE] = 0x7f
-            //termios.c_lflag &= ~{.ICANON}
-            
+    
             err := posix.tcsetattr(slave_fd, posix.TC_Optional_Action.TCSANOW, &termios)
             assert(err == posix.result.OK)
-
+    
             posix.close(master_fd)
+            posix.close(slave_fd) // Close slave_fd in child after dup2
             posix.setenv("TERM", "xterm", true)
-            
+    
             posix.execl("/bin/bash", "bash", nil)
-            
             posix._exit(1)
         }
-        
+    
+        // Ensure parent’s stdin/stdout/stderr are not tied to PTY
+        posix.dup2(0, 0)
+        posix.dup2(1, 1)
+        posix.dup2(2, 2)
+    
+        // Restore parent’s terminal settings
+        restore_parent_termios(&parent_termios)
+    
         tty := TtyHandle{
             int(pid),
             master_fd,
-            0, 
-            0, 
-            make([dynamic][dynamic]rune), 
+            0,
+            0,
+            make([dynamic][dynamic]rune),
             make([dynamic][dynamic]rune),
             0,
             0,
@@ -172,9 +207,9 @@ when ODIN_OS == .Linux {
             0,
             "Terminal",
         }
-        
+    
         init_terminal_thread()
-        
+    
         return tty
     }
     
@@ -191,14 +226,6 @@ when ODIN_OS == .Linux {
         return posix.read(h.master_fd, raw_data(buf), len(buf))
     }
     
-    close_shell :: proc(terminal: TtyHandle) {
-        posix.kill(posix.pid_t(terminal.pid), posix.Signal.SIGKILL)
-        //posix.close(terminal.master_fd)
-        
-        delete(terminal.scrollback_buffer)
-        delete(terminal.alt_buffer)
-        delete(terminal.title)
-    }
 } else when ODIN_OS == .Windows {
     spawn_shell :: proc() {
         panic("canont spawn shell yet on windows")
@@ -627,9 +654,7 @@ when ODIN_OS == .Windows {
     }
 } else {
     @(private="package")
-    terminal_loop :: proc(thread: ^thread.Thread) {    
-        context = runtime.default_context()
-        
+    terminal_loop :: proc(self: ^thread.Thread) {    
         defer fmt.println("Terminal loop exited.")
         
         for !glfw.WindowShouldClose(window) {
@@ -651,14 +676,24 @@ when ODIN_OS == .Windows {
                         {.NOHANG}
                     )
                     
-                    if result != 0 {
-                        close_shell(terminal^)
-                        free(terminal, context.allocator)
+                    if result > 0 {
+                        respawn :: proc(terminal_rawptr: rawptr) {
+                            terminal := cast(^TtyHandle)terminal_rawptr
+                            
+                            cleanup_tty(terminal^)
+                            
+                            free(terminal, context.allocator)
+                            
+                            terminal = nil
+                            terminal = new(TtyHandle, context.allocator)                        
+                            terminal^ = spawn_shell()
+                            
+                            terminals[current_terminal_idx] = terminal
+                            
+                            resize_terminal()
+                        }
                         
-                        terminal = nil
-                        terminal = new(TtyHandle, context.allocator)
-                        
-                        terminal^ = spawn_shell()
+                        thread.run_with_data(rawptr(terminal), respawn)
                     }
                     
                     continue
