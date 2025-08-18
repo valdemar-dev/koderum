@@ -47,7 +47,7 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
     }
 }
 
-ui_z_index :: 10
+ui_z_index :: 5000
 
 draw_ui :: proc() {
     reset_rect_cache(&rect_cache)

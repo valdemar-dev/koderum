@@ -64,7 +64,7 @@ large_text_scale = 1
 buffer_text_scale = .8
 line_thickness_em = 0.05
 line_count_padding_em = .5
-cursor_edge_padding_em = 5
+cursor_edge_padding_em = 10
 ui_scale = 1
 
 [cursor]

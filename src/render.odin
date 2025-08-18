@@ -23,9 +23,9 @@ prev_time : f64
 
 @(private="package")
 render :: proc() {
-    gl.ClearColor(1,0,0,1)
+    gl.ClearColor(0,0,0,1)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-                   
+    
     gl.UseProgram(shader_id)
     gl.ActiveTexture(gl.TEXTURE0)
     gl.Uniform1i(first_texture_loc, 0)

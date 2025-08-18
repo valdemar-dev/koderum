@@ -200,9 +200,7 @@ main :: proc() {
     }
     
     delete(notification_queue)
-    
-    
-    
+        
     for buffer in buffers {
         for &line in buffer.lines {
             clean_line(&line)
