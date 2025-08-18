@@ -2889,6 +2889,8 @@ handle_go_to_line_input :: proc() {
         go_to_line_input_string = ""
 
         input_mode = .COMMAND
+        
+        if input_mode_return_callback != nil do input_mode_return_callback()
 
         return
     }
@@ -2912,14 +2914,13 @@ handle_go_to_line_input :: proc() {
             len(active_buffer.lines)
         )
         
-        set_buffer_cursor_pos(
-            target_line,
-            buffer_cursor_char_index,
-        )
+        go_to_line(target_line, buffer_cursor_char_index)
         
         go_to_line_input_string = ""
         
         input_mode = .COMMAND
+        
+        if input_mode_return_callback != nil do input_mode_return_callback()
         
         return
     }
@@ -3075,15 +3076,12 @@ insert_completion :: proc() {
 clean_line :: proc(line: ^BufferLine) {
     context = global_context
     
-    /*
     delete(line.characters)
     delete(line.ts_tokens)
     delete(line.lsp_tokens)
     
     reset_buffer_errors(line)    
     delete(line.errors)
-    
-    */
 }
 
 @(private="package")
@@ -3120,7 +3118,8 @@ escape_json :: proc(text: string) -> string {
 
 @(private="package")
 go_to_line :: proc(line, char: int) {
-    error := ft.set_pixel_sizes(primary_font, 0, u32(font_base_px * buffer_text_scale))
+    font_size := math.round_f32(font_base_px * buffer_text_scale)
+    error := ft.set_pixel_sizes(primary_font, 0, u32(font_size))
     if error != .Ok do return
 
     asc := primary_font.size.metrics.ascender >> 6
@@ -3134,5 +3133,4 @@ go_to_line :: proc(line, char: int) {
     )
     
     scroll_target_y = f32(int(line_height) * line) - (fb_size.y / 2)
-    
 }

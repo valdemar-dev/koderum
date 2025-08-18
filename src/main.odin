@@ -250,7 +250,6 @@ main :: proc() {
     for cleanup_proc in cleanup_procedures {
         cleanup_proc()
     }
-    
 }
 
 cleanup :: proc() {

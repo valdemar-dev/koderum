@@ -71,7 +71,8 @@ Yank Buffer
 (S) -> Toggle yank buffer history.
 (J-K) -> Select Index.
 (Enter) -> Set as recent yank.
-
+(P) -> Paste from yank buffer.
+(Ctrl + P) -> Paste from clipboard.
 
 
 Configurations

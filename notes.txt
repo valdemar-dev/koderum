@@ -1,14 +1,4 @@
-today:
-
-high priority todo:
 todo:
     - add variable font weights
-    - add is saved state to ui
-    - add grep -Rn with "go to file and line" support
-    - delete old syntax_language.odin files
-    
 bugs:
-    - sometimes hangs in termianl when switching to terminal (2?). appears at first glance to happen randomly
-    - deleting search term can go -1 causing a segfault
-    
     - mem leak in grep, fix later

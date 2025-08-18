@@ -44,6 +44,9 @@ InputMode :: enum {
 @(private="package")
 input_mode : InputMode = .COMMAND
 
+@(private="package")
+input_mode_return_callback : proc() = nil
+
 click_pos := Click{}
 
 @(private="package")

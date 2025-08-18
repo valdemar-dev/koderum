@@ -43,6 +43,16 @@ handle_highlight_input :: proc() {
 
         return
     }
+    
+    if is_key_pressed(glfw.KEY_N) {
+        set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
+        
+        input_mode_return_callback = proc() {
+            input_mode = .HIGHLIGHT
+        }
+        
+        return
+    }
 
     if is_key_pressed(glfw.KEY_C) {
         copy_to_yank_buffer(
@@ -78,14 +88,21 @@ handle_highlight_input :: proc() {
     }
     
     if is_key_pressed(glfw.KEY_P) {
+        key := key_store[glfw.KEY_P]
+        
+        
         remove_selection(
             highlight_start_line,
             buffer_cursor_line,
             highlight_start_char,
             buffer_cursor_char_index,
         )
-            
-        paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+        
+        if key.modifiers == CTRL {
+            paste_string(glfw.GetClipboardString(window), buffer_cursor_line, buffer_cursor_char_index)        
+        } else {
+            paste_string(yank_buffer.data[0], buffer_cursor_line, buffer_cursor_char_index)
+        }
         
         input_mode = .COMMAND
     }

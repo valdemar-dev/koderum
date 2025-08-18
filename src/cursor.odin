@@ -144,8 +144,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
 @(private="package")
 tick_buffer_cursor :: proc() {
-    buffer_cursor_pos.x = smooth_lerp(buffer_cursor_pos.x, buffer_cursor_target_pos.x, 30, frame_time)
-    buffer_cursor_pos.y = smooth_lerp(buffer_cursor_pos.y, buffer_cursor_target_pos.y, 30, frame_time)
+    buffer_cursor_pos.x = smooth_lerp(buffer_cursor_pos.x, buffer_cursor_target_pos.x, 50, frame_time)
+    buffer_cursor_pos.y = smooth_lerp(buffer_cursor_pos.y, buffer_cursor_target_pos.y, 50, frame_time)
 }
 
 @(private="package")
