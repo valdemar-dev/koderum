@@ -26,6 +26,7 @@ import "core:unicode/utf8"
 import "core:sys/linux"
 import "core:strings"
 import "core:sync"
+import "core:time"
 import ft "../../alt-odin-freetype"
 import "base:runtime"
 
@@ -665,7 +666,22 @@ when ODIN_OS == .Windows {
     terminal_loop :: proc(self: ^thread.Thread) {    
         defer fmt.println("Terminal loop exited.")
         
+        last_time := glfw.GetTime()
+
         for !glfw.WindowShouldClose(window) {
+            current_time := glfw.GetTime()
+            local_frame_time := current_time - last_time
+    
+            if local_frame_time < target_frame_time {
+                sleep_duration := (target_frame_time - local_frame_time) * f64(second)
+                
+                time.sleep(time.Duration(sleep_duration))                
+                
+                continue
+            }
+            
+            last_time = current_time
+
             for &terminal, index in terminals {
                 if terminal == nil do continue
                 if terminal.pid == 0 do continue
