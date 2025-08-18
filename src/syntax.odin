@@ -1473,8 +1473,6 @@ notify_server_of_change :: proc(
     
     constrain_scroll_to_cursor()
     
-    fmt.println(new_text)
-    
     new_end_byte := start_byte + len(new_text)
 
     if do_update_buffer_content {

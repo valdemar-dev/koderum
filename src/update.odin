@@ -76,7 +76,7 @@ message_loop :: proc(thread: ^thread.Thread) {
 
         if read_err == os.ERROR_EOF {
             fmt.println("ran into end of file?")
-            return
+            continue
         }
         
         if read_err != os2.ERROR_NONE {
@@ -215,8 +215,6 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
     for &line in buffer^.lines {
         reset_buffer_errors(&line)
     }
-    
-    fmt.println("got error count:", len(errors))
     
     buffer^.error_count = len(errors)
     if len(errors) == 0 do return

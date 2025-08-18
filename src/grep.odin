@@ -1,4 +1,3 @@
-
 package main
 
 import "core:os"
@@ -350,6 +349,26 @@ draw_grep_view :: proc() {
                 continue
             }
             
+             if len(grep_found_files) > 0 {
+                font_size : f32 = small_text
+                
+                gap := font_size * .5
+        
+                add_text(&rect_cache,
+                    vec2{
+                        bg_rect.x + padding,
+                        bg_rect.y,
+                    },
+                    TEXT_MAIN,
+                    font_size,
+                    grep_found_files[item_offset].content,
+                    start_z + 3,
+                    true,
+                    bg_rect.width - padding * 2,
+                    false,
+                )
+            }
+            
             font_size : f32 = (index == start_idx) ? large_text : small_text
             
             gap := font_size * .5
@@ -381,26 +400,6 @@ draw_grep_view :: proc() {
                 break
             } 
         }
-    }
-    
-    if len(grep_found_files) > 0 {
-        font_size : f32 = small_text
-        
-        gap := font_size * .5
-
-        add_text(&rect_cache,
-            vec2{
-                bg_rect.x + padding,
-                bg_rect.y,
-            },
-            TEXT_MAIN,
-            font_size,
-            grep_found_files[item_offset].content,
-            start_z + 3,
-            true,
-            bg_rect.width - padding * 2,
-            false,
-        )
     }
 }
 

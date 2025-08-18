@@ -1289,9 +1289,10 @@ remove_char :: proc() {
             append_elems(&new_bytes, ..prev_line.characters[:])
             append_elems(&new_bytes, ..line.characters[:])
 
+            delete(prev_line^.characters)
             prev_line^.characters = new_bytes
 
-            clean_line(&active_buffer.lines[buffer_cursor_line])
+            clean_line(line)
             ordered_remove(active_buffer.lines, buffer_cursor_line)
         }
 
@@ -3074,12 +3075,15 @@ insert_completion :: proc() {
 clean_line :: proc(line: ^BufferLine) {
     context = global_context
     
+    /*
     delete(line.characters)
     delete(line.ts_tokens)
     delete(line.lsp_tokens)
     
     reset_buffer_errors(line)    
     delete(line.errors)
+    
+    */
 }
 
 @(private="package")
