@@ -160,8 +160,8 @@ get_info_under_cursor :: proc() {
     if active_buffer == nil {
         return
     } 
-
-    line := active_buffer.lines[buffer_cursor_line]
+    
+    line := active_buffer.lines[clamp(buffer_cursor_line, 0, len(active_buffer.lines)-1)]
 
     highlighted_error = nil
 
