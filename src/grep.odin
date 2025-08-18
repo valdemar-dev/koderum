@@ -396,7 +396,7 @@ draw_grep_view :: proc() {
             TEXT_MAIN,
             font_size,
             grep_found_files[item_offset].content,
-            start_z + 1,
+            start_z + 3,
             true,
             bg_rect.width - padding * 2,
             false,

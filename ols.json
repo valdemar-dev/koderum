@@ -5,7 +5,7 @@
 	"enable_hover": true,
 	"enable_format": true,
 	"enable_inlay_hints": true,
-	"enable_checker_only_saved": false,
+	"enable_checker_only_saved": true,
 	"enable_references": true,
 	"enable_snippets": true,
 	"profile": "linux_profile",

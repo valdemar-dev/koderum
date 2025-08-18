@@ -212,14 +212,11 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
         return int(start_line_a - start_line_b)
     }
     
-    for &line in buffer.lines {
-        for error in line.errors {
-            delete(error.source)
-            delete(error.message)
-        }
-
-        clear(&line.errors)
+    for &line in buffer^.lines {
+        reset_buffer_errors(&line)
     }
+    
+    fmt.println("got error count:", len(errors))
     
     buffer^.error_count = len(errors)
     if len(errors) == 0 do return
@@ -324,12 +321,14 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 }
 
 reset_buffer_errors :: proc(buf_line: ^BufferLine) {
-    for err in buf_line.errors {
+    context = global_context
+    
+    for &err in buf_line^.errors {
         delete(err.source)
         delete(err.message)
     }
     
-    clear(&buf_line.errors)
+    clear(&buf_line^.errors)
 }
 
 @(private="package")

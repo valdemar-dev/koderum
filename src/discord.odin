@@ -259,7 +259,7 @@ discord :: proc() {
                     
                     line := strings.to_string(sb)
                     
-                    set_discord_activity(line, file, "eef131aeb202b700be64dbb615a8b479")
+                    set_discord_activity(line, file, "koderum_logo")
                 } else {
                     buf : [32]u8
                     
@@ -273,7 +273,7 @@ discord :: proc() {
                     
                     defer delete(fps_text)
                     
-                    set_discord_activity(fps_text, "Not in a file.", "eef131aeb202b700be64dbb615a8b479")
+                    set_discord_activity(fps_text, "Not in a file.", "koderum_logo")
                 }
                 
                 time.sleep(time.Second * 1)
