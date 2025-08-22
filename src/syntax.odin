@@ -1635,6 +1635,7 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
 }
 
 attempt_resolve_request :: proc(idx: int) {
+    sync.lock(&completion_mutex)
     if idx >= len(completion_hits) {
         return
     }
@@ -1642,6 +1643,7 @@ attempt_resolve_request :: proc(idx: int) {
     lsp_request_id += 1
 
     hit := &completion_hits[idx]
+    sync.unlock(&completion_mutex)
 
     msg, id := completion_item_resolve_request_message(
         lsp_request_id,
