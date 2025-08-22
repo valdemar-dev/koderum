@@ -1526,10 +1526,6 @@ handle_text_input :: proc() -> bool {
             attempt_resolve_request(selected_completion_hit)
         }
     }
-
-    if is_key_pressed(glfw.KEY_LEFT_ALT) {
-        insert_completion()
-    }
     
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         move_down()
@@ -1545,6 +1541,12 @@ handle_text_input :: proc() -> bool {
     }
     
     if is_key_pressed(glfw.KEY_ENTER) {
+        if is_key_down(glfw.KEY_LEFT_SHIFT) {
+            insert_completion()
+            
+            return false
+        }
+
         defer {
             get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
         }
