@@ -8,3 +8,4 @@ src.bin
 releases
 node_modules
 stdout.txt
+error.json
