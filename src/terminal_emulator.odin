@@ -237,7 +237,9 @@ when ODIN_OS == .Windows {
     }
     
     spawn_shell :: proc() -> TtyHandle {
-        tty := new(TtyHandle)
+        fmt.println("Windows can't do TTY yet!")
+        
+        tty := TtyHandle{}
     
         return tty
     }
