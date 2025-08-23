@@ -230,9 +230,23 @@ when ODIN_OS == .Linux {
         return posix.read(h.master_fd, raw_data(buf), len(buf))
     }
     
-} else when ODIN_OS == .Windows {
-    spawn_shell :: proc() {
-        panic("canont spawn shell yet on windows")
+} 
+
+when ODIN_OS == .Windows {
+    cleanup_tty :: proc(tty: TtyHandle) {
+    }
+    
+    spawn_shell :: proc() -> TtyHandle {
+        tty := new(TtyHandle)
+    
+        return tty
+    }
+    
+    write_to_shell :: proc(h: TtyHandle, data: string) {
+    }
+    
+    read_from_shell :: proc(h: TtyHandle, buf: []u8) -> int {
+        return 0
     }
 }
 
