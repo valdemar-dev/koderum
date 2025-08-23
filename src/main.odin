@@ -56,10 +56,10 @@ cleanup_procedures : [dynamic]proc()
 main :: proc() {
     fmt.println("Loading..")
     
-    file_handle, err := os.open("error.log", os.O_WRONLY | os.O_CREATE, 0o644)
+    file_handle, err := os.open("error.json", os.O_WRONLY | os.O_CREATE, 0o644)
     
     if err == os.ERROR_NONE {
-        fmt.println("Piping errors to error.log!")
+        fmt.println("Piping errors to error.json!")
         os.stderr = file_handle
     }
     

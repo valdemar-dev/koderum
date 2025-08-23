@@ -14,9 +14,9 @@ OUTPUT="$RELEASE_DIR/koderum_${VERSION}.zip"
 mkdir -p "$RELEASE_DIR"
 
 # Build with Odin
-odin build src -o:speed
+odin build src -o:speed -out:koderum
 
 # Collect files
-zip -r "$OUTPUT" src.bin ./languages ./config
+zip -r "$OUTPUT" koderum ./languages ./config
 
 
