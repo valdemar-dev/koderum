@@ -44,6 +44,8 @@ parse_args :: proc() {
             do_print_frame_time = true
         } else if arg == "-log_performance_metrics" {
             do_log_performance_metrics = true
+        } else if arg == "-terminal_debug_mode" {
+            terminal_debug_mode = true
         }
     }
 }

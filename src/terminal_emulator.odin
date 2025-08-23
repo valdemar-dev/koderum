@@ -30,6 +30,9 @@ import "core:time"
 import ft "../../alt-odin-freetype"
 import "base:runtime"
 
+@(private="package")
+terminal_debug_mode : bool = false
+
 suppress := true
 
 
@@ -254,6 +257,10 @@ when ODIN_OS == .Windows {
 
 @(private="package")
 resize_terminal :: proc (index: int = current_terminal_idx) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Resizing Terminal")
+    }
+    
     text := math.round_f32(font_base_px * normal_text_scale)
 
     error := ft.set_pixel_sizes(primary_font, 0, u32(text))
@@ -312,6 +319,10 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
 
 @(private="package")
 toggle_terminal_emulator :: proc() {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Toggling Terminal Emulator")
+    }
+
     context = runtime.default_context()
     
     if is_terminal_open == false {
@@ -594,6 +605,10 @@ handle_terminal_control_input :: proc() -> bool {
 
 @(private="package")
 swap_terminal :: proc(index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Swapping Terminal")
+    }
+
     context = runtime.default_context()
     
     index := clamp(index, 0, 9)
@@ -655,6 +670,10 @@ tick_terminal_emulator :: proc() {
 
 @(private="package")
 ensure_scrollback_row :: proc(index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Ensuring Scrollback Row")
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -750,6 +769,10 @@ when ODIN_OS == .Windows {
 }
 
 erase_line :: proc(params: [dynamic]int, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Erasing a line at termianl index:", index)
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -772,6 +795,10 @@ erase_line :: proc(params: [dynamic]int, index: int) {
 }
 
 erase_screen :: proc(params: [dynamic]int, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Erasing Screen")
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -803,6 +830,10 @@ erase_screen :: proc(params: [dynamic]int, index: int) {
 }
 
 parse_csi_params :: proc(s: string, index: int) -> [dynamic]int {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Parsing CSI Params, ", transmute([]u8)s)
+    }
+
     params := make([dynamic]int)
     parts := strings.split(s, ";")
     
@@ -817,6 +848,10 @@ parse_csi_params :: proc(s: string, index: int) -> [dynamic]int {
     return params
 }
 process_ansi_chunk :: proc(input: string, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Processing ANSI Chunk.", transmute([]u8)input)
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -836,11 +871,11 @@ process_ansi_chunk :: proc(input: string, index: int) {
             if b == 0x08 { // backk spacuhhh
                 if terminal^.cursor_col > 0 {
                     terminal^.cursor_col -= 1
-                    terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
+                    //terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
                 } else if terminal^.cursor_row > 0 {
                     terminal^.cursor_row -= 1
                     terminal^.cursor_col = cell_count_x - 1
-                    terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
+                    //terminal^.scrollback_buffer[terminal^.cursor_row][terminal^.cursor_col] = 0
                 }
                 
                 continue
@@ -910,7 +945,7 @@ process_ansi_chunk :: proc(input: string, index: int) {
                 handled := handle_csi_seq(string(ansi_buf[:]), index)
                 
                 if !handled {
-                    fmt.println("csi was not handled!!")
+                    fmt.println("Unhandled CSI Sequence! Contained Bytes:", "(", ansi_buf[:], ")")
                 }
                 
                 ansi_state = .Normal
@@ -969,6 +1004,10 @@ scroll_region_up :: proc(index: int) {
 }
 
 handle_simple_escape :: proc(seq: []u8, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Handling Simple Escape", seq)
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -1004,6 +1043,10 @@ sanitize_title :: proc(s: string) -> [dynamic]rune {
 }
 
 handle_osc_seq :: proc(seq: string, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Handling OSC Seq, ", transmute([]u8)seq)
+    }
+
     if len(seq) < 3 { return }
     body := seq[2:]
     if body[len(body)-1] == 0x07 {
@@ -1048,6 +1091,10 @@ handle_normal_char :: proc(r: rune, index: int) {
 }
 
 handle_csi_seq :: proc(seq: string, index: int) -> (handled: bool) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Handling CSI Seq,", transmute([]u8)seq)
+    }
+
     if len(seq) < 2 { return false }
     
     terminal := terminals[index]
@@ -1168,6 +1215,10 @@ handle_csi_seq :: proc(seq: string, index: int) -> (handled: bool) {
 }
 
 handle_private_mode :: proc(seq: string, index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Handling Private Mode,", transmute([]u8)seq)
+    }
+
     if strings.contains(seq, "?1049h") {
         enable_alt_buffer(index)
     } else if strings.contains(seq, "?1049l") {
@@ -1197,6 +1248,10 @@ insert_chars :: proc(n: int, index: int) { }
 delete_chars :: proc(n: int, index: int) { }
 
 enable_alt_buffer :: proc(index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Enabling Alt Buffer.")
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -1217,6 +1272,10 @@ enable_alt_buffer :: proc(index: int) {
 }
 
 disable_alt_buffer :: proc(index: int) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Disabling Alt Buffer.")
+    }
+
     terminal := terminals[index]
     
     if terminal == nil do return
@@ -1236,5 +1295,7 @@ disable_alt_buffer :: proc(index: int) {
 }
 
 set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
-    fmt.println("GRAPHICS RENDITION PARAMS: ", params)
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Setting Graphics Rendition")
+    }
 }
