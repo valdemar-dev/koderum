@@ -10,13 +10,8 @@ VERSION="$1"
 RELEASE_DIR="./releases"
 OUTPUT="$RELEASE_DIR/koderum_${VERSION}.zip"
 
-# Ensure releases dir exists
 mkdir -p "$RELEASE_DIR"
 
-# Build with Odin
 odin build src -o:speed -out:koderum
 
-# Collect files
 zip -r "$OUTPUT" koderum ./languages ./config
-
-
