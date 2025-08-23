@@ -650,7 +650,7 @@ set_active_language_server :: proc(ext: string) {
         "/languages",
     })
     
-    fmt.println("Attempting to get languaged from path:", languages_path, exe_path)
+    fmt.println("Attempting to get languages from:", languages_path)
     
     defer delete(languages_path)
 

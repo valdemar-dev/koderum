@@ -320,7 +320,6 @@ set_option :: proc(options: []string) {
         do_highlight_current_line = value == "true" 
     case "line_thickness_em":
         line_thickness_em = f32(strconv.atof(value))
-        fmt.println(value, line_thickness_em, font_base_px, line_thickness_em * font_base_px)
     case "line_count_padding_em":
         line_count_padding_em = f32(strconv.atof(value))
     case "ui_scale":

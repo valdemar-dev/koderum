@@ -56,12 +56,13 @@ message_loop :: proc(thread: ^thread.Thread) {
         }
 
         if active_language_server == nil {
-            fmt.println("server is nil")
+            fmt.println("Exiting message loop. Reason: The LSP server pointer is nil.")
             return
         }
         
         if active_language_server.lsp_server_pid == 0 {
-            fmt.println("server has a pid of 0")
+            fmt.println("Exiting message loop. Reason: The LSP server's PID is 0.")
+            
             return
         }
 
@@ -75,7 +76,6 @@ message_loop :: proc(thread: ^thread.Thread) {
         defer delete(bytes)
 
         if read_err == os.ERROR_EOF {
-            fmt.println("ran into end of file?")
             continue
         }
         
@@ -360,12 +360,10 @@ send_lsp_message :: proc(
     }
 
     when ODIN_DEBUG {
-        fmt.println("LSP Message: Adding a message with ID", id, content)
+        // fmt.println("LSP Message: Adding a message with ID", id, content)
     }
     
     os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
-    
-    // fmt.println(content)
     
     if id == "" {
         return

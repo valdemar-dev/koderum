@@ -29,7 +29,7 @@ parse_args :: proc() {
         if arg == "-save_logs" {
             fmt.println("NOTE: All output will be directed to stdout.txt")
 
-            file_handle, err := os.open("stdout.txt", os.O_WRONLY | os.O_CREATE, 0o644)
+            file_handle, err := os.open("koderum.log", os.O_WRONLY | os.O_CREATE, 0o644)
             if err != os.ERROR_NONE {
                 fmt.println("Failed to open file:", os.error_string(err))
                 return
@@ -55,7 +55,14 @@ cleanup_procedures : [dynamic]proc()
 
 main :: proc() {
     fmt.println("Loading..")
-
+    
+    file_handle, err := os.open("error.log", os.O_WRONLY | os.O_CREATE, 0o644)
+    
+    if err == os.ERROR_NONE {
+        fmt.println("Piping errors to error.log!")
+        os.stderr = file_handle
+    }
+    
     when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track, context.allocator)
 		context.allocator = mem.tracking_allocator(&track)

@@ -146,7 +146,7 @@ add_missing_characters :: proc() {
     }
 
     when ODIN_DEBUG {
-        fmt.println("Adding some missing characters..")
+        fmt.println("Adding missing characters..")
     }
 
     for missing_char in missing_characters {
@@ -222,13 +222,6 @@ add_missing_characters :: proc() {
         i32(len(char_rects))
     )
 
-    when ODIN_DEBUG {
-        fmt.println("Success:", success == 1)
-        fmt.println("WH:", width, height)
-        fmt.println("Side:", side)
-        fmt.println("Total area:", total_area)
-    }
-
     for font_size,index in character_maps {
         character_map := character_maps_array[index]
         
@@ -271,15 +264,6 @@ add_missing_characters :: proc() {
     }
 
     clear(&missing_characters)
-
-    /*
-    image.write_png(
-        "atlas.png",
-        width,height,1,raw_data(atlas),width,
-    )
-    */
-
-    //free_character_buffers()
 }
 
 try_adding_character :: proc(missing_char: MissingCharacter) -> ^Character {
@@ -455,7 +439,7 @@ update_fonts :: proc() {
 @(private="package")
 init_fonts :: proc() {
     load_all_fonts()
-    fmt.println("Fonts inited")
+    fmt.println("Successfully initialized fonts!")
 }
 
 free_character_buffers :: proc() { 
