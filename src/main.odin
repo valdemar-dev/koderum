@@ -23,6 +23,40 @@ second := time.Duration(1_000_000_000)
 
 do_print_frame_time : bool
 
+@(private="file")
+fullscreen : bool = false
+@(private="file")
+stored_width : i32
+@(private="file")
+stored_height : i32
+@(private="file")
+stored_pos_x : i32
+@(private="file")
+stored_pos_y : i32
+
+toggle_fullscreen :: proc() {
+    if !fullscreen {
+        stored_pos_x, stored_pos_y = glfw.GetWindowPos(window)
+        stored_width, stored_height = glfw.GetWindowSize(window)
+
+        monitor := glfw.GetPrimaryMonitor()
+        video_mode := glfw.GetVideoMode(monitor)
+
+        glfw.SetWindowMonitor(window, monitor,
+                              0, 0,
+                              video_mode.width, video_mode.height,
+                              video_mode.refresh_rate)
+    } else {
+        glfw.SetWindowMonitor(window, nil,
+                              stored_pos_x, stored_pos_y,
+                              stored_width, stored_height,
+                              0)
+    }
+
+    fullscreen = !fullscreen
+}
+
+
 parse_args :: proc() {
     print_help :: proc() {
         fmt.println("Available Options:")

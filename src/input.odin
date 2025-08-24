@@ -95,6 +95,12 @@ check_inputs :: proc() -> bool {
 }
 
 handle_global_input :: proc() -> (continue_execution: bool = true) {
+    if is_key_pressed(glfw.KEY_F11) {
+        toggle_fullscreen()
+        
+        return
+    }
+    
     if is_key_pressed(glfw.KEY_MINUS) {
         key := key_store[glfw.KEY_MINUS]
         
