@@ -2,6 +2,7 @@
 package main
 
 import "core:os"
+import "core:os/os2"
 import "core:strings"
 import "core:strconv"
 import "core:fmt"
@@ -101,9 +102,9 @@ init_config :: proc() -> []u8 {
 
     if os.exists(path) == false {
         fmt.println("WARNING: Creating default directory.", path)
-        error := os.make_directory(path, u32(os.File_Mode(0o700)))
+        error := os2.make_directory_all(path)
 
-        if error != os.ERROR_NONE {
+        if error != os2.ERROR_NONE {
             fmt.println(error)
 
             panic("Failed to create default directory.")
@@ -162,9 +163,9 @@ init_local :: proc () {
     }
 
     fmt.println("WARNING: Creating default data directory.", path)
-    error := os.make_directory(path, u32(os.File_Mode(0o700)))
-
-    if error != os.ERROR_NONE {
+    error := os2.make_directory_all(path)
+    
+    if error != os2.ERROR_NONE {
         fmt.println(error)
 
         panic("Failed to create default data directory.")
