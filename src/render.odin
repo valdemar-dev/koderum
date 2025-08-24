@@ -299,7 +299,7 @@ add_text :: proc(
             pen.y += line_height
             pen.x = pos.x
             
-            if pen.y - pos.y >= max_height && max_height != -1 {
+            if (pen.y - pos.y) >= max_height && max_height != -1 {
                 break
             }
 
@@ -352,12 +352,17 @@ add_text :: proc(
                 pen.y += line_height
                 pen.x = pos.x
                 
-                if pen.y - pos.y >= max_height && max_height != -1 {
+                if (pen.y - pos.y + height) >= max_height && max_height != -1 {
                     break
                 }
             } else {
-                break
+                // dont touch this please
+                continue
             }
+        }
+        
+        if ((pen.y - pos.y) + height) >= max_height && max_height != -1 {
+            break
         }
 
         add_rect(rect_cache,
@@ -378,13 +383,13 @@ add_text :: proc(
             z_index,
         )
 
-        pen.x = pen.x + math.round_f32(character.advance.x)
-        pen.y = pen.y + math.round_f32(character.advance.y)
+        pen.x = pen.x + character.advance.x
+        pen.y = pen.y + character.advance.y
     }
 
     if do_wrap {
-        pen.y += math.round_f32(line_height)
-        pen.x = math.round_f32(highest_x)
+        pen.y += line_height
+        pen.x = highest_x
     }
 
     return pen

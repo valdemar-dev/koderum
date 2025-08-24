@@ -81,9 +81,7 @@ handle_grep_input :: proc() {
         
         toggle_grep_view()
         
-        set_buffer_cursor_pos(
-            hit.line-1,0
-        )
+        go_to_line(hit.line-1, 0)
         
         return
     }
@@ -154,18 +152,15 @@ set_found_files :: proc() {
     if search_term == "" {
         return
     }
-    
-    
 
     escaped_term, _ := strings.replace_all(strings.clone(search_term), "\"", "\\\"")
     
     concat := strings.concatenate({
-        `grep -Rn "`,escaped_term,`" | head -n 30`,
+        `grep -Rn -m 100  -C10 "`,escaped_term,`" . | head -n 600`,
     })
     defer delete(concat)
     
     cmd := []string{
-        //"grep", "-Rn", escaped_term, "|", "head", "-n", "4",
         "/bin/sh", "-c", concat
     }
     
@@ -187,31 +182,67 @@ set_found_files :: proc() {
     lines := strings.split_lines(output)
     defer delete(lines)
     
+    content_builder: strings.Builder
+    strings.builder_init(&content_builder)
+    defer strings.builder_destroy(&content_builder)
+
+    current_file := ""
+    current_line := 0
+
     for line in lines {
         if line == "" do continue
         
-        idx := strings.index(line, ":")
+        if line == "--" {
+            if current_file != "" && current_line != 0 {
+                append(&grep_found_files, GrepResult{
+                    file_name = strings.clone(current_file),
+                    line = current_line,
+                    content = strings.clone(strings.to_string(content_builder)),
+                })
+            }
+            current_file = ""
+            current_line = 0
+            strings.builder_reset(&content_builder)
+            continue
+        }
+        
+        idx := strings.index_any(line, ":-")
         
         if idx > 0 {
             filename := line[:idx]
+            sep := line[idx]
             rest := line[idx+1:]
-            second_idx := strings.index(rest, ":")
+            second_idx := strings.index_byte(rest, sep)
             
             if second_idx > 0 {
                 line_num_str := rest[:second_idx]
-                content := rest[second_idx+1:]
+                content_str := rest[second_idx+1:]
                 line_num, ok := strconv.parse_int(line_num_str)
                 
                 if ok {
-                    append(&grep_found_files, GrepResult{
-                        file_name = strings.clone(filename),
-                        line = line_num,
-                        content = strings.clone(content),
-                    })
+                    if current_file == "" {
+                        current_file = filename
+                    }
+                    if strings.builder_len(content_builder) > 0 {
+                        strings.write_string(&content_builder, "\n")
+                    }
+                    strings.write_string(&content_builder, content_str)
+                    if sep == ':' {
+                        current_line = line_num
+                    }
                 }
             }
+        }
     }
-}
+
+    // Process the last block if any
+    if current_file != "" && current_line != 0 {
+        append(&grep_found_files, GrepResult{
+            file_name = strings.clone(current_file),
+            line = current_line,
+            content = strings.clone(strings.to_string(content_builder)),
+        })
+    }
 }
 
 @(private="package")
@@ -247,7 +278,7 @@ draw_grep_view :: proc() {
     one_width_percentage := fb_size.x / 100
     one_height_percentage := fb_size.y / 100
 
-    margin := one_width_percentage * 20
+    margin := font_base_px * 4
     
     start_z : f32 = 20
 
@@ -381,36 +412,52 @@ draw_grep_view :: proc() {
             )
             
             return
+        } else if len(grep_found_files) == 0 {
+            add_text(&rect_cache,
+                vec2{
+                    bg_rect.x + padding,
+                    y_pen,
+                },
+                TEXT_DARKER,
+                normal_text,
+                "Searching..",
+                start_z + 1,
+            )
+            
+            return            
         }
         
         start_idx := item_offset
+        
+        if len(grep_found_files) > 0 {
+            offset_x := bg_rect.width / 2
+            font_size : f32 = small_text
+            
+            gap := font_size * .5
+    
+            add_text(&rect_cache,
+                vec2{
+                    bg_rect.x + padding + offset_x,
+                    y_pen,
+                },
+                TEXT_MAIN,
+                font_size,
+                grep_found_files[item_offset].content,
+                start_z + 3,
+                true,
+                (bg_rect.width - offset_x) - padding * 2,
+                false,
+                true,
+                bg_rect.y + bg_rect.height - y_pen - padding,
+            )
+        }
         
         for found_file,index in grep_found_files {
             if index < start_idx {
                 continue
             }
             
-             if len(grep_found_files) > 0 {
-                font_size : f32 = small_text
-                
-                gap := font_size * .5
-        
-                add_text(&rect_cache,
-                    vec2{
-                        bg_rect.x + padding,
-                        bg_rect.y,
-                    },
-                    TEXT_MAIN,
-                    font_size,
-                    grep_found_files[item_offset].content,
-                    start_z + 3,
-                    true,
-                    bg_rect.width - padding * 2,
-                    false,
-                )
-            }
-            
-            font_size : f32 = (index == start_idx) ? large_text : small_text
+            font_size : f32 = small_text
             
             gap := font_size * .5
             
