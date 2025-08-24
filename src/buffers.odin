@@ -1631,10 +1631,6 @@ handle_text_input :: proc() -> bool {
 insert_into_buffer :: proc (key: rune) {
     line := &active_buffer.lines[buffer_cursor_line] 
 
-    when ODIN_DEBUG {
-        start := time.now()
-    }
-
     buffer_cursor_byte_position := utf8.rune_offset(
         string(line.characters[:]), 
         buffer_cursor_char_index
@@ -1653,12 +1649,6 @@ insert_into_buffer :: proc (key: rune) {
     
     get_char(font_size, u64(key))
     add_missing_characters()
-
-    when ODIN_DEBUG {
-        now := time.now()
-
-        fmt.println(time.diff(start,now), "to insert a character.")
-    } 
 
     buffer_cursor_accumulated_byte_position := compute_byte_offset(
         active_buffer, 

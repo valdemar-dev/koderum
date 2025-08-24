@@ -1352,19 +1352,10 @@ set_buffer_tokens :: proc() {
     )
 
     ts.tree_delete(active_buffer.previous_tree)
+    
     active_buffer.previous_tree = new_tree
     
     sync.unlock(&tree_mutex)
-
-    {
-        when ODIN_DEBUG {
-            now := time.now()
-            
-            fmt.println("Took", time.diff(start, now), "to set single-threaded buffer tokens.")
-            
-            prev = now
-        }
-    }    
 }
 
 set_buffer_tokens_threaded :: proc() {
