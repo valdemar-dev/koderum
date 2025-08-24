@@ -38,6 +38,9 @@ LSP Motions
 (Ctrl + W) -> Previous Completion.
 (Shift + Enter) -> Insert Completion.
 
+Grep
+(Ctrl + O) -> Grep File Search
+
 Mouse Motions
 (Left Click) -> Move Buffer Cursor to Mouse Pos.
 (Drag) -> Highlight Region.

@@ -559,9 +559,9 @@ draw_terminal_emulator :: proc() {
             )
         }
     }
-
-    draw_rects(&text_rect_cache)
+    
     draw_rects(&rect_cache)
+    draw_rects(&text_rect_cache)
 }
 
 

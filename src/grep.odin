@@ -7,6 +7,7 @@ import fp "core:path/filepath"
 import "core:strings"
 import "core:fmt"
 import "core:math"
+import "core:strconv"
 import "core:unicode/utf8"
 import "vendor:glfw"
 import "core:thread"
@@ -23,6 +24,7 @@ bg_rect : rect
 GrepResult :: struct {
     file_name: string,
     content: string,
+    line: int,
 }
 
 grep_found_files : [dynamic]GrepResult
@@ -50,7 +52,7 @@ handle_grep_input :: proc() {
 
         item_offset = 0
 
-        set_found_files()
+        thread.run(set_found_files)
     }
    
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
@@ -71,9 +73,17 @@ handle_grep_input :: proc() {
         }
 
         target := item_offset
-
-        open_file(grep_found_files[target].file_name)
+        hit := grep_found_files[target]
+        
+        open_file(
+            strings.concatenate({ cwd, "/", hit.file_name, }, context.temp_allocator)
+        )
+        
         toggle_grep_view()
+        
+        set_buffer_cursor_pos(
+            hit.line,0
+        )
         
         return
     }
@@ -101,7 +111,7 @@ toggle_grep_view :: proc() {
         
         search_term = ""
 
-        set_found_files()
+        thread.run(set_found_files)
         
         return
     }
@@ -109,6 +119,7 @@ toggle_grep_view :: proc() {
 
 run_command_output :: proc(cmd: []string, env: []string) -> (output: string, ok: bool) {
     context = global_context
+    
     desc := os2.Process_Desc{
         cwd,
         cmd,
@@ -120,28 +131,48 @@ run_command_output :: proc(cmd: []string, env: []string) -> (output: string, ok:
 
     state, stdout, stderr, err := os2.process_exec(desc, context.allocator)
     
+    defer delete(stderr)
+    defer delete(stdout)
+    
     if err != os2.ERROR_NONE {
-        return "", false
+        return strings.clone(string(stdout)), false
     }
-
-    return string(stdout[:]), true
+    
+    return strings.clone(string(stdout)), true
 }
 
 set_found_files :: proc() {
-    clear(&grep_found_files)
+    context = global_context
+    
+    for file in grep_found_files {
+        delete(file.file_name)
+        delete(file.content)
+    }
 
+    clear(&grep_found_files)
+    
     if search_term == "" {
         return
     }
+    
+    
 
     escaped_term, _ := strings.replace_all(strings.clone(search_term), "\"", "\\\"")
+    
+    concat := strings.concatenate({
+        `grep -Rn "`,escaped_term,`" | head -n 30`,
+    })
+    defer delete(concat)
+    
     cmd := []string{
-        "grep", "-Rn", "-m", "3", escaped_term,
+        //"grep", "-Rn", escaped_term, "|", "head", "-n", "4",
+        "/bin/sh", "-c", concat
     }
     
     defer delete(escaped_term)
 
     output, ok := run_command_output(cmd, {})
+    defer delete(output)
 
     if !ok {
         create_alert(
@@ -152,25 +183,35 @@ set_found_files :: proc() {
         )
         return
     }
-    
-    defer delete(output)
 
     lines := strings.split_lines(output)
     defer delete(lines)
     
     for line in lines {
-        if line == "" { continue }
+        if line == "" do continue
+        
         idx := strings.index(line, ":")
+        
         if idx > 0 {
-            filename := strings.clone(line[:idx])
-            content := strings.clone(line[idx+1:])
+            filename := line[:idx]
+            rest := line[idx+1:]
+            second_idx := strings.index(rest, ":")
             
-            append(&grep_found_files, GrepResult{
-                file_name = filename,
-                content = content,
-            })
-        }
+            if second_idx > 0 {
+                line_num_str := rest[:second_idx]
+                content := rest[second_idx+1:]
+                line_num, ok := strconv.parse_int(line_num_str)
+                
+                if ok {
+                    append(&grep_found_files, GrepResult{
+                        file_name = strings.clone(filename),
+                        line = line_num,
+                        content = strings.clone(content),
+                    })
+                }
+            }
     }
+}
 }
 
 @(private="package")

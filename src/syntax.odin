@@ -1059,6 +1059,8 @@ read_language_from_file :: proc(
 
 init_language_server :: proc(ext: string) {
     language := &languages[ext]
+    
+    if language == nil do return
 
     parser := ts.parser_new()
 
@@ -1106,6 +1108,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 
     language := &languages[ext]
 
+    if language == nil do return
     if len(language.lsp_command) == 0 do return
     
     stdin_r, stdin_w, _ := os2.pipe()
@@ -1948,7 +1951,8 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
         error_offset : u32
         error_type : ts.Query_Error
 
-        language := languages[active_buffer.ext]
+        language := &languages[active_buffer.ext]
+        if language == nil do return nil
         
         query := ts._query_new(
             language.ts_language^,
