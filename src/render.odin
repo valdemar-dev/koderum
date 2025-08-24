@@ -362,8 +362,8 @@ add_text :: proc(
 
         add_rect(rect_cache,
             rect{
-                (pen.x + character.offset.x + 0.11),
-                ((pen.y - character.offset.y + f32(ascend))),
+                (pen.x + character.offset.x) + 0.1,
+                ((pen.y - character.offset.y + f32(ascend))) + 0.1,
                 (width),
                 (height),
             },
@@ -378,13 +378,13 @@ add_text :: proc(
             z_index,
         )
 
-        pen.x = pen.x + (character.advance.x)
-        pen.y = pen.y + character.advance.y
+        pen.x = pen.x + math.round_f32(character.advance.x)
+        pen.y = pen.y + math.round_f32(character.advance.y)
     }
 
     if do_wrap {
-        pen.y += line_height
-        pen.x = highest_x
+        pen.y += math.round_f32(line_height)
+        pen.x = math.round_f32(highest_x)
     }
 
     return pen

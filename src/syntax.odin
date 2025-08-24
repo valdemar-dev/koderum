@@ -1401,9 +1401,14 @@ set_buffer_tokens_threaded :: proc() {
     sync.lock(&tree_mutex)
     new_tree := parse_tree(0, len(active_buffer.lines))
     ts.tree_delete(new_tree)
+    
     sync.unlock(&tree_mutex)
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        if active_buffer == nil {
+            return
+        }
+        
         context = runtime.default_context()
         
         defer free(data)
@@ -1980,7 +1985,7 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
         
         active_buffer.query = query
     }
-
+    
     set_tokens(first_line, last_line, &tree)
     
     return tree

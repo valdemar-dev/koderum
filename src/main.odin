@@ -22,11 +22,34 @@ fps : int
 second := time.Duration(1_000_000_000)
 
 do_print_frame_time : bool
-do_log_performance_metrics : bool
 
 parse_args :: proc() {
-    for arg in os.args {
-        if arg == "-save_logs" {
+    print_help :: proc() {
+        fmt.println("Available Options:")
+        
+        fmt.println("-save_logs", "Pipes stdout to stdout.txt, (relative to executable path)")
+        fmt.println("-log_unhandled_ts", "Writes captured, yet uncolored tree-sitter named nodes to stdout.")
+        fmt.println("-print_frame_time", "Writes frame times to stdout.")
+        fmt.println("-terminal_debug_mode", "Writes verbose TTY information to stdout.")
+        
+        os.exit(0)
+    }
+    
+    for arg in os.args[1:] {
+        switch arg {
+        case "-help":
+            print_help()
+            break
+        case "-log_unhandled_ts":
+            log_unhandled_treesitter_cases = true
+            break
+        case "-print_frame_time":
+            do_print_frame_time = true
+            break
+        case "-terminal_debug_mode":
+            terminal_debug_mode = true
+            break
+        case "-save_logs":
             fmt.println("NOTE: All output will be directed to stdout.txt")
 
             file_handle, err := os.open("koderum.log", os.O_WRONLY | os.O_CREATE, 0o644)
@@ -38,14 +61,11 @@ parse_args :: proc() {
             os.stdout = file_handle
 
             fmt.println("-- START OF LOG --")
-        } else if arg == "-log_unhandled_ts" {
-            log_unhandled_treesitter_cases = true
-        } else if arg == "-print_frame_time" {
-            do_print_frame_time = true
-        } else if arg == "-log_performance_metrics" {
-            do_log_performance_metrics = true
-        } else if arg == "-terminal_debug_mode" {
-            terminal_debug_mode = true
+            break
+        case: 
+            fmt.println("Unknown option:", arg)
+            print_help()
+            break
         }
     }
 }

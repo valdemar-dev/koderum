@@ -2322,6 +2322,8 @@ paste_string :: proc(str: string, line: int, char: int) {
 
 
 reload_buffer :: proc(buffer: ^Buffer) {
+    sync.lock(&tree_mutex)
+    
     old_byte_length := len(buffer.content)
     old_line_count := len(buffer.lines)
     old_last_line_char_count := utf8.rune_count(
@@ -2351,6 +2353,7 @@ reload_buffer :: proc(buffer: ^Buffer) {
     content := make([dynamic]u8, len(data))
     copy(content[:], data)
     
+    new_buffer^.query = buffer.query
     new_buffer^.content = content
 
     new_buffer^.width = fb_size.x
@@ -2404,6 +2407,9 @@ reload_buffer :: proc(buffer: ^Buffer) {
     }
     
     buffer^ = new_buffer^
+    
+    sync.unlock(&tree_mutex)
+    
     lsp_handle_file_open()
 }
 

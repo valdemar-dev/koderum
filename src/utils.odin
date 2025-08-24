@@ -423,7 +423,7 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
 
     switch key {
     case glfw.KEY_ENTER:
-        return "\n", false
+        return "\r", false
     case glfw.KEY_BACKSPACE:
         return "\b", false
     case glfw.KEY_TAB:
