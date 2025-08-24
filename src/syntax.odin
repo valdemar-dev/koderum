@@ -678,6 +678,10 @@ set_active_language_server :: proc(ext: string) {
     
     defer delete(scm_file_path)
     
+    if len(ext) < 2 {
+        return
+    }
+    
     for &file in language_servers_list {
         ext_name := ext[1:]
     

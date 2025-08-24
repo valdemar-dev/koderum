@@ -76,13 +76,13 @@ handle_grep_input :: proc() {
         hit := grep_found_files[target]
         
         open_file(
-            strings.concatenate({ cwd, "/", hit.file_name, }, context.temp_allocator)
+            strings.concatenate({ cwd, "/", hit.file_name, })
         )
         
         toggle_grep_view()
         
         set_buffer_cursor_pos(
-            hit.line,0
+            hit.line-1,0
         )
         
         return

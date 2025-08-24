@@ -2314,17 +2314,19 @@ paste_string :: proc(str: string, line: int, char: int) {
 reload_buffer :: proc(buffer: ^Buffer) {
     sync.lock(&tree_mutex)
     
+    defer sync.unlock(&tree_mutex)
+    
     old_byte_length := len(buffer.content)
     old_line_count := len(buffer.lines)
     old_last_line_char_count := utf8.rune_count(
         buffer.lines[old_line_count-1].characters[:]
     )
         
-    data, ok := os.read_entire_file_from_filename(buffer.file_name)
+    data, err := os.read_entire_file_from_filename_or_err(buffer.file_name)
     defer delete(data)
 
-    if !ok {
-        fmt.println("failed to open file")
+    if err != os.ERROR_NONE {
+        fmt.println("Could not open file:", buffer.file_name, "- Got error:", err)
 
         return
     }
