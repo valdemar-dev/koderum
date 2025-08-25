@@ -31,7 +31,10 @@ grep_found_files : [dynamic]GrepResult
 
 search_term := ""
 
-item_offset := 0 
+
+grep_progress_text : string
+
+item_offset := 0
 
 @(private="package")
 handle_grep_input :: proc() {
@@ -52,7 +55,7 @@ handle_grep_input :: proc() {
 
         item_offset = 0
 
-        thread.run(set_found_files)
+        set_found_files()
     }
    
     if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
@@ -109,7 +112,7 @@ toggle_grep_view :: proc() {
         
         search_term = ""
 
-        thread.run(set_found_files)
+        set_found_files()
         
         return
     }
@@ -139,7 +142,20 @@ run_command_output :: proc(cmd: []string, env: []string) -> (output: string, ok:
     return strings.clone(string(stdout)), true
 }
 
+
+set_found_files_thread : ^thread.Thread
+
 set_found_files :: proc() {
+    if set_found_files_thread != nil {
+        thread.terminate(set_found_files_thread, 9)
+        thread.destroy(set_found_files_thread)
+    }
+    
+    set_found_files_thread = thread.create(set_found_files_threaded)
+    thread.start(set_found_files_thread)
+}
+
+set_found_files_threaded :: proc(thread: ^thread.Thread) {
     context = global_context
     
     for file in grep_found_files {
@@ -152,11 +168,13 @@ set_found_files :: proc() {
     if search_term == "" {
         return
     }
+    
+    grep_progress_text = "Searching.."
 
     escaped_term, _ := strings.replace_all(strings.clone(search_term), "\"", "\\\"")
     
     concat := strings.concatenate({
-        `grep -Rn -m 100  -C10 "`,escaped_term,`" . | head -n 600`,
+        `grep -Rn -A10 "`,escaped_term,`" . | head -n 600`,
     })
     defer delete(concat)
     
@@ -243,6 +261,10 @@ set_found_files :: proc() {
             content = strings.clone(strings.to_string(content_builder)),
         })
     }
+    
+    if len(grep_found_files) == 0 {
+        grep_progress_text = "No Hits Found!"
+    }
 }
 
 @(private="package")
@@ -256,7 +278,7 @@ grep_append_to_search_term :: proc(key: rune) {
 
     search_term = utf8.runes_to_string(buf[:])
     
-    thread.run(set_found_files)
+    set_found_files()
 
     delete(runes)
 
@@ -420,7 +442,7 @@ draw_grep_view :: proc() {
                 },
                 TEXT_DARKER,
                 normal_text,
-                "Searching..",
+                grep_progress_text,
                 start_z + 1,
             )
             

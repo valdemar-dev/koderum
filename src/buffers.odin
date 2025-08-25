@@ -2507,32 +2507,6 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_pressed(glfw.KEY_MINUS) {
-        buffer_text_scale = clamp(buffer_text_scale + .1, buffer_text_scale, 100)
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            buffer_cursor_char_index,
-        )
-        
-        update_fonts()
-
-        return false
-    }
-
-    if is_key_pressed(glfw.KEY_SLASH) {
-        buffer_text_scale = clamp(buffer_text_scale - .1, .1, buffer_text_scale)
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            buffer_cursor_char_index,
-        )
-        
-        update_fonts()
-        
-        return false
-    }
-
     if is_key_pressed(glfw.KEY_I) {
         set_mode(.BUFFER_INPUT, glfw.KEY_I, 'i')
         

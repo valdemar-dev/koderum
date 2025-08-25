@@ -109,6 +109,8 @@ handle_global_input :: proc() -> (continue_execution: bool = true) {
         
             continue_execution = false
             
+            resize_terminal()
+            
             if active_buffer != nil {
                 set_buffer_cursor_pos(
                     buffer_cursor_line,
@@ -116,8 +118,7 @@ handle_global_input :: proc() -> (continue_execution: bool = true) {
                 )
             }
         
-            return
-            
+            return            
         }
     }
     
@@ -128,6 +129,8 @@ handle_global_input :: proc() -> (continue_execution: bool = true) {
             font_base_px = clamp(font_base_px - 1, 4, font_base_px)
             
             continue_execution = false
+            
+            resize_terminal()
             
             if active_buffer != nil {
                 set_buffer_cursor_pos(

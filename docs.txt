@@ -27,10 +27,10 @@ Buffer Motions
 (F5) -> Reload LSP Server.
 
 Terminal
-(Ctrl + T) -> Toggle Persistent Terminal (if in command mode).
+(Ctrl + T) -> Toggle Show Terminal (if in command mode).
 (I) -> Terminal Text Insert Mode.
-(Esc) -> Terminal Control Mode.
-(1-0) -> Swap To Other Terminal Instance.
+(Ctrl + Esc) -> Terminal Control Mode.
+(1-0) -> Swap To Other Terminal Instances.
 
 LSP Motions
 (.) -> Go to definition.
@@ -77,6 +77,8 @@ Yank Buffer
 (P) -> Paste from yank buffer.
 (Ctrl + P) -> Paste from clipboard.
 
+Window
+(F11) -> Toggle Fullscrreen 
 
 Configurations
 Configuration location depends on your platform.
