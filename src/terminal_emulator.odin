@@ -344,7 +344,97 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
     terminal := terminals[index]
     if terminal == nil do return
 
+    terminal^.scroll_bottom = cell_count_y - 1
+    terminal^.scroll_top = 0
     
+    for &row in terminal^.scrollback_buffer {
+        old_len := len(row)
+        resize(&row, cell_count_x)
+        
+        for c := old_len; c < cell_count_x; c += 1 {
+            row[c] = ' '
+        }
+    }
+    
+    for len(terminal^.scrollback_buffer) < cell_count_y {
+        blank := make([dynamic]rune, cell_count_x)
+        for &c in blank { c = ' ' }
+        append(&terminal^.scrollback_buffer, blank)
+    }
+    
+    for &row in terminal^.alt_buffer {
+        old_len := len(row)
+        resize(&row, cell_count_x)
+        
+        for c := old_len; c < cell_count_x; c += 1 {
+            row[c] = ' '
+        }
+    }
+    
+    for len(terminal^.alt_buffer) < cell_count_y {
+        blank := make([dynamic]rune, cell_count_x)
+        for &c in blank { c = ' ' }
+        append(&terminal^.alt_buffer, blank)
+    }
+    
+    terminal^.cursor_row = clamp(terminal^.cursor_row, 0, cell_count_y - 1)
+    terminal^.cursor_col = clamp(terminal^.cursor_col, 0, cell_count_x - 1)
+    
+    when ODIN_OS == .Linux {
+        TIOCSWINSZ :: 0x5414
+        
+        winsize :: struct {
+            ws_row: u16,
+            ws_col: u16,
+            ws_xpixel: u16,
+            ws_ypixel: u16,
+        }
+        
+        size := winsize{
+            ws_col=u16(cell_count_x),
+            ws_row=u16(cell_count_y),
+        }
+        
+        linux.ioctl(linux.Fd(terminal.master_fd), TIOCSWINSZ, uintptr(&size))
+    }
+}
+
+/*
+@(private="package")
+resize_terminal :: proc (index: int = current_terminal_idx) {
+    if terminal_debug_mode {
+        fmt.println("Terminal Debugger: Resizing Terminal")
+    }
+    
+    text := math.round_f32(font_base_px * normal_text_scale)
+
+    error := ft.set_pixel_sizes(primary_font, 0, u32(text))
+    assert(error == .Ok)
+
+    ascender := f32(primary_font.size.metrics.ascender >> 6)
+    descender := f32(primary_font.size.metrics.descender >> 6)
+    
+    char_map := get_char_map(text)
+    char := get_char_with_char_map(char_map, text, ' ')
+    if char == nil do return
+    
+    margin = font_base_px * 6
+    
+    width = fb_size.x-300
+    height = fb_size.y - margin * 2
+    
+    cell_width = char.advance.x
+    cell_height = ascender - descender
+    
+    cell_count_x = int(math.round_f32(width / f32(cell_width)))
+    cell_count_y = int(math.round_f32(height / f32(cell_height)))
+    
+    width = f32(cell_width) * f32(cell_count_x)
+    height = f32(cell_height) * f32(cell_count_y)
+    
+    terminal := terminals[index]
+    if terminal == nil do return
+
     terminal^.scroll_bottom = cell_count_y - 1
     terminal^.scroll_top = 0
     
@@ -390,6 +480,7 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
         linux.ioctl(linux.Fd(terminal.master_fd), TIOCSWINSZ, uintptr(&size))
     }
 }
+*/
 
 @(private="package")
 toggle_terminal_emulator :: proc() {
