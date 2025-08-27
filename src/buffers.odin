@@ -1470,6 +1470,8 @@ handle_text_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
         
+        reset_completion_hits()
+        
         if len(active_buffer.insert_undo_stack) > 0 {
             active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
             active_buffer.insert_undo_stack[0].redo_for = len(active_buffer.insert_undo_stack[:]) - 1
@@ -1527,24 +1529,25 @@ handle_text_input :: proc() -> bool {
         }
     }
     
-    if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        move_down()
-    }
-    if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        move_up()
-    }
-    if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        move_left()
-    }
-    if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
-        move_right()
+    {
+        if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+            move_down()
+        }
+        if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+            move_up()
+        }
+        if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+            move_left()
+        }
+        if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+            move_right()
+        }
     }
     
     if is_key_pressed(glfw.KEY_ENTER) {
-        if is_key_down(glfw.KEY_LEFT_SHIFT) {
+        if len(completion_hits) > 0 {
             insert_completion()
-            
-            return false
+            return false 
         }
 
         defer {
@@ -2629,13 +2632,13 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_J) {
+    if is_key_pressed(glfw.KEY_J) || is_key_pressed(glfw.KEY_DOWN) {
         move_down()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_K) {
+    if is_key_down(glfw.KEY_K) || is_key_pressed(glfw.KEY_DOWN) {
         key := key_store[glfw.KEY_K]
 
         if key.modifiers == SHIFT {
@@ -2645,13 +2648,13 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_K) {
+    if is_key_pressed(glfw.KEY_K) || is_key_pressed(glfw.KEY_UP) {
         move_up()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_D) {
+    if is_key_down(glfw.KEY_D) || is_key_pressed(glfw.KEY_DOWN) {
         key := key_store[glfw.KEY_D]
 
         if key.modifiers == SHIFT {
@@ -2661,13 +2664,13 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_D) {
+    if is_key_pressed(glfw.KEY_D) || is_key_pressed(glfw.KEY_LEFT) {
         move_left()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_F) {
+    if is_key_down(glfw.KEY_F){
         key := key_store[glfw.KEY_F]
 
         if key.modifiers == SHIFT {
@@ -2677,7 +2680,7 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_F) {
+    if is_key_pressed(glfw.KEY_F) || is_key_pressed(glfw.KEY_RIGHT) {
         move_right()
 
         return false

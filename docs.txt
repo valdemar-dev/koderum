@@ -10,8 +10,8 @@ Windows:
           Make sure to get either freetype.a, or .lib, and put it in the alt-odin-freetype directory.
 
 Buffer Motions
-(D)&(F) -> Left-Right Movement.
-(J)&(K) -> Up-Down Movement.
+(D)&(F) / (Left Arrow)&(Right Arrow) -> Left-Right Movement.
+(J)&(K) / (Up Arrow)&(Down Arrow) -> Up-Down Movement.
 (R) -> Move backwards in the current bufferline until a word-break character is detected.
 (U) -> Move forwards in the current bufferline until a word-break character is detected. (and then move past it)
 (I) -> Go into Text Insert mode.
@@ -36,7 +36,8 @@ LSP Motions
 (.) -> Go to definition.
 (Ctrl + E) -> Next Completion.
 (Ctrl + W) -> Previous Completion.
-(Shift + Enter) -> Insert Completion.
+(Enter) -> Insert Completion.
+(Escape) -> Clear Completion Hits
 
 Grep
 (Ctrl + O) -> Grep File Search

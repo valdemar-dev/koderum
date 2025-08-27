@@ -725,15 +725,16 @@ add_code_text :: proc(
         add_rect(
             &text_rect_cache,
             rect{
-                pen.x + character.offset.x + 0.1,
-                pen.y - character.offset.y + ascender,
-                f32(character.width), f32(character.rows)
+                math.round_f32(pen.x + character.offset.x + 0.1),
+                math.round_f32(pen.y - character.offset.y + ascender),
+                math.round_f32(f32(character.width)),
+                math.round_f32(f32(character.rows)),
             },
             rect{
-                f32(uvs.x),
-                f32(uvs.y),
-                f32(uvs.w) - rect_pack_glyp_padding,
-                f32(uvs.h) - rect_pack_glyp_padding,
+                math.round_f32(f32(uvs.x)),
+                math.round_f32(f32(uvs.y)),
+                math.round_f32(f32(uvs.w) - rect_pack_glyp_padding),
+                math.round_f32(f32(uvs.h) - rect_pack_glyp_padding),
             },
             color,
             char_uv_map_size,
@@ -766,16 +767,17 @@ add_code_text :: proc(
             }
 
             add_rect(&text_rect_cache, rect{
-                pen.x + character.offset.x + 0.1,
-                pen.y - character.offset.y + ascender + f32(character.rows),
-                f32(character.width), f32(character.rows)
+                math.round_f32(pen.x + character.offset.x + 0.1),
+                math.round_f32(pen.y - character.offset.y + ascender + f32(character.rows)),
+                math.round_f32(f32(character.width)),
+                math.round_f32(f32(character.rows))
             }, rect{
-                f32(uvs.x), f32(uvs.y), f32(uvs.w) - rect_pack_glyp_padding, f32(uvs.h) - rect_pack_glyp_padding
+                math.round_f32(f32(uvs.x)), math.round_f32(f32(uvs.y)), math.round_f32(f32(uvs.w) - rect_pack_glyp_padding), math.round_f32(f32(uvs.h) - rect_pack_glyp_padding)
             }, color, char_uv_map_size, z_index - .1)
         }
 
-        pen.x += character.advance.x
-        pen.y += character.advance.y
+        pen.x += math.round_f32(character.advance.x)
+        pen.y += math.round_f32(character.advance.y)
     }
 
     if input_mode != .HIGHLIGHT {
