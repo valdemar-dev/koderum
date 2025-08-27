@@ -32,11 +32,11 @@ Terminal
 (Ctrl + Esc) -> Terminal Control Mode.
 (1-0) -> Swap To Other Terminal Instances.
 
-LSP Motions
+Autocomplete
 (.) -> Go to definition.
 (Ctrl + E) -> Next Completion.
 (Ctrl + W) -> Previous Completion.
-(Enter) -> Insert Completion.
+(Ctrl + R) -> Insert Completion.
 (Escape) -> Clear Completion Hits
 
 Grep

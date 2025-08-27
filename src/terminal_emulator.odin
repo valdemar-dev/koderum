@@ -38,8 +38,8 @@ cell_count_y: int
 @(private="package")
 is_terminal_open := false
 
-default_fg_color := TEXT_MAIN
-default_bg_color := BG_MAIN_10
+default_fg_color := &TEXT_MAIN
+default_bg_color := &BG_MAIN_10
 
 ansi_basic_colors := [8]vec4{
     {0.0, 0.0, 0.0, 1.0},  // 0 black
@@ -117,7 +117,7 @@ get_256_color :: proc(idx: int) -> vec4 {
         gray := f32( (idx - 232) * 10 + 8 ) / 255.0
         return {gray, gray, gray, 1.0}
     }
-    return default_fg_color
+    return default_fg_color^
 }
 
 Cell :: struct {
@@ -208,7 +208,7 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
         if terminal.scroll_top == 0 && !terminal.using_alt_buffer {
             blank := make([dynamic]Cell, cell_count_x)
             
-            for &c in blank { c = Cell{' ', default_fg_color, default_bg_color} }
+            for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
             
             append(buf, blank)
             
@@ -224,7 +224,7 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
             
             buf[region_bottom] = make([dynamic]Cell, cell_count_x)
             
-            for &c in buf[region_bottom] { c = Cell{' ', default_fg_color, default_bg_color} }
+            for &c in buf[region_bottom] { c = Cell{' ', default_fg_color^, default_bg_color^} }
             
             delete(discarded)
         }
@@ -251,7 +251,7 @@ scroll_terminal_down :: proc(lines: int = 1, index: int = current_terminal_idx) 
             ordered_remove(buf, len(buf) - 1)
             blank := make([dynamic]Cell, cell_count_x)
             
-            for &c in blank { c = Cell{' ', default_fg_color, default_bg_color} }
+            for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
             
             inject_at(buf, 0, blank)
             delete(discarded)
@@ -261,7 +261,7 @@ scroll_terminal_down :: proc(lines: int = 1, index: int = current_terminal_idx) 
                 buf[r] = buf[r - 1]
             }
             buf[region_top] = make([dynamic]Cell, cell_count_x)
-            for &c in buf[region_top] { c = Cell{' ', default_fg_color, default_bg_color} }
+            for &c in buf[region_top] { c = Cell{' ', default_fg_color^, default_bg_color^} }
             delete(discarded)
         }
     }
@@ -390,8 +390,8 @@ when ODIN_OS == .Linux {
             true,
             ' ',  // last_char
             .US_ASCII,  // g0_charset
-            default_fg_color,
-            default_bg_color,
+            default_fg_color^,
+            default_bg_color^,
             false,
         }
     
@@ -458,13 +458,13 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
         resize(&row, cell_count_x)
         
         for c := old_len; c < cell_count_x; c += 1 {
-            row[c] = Cell{' ', default_fg_color, default_bg_color}
+            row[c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     }
     
     for len(terminal^.scrollback_buffer) < cell_count_y {
         blank := make([dynamic]Cell, cell_count_x)
-        for &c in blank { c = Cell{' ', default_fg_color, default_bg_color} }
+        for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
         append(&terminal^.scrollback_buffer, blank)
     }
     
@@ -473,13 +473,13 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
         resize(&row, cell_count_x)
         
         for c := old_len; c < cell_count_x; c += 1 {
-            row[c] = Cell{' ', default_fg_color, default_bg_color}
+            row[c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     }
     
     for len(terminal^.alt_buffer) < cell_count_y {
         blank := make([dynamic]Cell, cell_count_x)
-        for &c in blank { c = Cell{' ', default_fg_color, default_bg_color} }
+        for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
         append(&terminal^.alt_buffer, blank)
     }
     
@@ -639,7 +639,7 @@ draw_terminal_emulator :: proc() {
         i := start_row + local_i;
         row := buf[i];
         
-        // Draw bg runs (only if bg != default_bg_color)
+        // Draw bg runs (only if bg != default_bg_color^)
         run_start := 0;
         current_bg := row[0].bg_color;
         pos_x := x_pos;
@@ -650,7 +650,7 @@ draw_terminal_emulator :: proc() {
                 if cell.bg_color == current_bg {
                     run_len += 1;  // Include the last cell if we entered due to end-of-row
                 }
-                if run_len > 0 && current_bg != default_bg_color {
+                if run_len > 0 && current_bg != default_bg_color^ {
                     bg_run_rect := rect{
                         pos_x,
                         pen_y,
@@ -1132,15 +1132,15 @@ erase_line :: proc(params: [dynamic]int, index: int) {
     switch mode {
     case 0:
         for c in terminal.cursor_col..<cell_count_x {
-            buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     case 1:
         for c in 0..=terminal.cursor_col {
-            buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     case 2:
         for c in 0..<cell_count_x {
-            buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     }
 }
@@ -1160,7 +1160,7 @@ erase_screen :: proc(params: [dynamic]int, index: int) {
             row_idx := start_row_in_buf + r
             start_col := r == terminal.cursor_row ? terminal.cursor_col : 0
             for c in start_col..<cell_count_x {
-                buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     case 1:
@@ -1168,14 +1168,14 @@ erase_screen :: proc(params: [dynamic]int, index: int) {
             row_idx := start_row_in_buf + r
             end_col := r == terminal.cursor_row ? terminal.cursor_col : cell_count_x - 1
             for c in 0..=end_col {
-                buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     case 2:
         for r in 0..<cell_count_y {
             row_idx := start_row_in_buf + r
             for c in 0..<cell_count_x {
-                buf[row_idx][c] = Cell{' ', default_fg_color, default_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     }
@@ -1713,7 +1713,7 @@ insert_chars :: proc(n: int, index: int) {
         row[c] = row[c - effective_n]
     }
     for c := terminal.cursor_col; c < terminal.cursor_col + effective_n; c += 1 {
-        row[c] = Cell{' ', default_fg_color, default_bg_color}
+        row[c] = Cell{' ', default_fg_color^, default_bg_color^}
     }
 }
 
@@ -1732,7 +1732,7 @@ delete_chars :: proc(n: int, index: int) {
         row[c] = row[c + effective_n]
     }
     for c := cell_count_x - effective_n; c < cell_count_x; c += 1 {
-        row[c] = Cell{' ', default_fg_color, default_bg_color}
+        row[c] = Cell{' ', default_fg_color^, default_bg_color^}
     }
 }
 
@@ -1754,7 +1754,7 @@ enable_alt_buffer :: proc(index: int) {
 
     for &row in terminal.alt_buffer {
         for &c in row {
-            c = Cell{' ', default_fg_color, default_bg_color}
+            c = Cell{' ', default_fg_color^, default_bg_color^}
         }
     }
 }
@@ -1769,8 +1769,8 @@ disable_alt_buffer :: proc(index: int) {
     terminal.cursor_row = clamp(terminal.stored_cursor_row, 0, cell_count_y - 1);
     terminal.cursor_col = clamp(terminal.stored_cursor_col, 0, cell_count_x - 1);
     
-    terminal.current_fg_color = default_fg_color;
-    terminal.current_bg_color = default_bg_color;
+    terminal.current_fg_color = default_fg_color^;
+    terminal.current_bg_color = default_bg_color^;
     terminal.current_bold = false;
 }
 
@@ -1787,8 +1787,8 @@ set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
         p := params[i]
         switch p {
         case 0:
-            terminal.current_fg_color = default_fg_color
-            terminal.current_bg_color = default_bg_color
+            terminal.current_fg_color = default_fg_color^
+            terminal.current_bg_color = default_bg_color^
             terminal.current_bold = false
         case 1:
             terminal.current_bold = true
@@ -1803,9 +1803,9 @@ set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
         case 100..=107:
             terminal.current_bg_color = ansi_bright_colors[p - 100]
         case 39:
-            terminal.current_fg_color = default_fg_color
+            terminal.current_fg_color = default_fg_color^
         case 49:
-            terminal.current_bg_color = default_bg_color
+            terminal.current_bg_color = default_bg_color^
         case 38, 48:  // Extended color
             if i + 1 < len(params) {
                 sub := params[i + 1]

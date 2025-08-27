@@ -1470,7 +1470,10 @@ handle_text_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
         
-        reset_completion_hits()
+        if len(completion_hits) > 0 {
+            reset_completion_hits()
+            return false
+        }
         
         if len(active_buffer.insert_undo_stack) > 0 {
             active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
@@ -1500,32 +1503,43 @@ handle_text_input :: proc() -> bool {
 
         return false
     }
-
-    if is_key_pressed(glfw.KEY_W) {
-        key := key_store[glfw.KEY_W]
-
-        if key.modifiers == CTRL {
-            selected_completion_hit = clamp(
-                selected_completion_hit - 1,
-                0,
-                len(completion_hits) - 1
-            )
-
-            attempt_resolve_request(selected_completion_hit)
+    
+    // Auto completion stuff
+    {
+        if is_key_pressed(glfw.KEY_W) {
+            key := key_store[glfw.KEY_W]
+    
+            if key.modifiers == CTRL {
+                selected_completion_hit = clamp(
+                    selected_completion_hit - 1,
+                    0,
+                    selected_completion_hit,
+                )
+    
+                attempt_resolve_request(selected_completion_hit)
+            }
+        } 
+    
+        if is_key_pressed(glfw.KEY_E) {
+            key := key_store[glfw.KEY_E]
+    
+            if key.modifiers == CTRL {
+                selected_completion_hit = clamp(
+                    selected_completion_hit + 1,
+                    0,
+                    max(len(completion_hits)-1, 0),
+                )
+    
+                attempt_resolve_request(selected_completion_hit)
+            }
         }
-    } 
-
-    if is_key_pressed(glfw.KEY_E) {
-        key := key_store[glfw.KEY_E]
-
-        if key.modifiers == CTRL {
-            selected_completion_hit = clamp(
-                selected_completion_hit + 1,
-                0,
-                len(completion_hits) - 1
-            )
-
-            attempt_resolve_request(selected_completion_hit)
+        
+        if is_key_pressed(glfw.KEY_R) {
+            key := key_store[glfw.KEY_R]
+    
+            if key.modifiers == CTRL {
+                insert_completion()
+            }
         }
     }
     
@@ -1545,11 +1559,6 @@ handle_text_input :: proc() -> bool {
     }
     
     if is_key_pressed(glfw.KEY_ENTER) {
-        if len(completion_hits) > 0 {
-            insert_completion()
-            return false 
-        }
-
         defer {
             get_autocomplete_hits(buffer_cursor_line, buffer_cursor_char_index, "1", "")
         }
@@ -2388,6 +2397,8 @@ reload_buffer :: proc(buffer: ^Buffer) {
     
     set_buffer_cursor_pos(0,0)
     
+    sync.unlock(&tree_mutex)
+    
     notify_server_of_change(
         buffer,
         0, old_byte_length,
@@ -2402,8 +2413,6 @@ reload_buffer :: proc(buffer: ^Buffer) {
     }
     
     buffer^ = new_buffer^
-    
-    sync.unlock(&tree_mutex)
     
     lsp_handle_file_open()
 }

@@ -1639,6 +1639,8 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
 
 attempt_resolve_request :: proc(idx: int) {
     sync.lock(&completion_mutex)
+    defer sync.unlock(&completion_mutex)
+    
     if idx >= len(completion_hits) {
         return
     }
@@ -1646,6 +1648,8 @@ attempt_resolve_request :: proc(idx: int) {
     lsp_request_id += 1
 
     hit := &completion_hits[idx]
+    
+    // early unlock makes life better
     sync.unlock(&completion_mutex)
 
     msg, id := completion_item_resolve_request_message(
@@ -1829,7 +1833,6 @@ get_autocomplete_hits :: proc(
         completion_hits = new_hits
         
         sync.unlock(&completion_mutex)
-
 
         if len(completion_hits) > 0 {
             attempt_resolve_request(selected_completion_hit)

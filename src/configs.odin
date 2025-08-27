@@ -368,7 +368,7 @@ set_option :: proc(options: []string) {
     case "bg_main_50":
         BG_MAIN_50 = hex_string_to_vec4(value)
     case "text_main":
-        TEXT_MAIN = hex_string_to_vec4(value)    
+        TEXT_MAIN = hex_string_to_vec4(value)
     case "text_darker":
         TEXT_DARKER = hex_string_to_vec4(value)
     case "text_darkest":
