@@ -39,6 +39,7 @@ InputMode :: enum {
     TERMINAL,
     TERMINAL_TEXT_INPUT,
     GREP_SEARCH,
+    FIND_AND_REPLACE,
 }
 
 @(private="package")
@@ -89,6 +90,8 @@ check_inputs :: proc() -> bool {
         handle_yank_history_input()
     case .GREP_SEARCH:
         handle_grep_input()
+    case .FIND_AND_REPLACE:
+        handle_find_and_replace_input()
     }
 
     return false
@@ -218,6 +221,8 @@ char_callback :: proc "c" (handle: glfw.WindowHandle, key: rune) {
         handle_terminal_input(key)
     case .GREP_SEARCH:
         grep_append_to_search_term(key)
+    case .FIND_AND_REPLACE:
+        handle_find_and_replace_text_input(key)
     }
 }
 
@@ -378,6 +383,9 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
                 is_clicking = true
             
                 input_mode = .COMMAND
+                
+                highlight_start_line = 0
+                highlight_start_char = 0
             } else if action == glfw.RELEASE {
                 is_clicking = false
             }

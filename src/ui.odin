@@ -49,7 +49,7 @@ handle_ui_input :: proc(key, scancode, action, mods: i32) {
 
 ui_z_index :: 5000
 
-draw_ui :: proc() {
+draw_ui :: proc() {    
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
     
@@ -118,6 +118,9 @@ draw_ui :: proc() {
     case .GREP_SEARCH:
         mode_string = "Grep Search"
         mode_text_color = TOKEN_COLOR_09
+    case .FIND_AND_REPLACE:
+        mode_string = "Find & Replace"
+        mode_text_color = TOKEN_COLOR_10
     }
     
     // Draw Input Mode
@@ -360,6 +363,11 @@ draw_ui :: proc() {
                 small_text,
                 buffer_search_term,
                 ui_z_index + 4,
+                false,
+                -1,
+                true,
+                true,
+                -1,
             )       
         }
     } else if input_mode == .GO_TO_LINE {        
@@ -564,4 +572,8 @@ draw_ui :: proc() {
 
     draw_rects(&text_rect_cache)
     reset_rect_cache(&text_rect_cache)
+    
+    if input_mode == .FIND_AND_REPLACE {
+        draw_find_and_replace()
+    }
 }

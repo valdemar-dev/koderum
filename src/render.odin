@@ -401,7 +401,7 @@ process_highlights :: proc(
     advance_amount: f32, 
     highlight_width,highlight_offset: ^f32
 ) -> (was_highlighted: bool) {
-    if input_mode != .HIGHLIGHT {
+    if is_not_highlighting() {
         return false
     }        
 
@@ -524,7 +524,7 @@ add_code_text :: proc(
     negative_dir := buffer_cursor_line < highlight_start_line
 
     is_line_fully_highlighted := false
-    if input_mode == .HIGHLIGHT {
+    if is_not_highlighting() == false {
         if (line_number > buffer_cursor_line && line_number < highlight_start_line) ||
            (line_number < buffer_cursor_line && line_number > highlight_start_line) {
             is_line_fully_highlighted = true
@@ -780,7 +780,7 @@ add_code_text :: proc(
         pen.y += math.round_f32(character.advance.y)
     }
 
-    if input_mode != .HIGHLIGHT {
+    if is_not_highlighting() {
         return 0, 0
     }
 

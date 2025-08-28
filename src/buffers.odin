@@ -597,20 +597,20 @@ draw_buffer_line :: proc(
         buffer,
     )
 
-    if (input_mode == .HIGHLIGHT) {
-        add_rect(&rect_cache,
-            rect{
-                line_pos.x + highlight_offset,
-                line_pos.y,
-                highlight_width,
-                true_font_height,
-            },
-            no_texture,
-            text_highlight_bg,
-            vec2{},
-            2,
-        )
-    } else if do_highlight_current_line && buffer_cursor_line == index {
+    add_rect(&rect_cache,
+        rect{
+            line_pos.x + highlight_offset,
+            line_pos.y,
+            highlight_width,
+            true_font_height,
+        },
+        no_texture,
+        text_highlight_bg,
+        vec2{},
+        2,
+    )
+    
+    if do_highlight_current_line && buffer_cursor_line == index && is_not_highlighting() {
         add_rect(&rect_cache,
             rect{
                 0,
@@ -2809,7 +2809,9 @@ buffer_append_to_search_term :: proc(key: rune) {
     
     append_elems(&buf, ..runes)
     append_elem(&buf, key)
+    
     delete(buffer_search_term)
+    
     buffer_search_term = utf8.runes_to_string(buf[:])
 }
 
@@ -2821,7 +2823,9 @@ append_to_go_to_line_input_string :: proc(key: rune) {
     
     append_elems(&buf, ..runes)
     append_elem(&buf, key)
+    
     delete(go_to_line_input_string)
+    
     go_to_line_input_string = utf8.runes_to_string(buf[:])
 }
 
@@ -2833,7 +2837,9 @@ handle_search_input :: proc() {
         clear(&search_hits)
 
         input_mode = .COMMAND
-
+        
+        if input_mode_return_callback != nil do input_mode_return_callback()
+        
         return
     }
 
@@ -2862,6 +2868,10 @@ handle_search_input :: proc() {
 
     if is_key_pressed(glfw.KEY_ENTER) {
         selected_hit = nil
+        
+        // set just in case we went from highlight to search
+        highlight_start_line = 0
+        highlight_start_char = 0
 
         find_search_hits()
         

@@ -15,9 +15,19 @@ highlight_start_line : int
 highlight_start_char : int
 
 @(private="package")
+is_not_highlighting :: proc() -> bool {
+    if highlight_start_line == 0 && highlight_start_char == 0 do return true
+    
+    return false
+}
+
+@(private="package")
 handle_highlight_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) || is_key_pressed(glfw.KEY_V) {
         input_mode = .COMMAND
+        
+        highlight_start_line = 0
+        highlight_start_char = 0
 
         return
     } 
@@ -51,6 +61,16 @@ handle_highlight_input :: proc() {
             input_mode = .HIGHLIGHT
         }
         
+        return
+    }
+    
+    if is_key_pressed(glfw.KEY_H) {
+        set_mode(.FIND_AND_REPLACE, glfw.KEY_H, 'h')
+        
+        input_mode_return_callback = proc() {
+            input_mode = .HIGHLIGHT
+        }
+    
         return
     }
 
@@ -114,8 +134,12 @@ handle_highlight_input :: proc() {
             highlight_start_char,
             buffer_cursor_char_index,
         ) 
-
-        input_mode = .SEARCH
+    
+        set_mode(.SEARCH, glfw.KEY_G, 'g')
+        
+        input_mode_return_callback = proc() {
+            input_mode = .HIGHLIGHT
+        }
 
         find_search_hits()
     }
