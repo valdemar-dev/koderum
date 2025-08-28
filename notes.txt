@@ -2,6 +2,5 @@ todo:
     - add variable font weights
 think:
     - control + escape is a bad keybind for the terminal input mode switching.
-    - shift + enter is a bad keybind for inserting a completion
     
 bugs:

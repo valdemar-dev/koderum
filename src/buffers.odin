@@ -2133,6 +2133,55 @@ remove_selection :: proc(
     set_buffer_cursor_pos(a_line, a_char)
 }
 
+cut_line :: proc(line: int) {
+    byte_offset := compute_byte_offset(active_buffer, line, 0)
+    buf_line := active_buffer.lines[line]
+    
+    size := len(buf_line.characters)
+    
+    if line < (len(active_buffer.lines)-1) {
+        size += 1
+    }
+    
+    copy_to_yank_buffer(line,line+1,0,0)
+    
+    notify_server_of_change(
+        active_buffer,
+        byte_offset,
+        byte_offset + size,
+        line,
+        0,
+        line+1,
+        0,
+        {},
+    )
+
+    clean_line(&active_buffer.lines[line])
+    ordered_remove(active_buffer.lines, line)
+ 
+    if len(active_buffer.lines) == 0 {
+        append(active_buffer.lines, BufferLine{})
+    }
+
+    if buffer_cursor_line > len(active_buffer.lines) - 1 {
+        set_buffer_cursor_pos(
+            buffer_cursor_line - (buffer_cursor_line - (len(active_buffer.lines)-1)),
+            buffer_cursor_char_index,
+        )
+    }
+    
+    new_line := active_buffer.lines[buffer_cursor_line]
+    
+    new_line_size := len(new_line.characters)
+    
+    if buffer_cursor_char_index > new_line_size {
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            new_line_size,
+        )
+    }
+}
+
 delete_line :: proc(line: int) {
     byte_offset := compute_byte_offset(active_buffer, line, 0)
     buf_line := active_buffer.lines[line]
@@ -2462,12 +2511,18 @@ handle_buffer_input :: proc() -> bool {
         key := key_store[glfw.KEY_C]
 
         if key.modifiers == SHIFT {
-            delete_line(buffer_cursor_line)
+            cut_line(buffer_cursor_line)
         }
     }
 
-    if is_key_pressed(glfw.KEY_X) {
-        undo_change()
+    if is_key_pressed(glfw.KEY_X) {        
+        key := key_store[glfw.KEY_X]
+    
+        if key.modifiers == SHIFT {
+            delete_line(buffer_cursor_line)
+        } else {
+            undo_change()
+        }
     }
 
     if is_key_pressed(glfw.KEY_C) {
@@ -2711,14 +2766,18 @@ handle_movement_input :: proc() -> bool {
         key := key_store[glfw.KEY_A]
         
         if key.modifiers == SHIFT {
+            target := len(active_buffer.lines) - 1
+            
+            line := active_buffer.lines[target]
+            target_rune := byte_offset_to_rune_index(string(line.characters[:]), 0)
+            
             set_buffer_cursor_pos(
-                len(active_buffer.lines) - 1,
-                buffer_cursor_char_index,
+                target,
+                target_rune,
             )
             
             return true
         }
-        
         
         line := active_buffer.lines[buffer_cursor_line]
 

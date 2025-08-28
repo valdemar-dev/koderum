@@ -19,7 +19,8 @@ Buffer Motions
 (Z) -> Go to start of line.
 (Shift + Z) -> Go to start of file.
 (Shift + A) -> Go to end of file.
-(Shift + C) -> Delete Current Line
+(Shift + C) -> Cut Current Line.
+(Shift + X) -> Delete Current Line.
 (Ctrl + S) -> Save active buffer.
 (Q) -> Toggle File Info View.
 (Ctrl + Shift + W) -> Close File.

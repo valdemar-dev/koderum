@@ -321,13 +321,6 @@ tick_smooth_scroll :: proc() {
         scroll_target_x,
         0
     )
-
-    /*
-    active_buffer.scroll_x = clamp(
-        active_buffer.scroll_x,
-        -1000,
-        0,
-    )*/
 }
 
 is_clicking := false
