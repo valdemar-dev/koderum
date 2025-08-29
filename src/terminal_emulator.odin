@@ -42,14 +42,14 @@ default_fg_color := &TEXT_MAIN
 default_bg_color := &BG_MAIN_10
 
 ansi_basic_colors := [8]vec4{
-    {0.0, 0.0, 0.0, 1.0},  // 0 black
-    {0.5, 0.0, 0.0, 1.0},  // 1 red
-    {0.0, 0.5, 0.0, 1.0},  // 2 green
-    {0.5, 0.5, 0.0, 1.0},  // 3 yellow
-    {0.0, 0.0, 0.5, 1.0},  // 4 blue
-    {0.5, 0.0, 0.5, 1.0},  // 5 magenta
+    {0.1, 0.1, 0.1, 1.0},  // 0 black
+    {1, 0.0, 0.0, 1.0},  // 1 red
+    {0.0, 1, 0.0, 1.0},  // 2 green
+    {0, 1, 1, 1.0},  // 3 yellow
+    {0, 0.0, 1, 1.0},  // 4 blue
+    {1, 0.0, 1, 1.0},  // 5 magenta
     {0.0, 0.5, 0.5, 1.0},  // 6 cyan
-    {0.8, 0.8, 0.8, 1.0},  // 7 white
+    {1, 1, 1, 1.0},  // 7 white
 }
 
 ansi_bright_colors := [8]vec4{
@@ -197,9 +197,6 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
 
     buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
 
-    sync.lock(&terminal.rw_mutex)
-    defer sync.unlock(&terminal.rw_mutex)
-
     for _ in 0..<lines {
         start_row_in_buf := max(0, len(buf) - cell_count_y)
         region_top := start_row_in_buf + terminal.scroll_top
@@ -237,9 +234,6 @@ scroll_terminal_down :: proc(lines: int = 1, index: int = current_terminal_idx) 
     if terminal == nil { return }
 
     buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
-
-    sync.lock(&terminal.rw_mutex)
-    defer sync.unlock(&terminal.rw_mutex)
 
     for _ in 0..<lines {
         start_row_in_buf := max(0, len(buf) - cell_count_y)
@@ -560,6 +554,9 @@ draw_terminal_emulator :: proc() {
     
     terminal := terminals[current_terminal_idx]
     if terminal == nil do return
+    
+    sync.lock(&terminal.rw_mutex)
+    defer sync.unlock(&terminal.rw_mutex)
 
     pen := vec2{x_pos, margin}
     
@@ -629,27 +626,38 @@ draw_terminal_emulator :: proc() {
         add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 3);
     }
     
+    draw_rects(&rect_cache)
+    draw_rects(&text_rect_cache)
+    
+    reset_rect_cache(&rect_cache)
+    reset_rect_cache(&text_rect_cache)
+    
+    z_index *= 2
+    
     buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer;
     start_row := max(0, len(buf) - cell_count_y);
     num_displayed := min(len(buf) - start_row, cell_count_y);
     
-    pen_y := margin;  // Use cell_height instead of ascender-descender for consistency
+    pen_y := margin;
     
     for local_i in 0..<num_displayed {
         i := start_row + local_i;
         row := buf[i];
         
-        // Draw bg runs (only if bg != default_bg_color^)
         run_start := 0;
         current_bg := row[0].bg_color;
         pos_x := x_pos;
+        
         for col in 0..<cell_count_x {
             cell := row[col];
+            
             if cell.bg_color != current_bg || col == cell_count_x - 1 {
                 run_len := col - run_start;
+                
                 if cell.bg_color == current_bg {
-                    run_len += 1;  // Include the last cell if we entered due to end-of-row
+                    run_len += 1;
                 }
+                
                 if run_len > 0 && current_bg != default_bg_color^ {
                     bg_run_rect := rect{
                         pos_x,
@@ -657,45 +665,60 @@ draw_terminal_emulator :: proc() {
                         f32(run_len) * cell_width,
                         cell_height,
                     };
-                    add_rect(&rect_cache, bg_run_rect, no_texture, current_bg, vec2{}, z_index);
+                    
+                    add_rect(&rect_cache, bg_run_rect, no_texture, current_bg, vec2{}, z_index+3);
                 }
+                
                 pos_x += f32(run_len) * cell_width;
                 run_start = col;
                 current_bg = cell.bg_color;
             }
         }
         
-        // Draw text runs (group by same fg_color)
         run_start = 0;
         current_fg := row[0].fg_color;
         pos_x = x_pos;
+        
         sb := strings.builder_make();
+        
         for col in 0..<cell_count_x {
             cell := row[col];
+            
             if cell.fg_color != current_fg || col == cell_count_x - 1 {
                 run_len := col - run_start;
+                
                 if cell.fg_color == current_fg {
-                    run_len += 1;  // Include the last cell if we entered due to end-of-row
+                    run_len += 1;
                 }
-                // Build str for previous run
+                
                 for j in run_start..<run_start + run_len {
                     strings.write_rune(&sb, row[j].ch);
                 }
+                
                 str := strings.to_string(sb);
+                
                 if len(str) > 0 {
                     add_text(
                         &text_rect_cache,
                         {pos_x, pen_y},
-                        current_fg,
+                        vec4{
+                            current_fg.x,
+                            current_fg.y,
+                            current_fg.z,
+                            1,
+                        },
                         text,
                         str,
-                        z_index + 1,
+                        z_index + 4,
                         true,
                         -1
                     );
                 }
+                
                 pos_x += f32(run_len) * cell_width;
+                
                 strings.builder_reset(&sb);
+                
                 run_start = col;
                 current_fg = cell.fg_color;
             }
@@ -728,157 +751,6 @@ draw_terminal_emulator :: proc() {
     draw_rects(&rect_cache)
     draw_rects(&text_rect_cache)
 }
-/*
-@(private="package")
-draw_terminal_emulator :: proc() {
-    if suppress {
-        x_pos = fb_size.x
-        return
-    }
-
-    text := math.round_f32(font_base_px * normal_text_scale)
-    error := ft.set_pixel_sizes(primary_font, 0, u32(text))
-    assert(error == .Ok)
-    ascender := f32(primary_font.size.metrics.ascender >> 6)
-    descender := f32(primary_font.size.metrics.descender >> 6)
-    
-    line_thickness := math.round_f32(font_base_px * line_thickness_em)
-
-    small_text := math.round_f32(font_base_px * small_text_scale)
-    padding := small_text
-    
-    z_index: f32 = 100
-    reset_rect_cache(&rect_cache)
-    reset_rect_cache(&text_rect_cache)
-    
-    terminal := terminals[current_terminal_idx]
-    if terminal == nil do return
-    
-    
-    pen := vec2{x_pos, margin}
-    
-    // Draw Terminal Title
-    {
-        padding_sm := math.round_f32(padding * .5)
-        
-        title_pos := vec2{
-            x_pos,
-            font_base_px * 5 - (padding_sm * 2),
-        }
-        
-        text := math.round_f32(font_base_px * normal_text_scale)
-        error := ft.set_pixel_sizes(primary_font, 0, u32(text))
-        assert(error == .Ok)
-        ascender := f32(primary_font.size.metrics.ascender >> 6)
-        descender := f32(primary_font.size.metrics.descender >> 6)
-        
-        bg_rect := rect{
-            title_pos.x - padding - line_thickness,
-            title_pos.y - padding_sm - line_thickness,
-            width + padding * 2 + (line_thickness * 2),
-            ascender - descender + padding_sm*2 + (line_thickness * 2),
-        }
-        
-        sb := strings.builder_make()
-        
-        strings.write_string(&sb, "Term:")
-        strings.write_int(&sb, current_terminal_idx)
-        strings.write_string(&sb, " - ")
-        strings.write_string(&sb, terminal.title)
-        
-        defer strings.builder_destroy(&sb)
-        
-        add_text(
-            &text_rect_cache,
-            title_pos,
-            TEXT_MAIN,
-            small_text,
-            strings.to_string(sb),
-            z_index + 1,
-            true,
-            -1
-        )
-        
-        add_rect(&rect_cache, bg_rect, no_texture, border_color, vec2{}, z_index)
-    }
-    
-    // Draw Terminal Content
-    {
-        bg_rect := rect{
-            x_pos - padding,
-            margin - padding, 
-            width + padding * 2, 
-            height + padding * 2,
-        }
-        
-        add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_10, vec2{}, z_index-2)
-
-        border_rect := rect{
-            bg_rect.x - line_thickness,
-            bg_rect.y - line_thickness,
-            bg_rect.width + line_thickness * 2,
-            bg_rect.height + line_thickness * 2,
-        }
-        
-        add_rect(&rect_cache, border_rect, no_texture, border_color, vec2{}, z_index - 3)
-    }
-    
-    buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer
-    start_row := max(0, len(buf) - cell_count_y)
-    num_displayed := min(len(buf) - start_row, cell_count_y)
-    
-    for local_i in 0..<num_displayed {
-        i := start_row + local_i
-        row := buf[i]
-        
-        runes := make([dynamic]rune)
-        defer delete(runes)
-        
-        for cell in row {
-            append(&runes, cell.ch)
-        }
-        
-        str := utf8.runes_to_string(runes[:])
-        defer delete(str)
-        
-        add_text(
-            &text_rect_cache,
-            pen,
-            TEXT_MAIN,
-            text,
-            str,
-            z_index + 1,
-            true,
-            -1
-        )
-        pen.y += (ascender - descender)
-    }
-    
-    if (input_mode == .TERMINAL_TEXT_INPUT) && terminal.cursor_visible {
-        cursor_rect := rect{
-            x=x_pos + (f32(terminal^.cursor_col) * cell_width),
-            y=margin + (f32(terminal^.cursor_row) * cell_height),
-            width=cell_width,
-            height=cell_height
-        }
-        
-        if cursor_rect.y + cursor_rect.height < ((margin + padding) + height) {
-            add_rect(
-                &rect_cache,
-                cursor_rect,
-                no_texture,
-                TEXT_MAIN,
-                vec2{},
-                z_index + 2,
-            )
-        }
-    }
-    
-    draw_rects(&rect_cache)
-    draw_rects(&text_rect_cache)
-}
-*/
-
 
 @(private="package")
 handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_continue: bool) {
@@ -1211,10 +1083,13 @@ process_ansi_chunk :: proc(input: string, index: int) {
     if terminal_debug_mode {
         fmt.println("Terminal Debugger: Processing ANSI Chunk.", transmute([]u8)input)
     }
-
+    
     terminal := terminals[index]
     if terminal == nil { return }
 
+    sync.lock(&terminal.rw_mutex)
+    defer sync.unlock(&terminal.rw_mutex)
+    
     for i := 0; i < len(input); i += 1 {
         b := input[i]
 
@@ -1781,6 +1656,14 @@ set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
 
     terminal := terminals[index]
     if terminal == nil { return }
+    
+    if len(params) == 0 {
+        terminal.current_fg_color = default_fg_color^
+        terminal.current_bg_color = default_bg_color^
+        terminal.current_bold = false
+        
+        return
+    }
 
     i := 0
     for i < len(params) {

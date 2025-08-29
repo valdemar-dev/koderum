@@ -4,3 +4,4 @@ think:
     - control + escape is a bad keybind for the terminal input mode switching.
     
 bugs:
+    - bad free in edit_alert(?)

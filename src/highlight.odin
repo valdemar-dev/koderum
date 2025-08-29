@@ -90,6 +90,9 @@ handle_highlight_input :: proc() {
         )
 
         input_mode = .COMMAND
+        
+        highlight_start_char = 0
+        highlight_start_line = 0
 
         return
     }
@@ -103,6 +106,9 @@ handle_highlight_input :: proc() {
         )
 
         input_mode = .COMMAND
+        
+        highlight_start_char = 0
+        highlight_start_line = 0
 
         return
     }
@@ -125,6 +131,9 @@ handle_highlight_input :: proc() {
         }
         
         input_mode = .COMMAND
+        
+        highlight_start_char = 0
+        highlight_start_line = 0
     }
 
     if is_key_pressed(glfw.KEY_G) {
@@ -137,9 +146,8 @@ handle_highlight_input :: proc() {
     
         set_mode(.SEARCH, glfw.KEY_G, 'g')
         
-        input_mode_return_callback = proc() {
-            input_mode = .HIGHLIGHT
-        }
+        highlight_start_line = 0
+        highlight_start_char = 0
 
         find_search_hits()
     }
