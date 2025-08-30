@@ -1689,6 +1689,9 @@ attempt_resolve_request :: proc(idx: int) {
             return
         }
         
+        sync.lock(&completion_mutex)
+        defer sync.unlock(&completion_mutex)
+        
         hit_ptr := data.hit_ptr
 
         if hit_ptr == nil {
@@ -1698,7 +1701,6 @@ attempt_resolve_request :: proc(idx: int) {
         result,_ := response["result"].(json.Object)
         detail,detail_ok := result["detail"].(string)
         
-        sync.lock(&completion_mutex)
         
         if detail_ok {
             if (hit_ptr^.detail != "") {
@@ -1707,8 +1709,6 @@ attempt_resolve_request :: proc(idx: int) {
             
             hit_ptr^.detail = strings.clone(detail)
         }
-        
-        sync.unlock(&completion_mutex)
     }
 }
 
@@ -1994,6 +1994,8 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
 }
 
 set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) { 
+    if active_language_server == nil do return
+    
     if tree_ptr == nil {
         return
     }

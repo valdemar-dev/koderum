@@ -397,7 +397,7 @@ update_thread_allocator : mem.Allocator
 update :: proc(thread: ^thread.Thread) {
     last_time := glfw.GetTime()
 
-    context.allocator = update_thread_allocator
+    context = global_context
 
     for !glfw.WindowShouldClose(window) {
         current_time := glfw.GetTime()
