@@ -1318,12 +1318,14 @@ handle_normal_char :: proc(r: rune, index: int) {
         effective_r = '\u00A3'
     }
 
-    buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer
-    start_row_in_buf := max(0, len(buf) - cell_count_y)
+    buf: ^[dynamic][dynamic]Cell = terminal.using_alt_buffer ? &terminal.alt_buffer : &terminal.scrollback_buffer
+
+    clear_needed := false
 
     if terminal.cursor_col >= cell_count_x {
         terminal.cursor_col = 0
         newline(index)
+        clear_needed = true
     }
 
     if terminal.cursor_row >= cell_count_y {
@@ -1331,8 +1333,16 @@ handle_normal_char :: proc(r: rune, index: int) {
         terminal.cursor_row = cell_count_y - 1
     }
 
+    start_row_in_buf := max(0, len(buf^) - cell_count_y)
     row_idx := start_row_in_buf + terminal.cursor_row
-    buf[row_idx][terminal.cursor_col] = Cell{effective_r, terminal.current_fg_color, terminal.current_bg_color}
+
+    if clear_needed {
+        for &c in buf^[row_idx] {
+            c = Cell{' ', default_fg_color^, default_bg_color^}
+        }
+    }
+
+    buf^[row_idx][terminal.cursor_col] = Cell{effective_r, terminal.current_fg_color, terminal.current_bg_color}
     terminal.cursor_col += 1
     terminal.last_char = effective_r
 }
