@@ -190,6 +190,29 @@ Ansi_State :: enum {
     Designator
 }
 
+ensure_row :: proc(index: int = current_terminal_idx) {
+    terminal := terminals[index]
+    if terminal == nil { return }
+    
+    buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
+
+    blank := make([dynamic]Cell, cell_count_x)
+    for i in 0..<len(blank) { blank[i] = Cell{' ', default_fg_color^, default_bg_color^} }
+
+    append(buf, blank)
+
+    if !terminal.using_alt_buffer && len(buf) > scrollback_limit {
+        discarded := buf[0]
+        ordered_remove(buf, 0)
+        delete(discarded)
+
+        if terminal.scroll_top > 0 {
+            terminal.scroll_top -= 1
+            terminal.scroll_bottom -= 1
+        }
+    }
+}
+
 @(private="package")
 scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
     terminal := terminals[index]
@@ -197,33 +220,14 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
 
     buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
 
-    for _ in 0..<lines {
-        start_row_in_buf := max(0, len(buf) - cell_count_y)
-        region_top := start_row_in_buf + terminal.scroll_top
-        region_bottom := start_row_in_buf + terminal.scroll_bottom
+    max_scroll := max(0, len(buf) - cell_count_y)
 
-        if terminal.scroll_top == 0 && !terminal.using_alt_buffer {
-            blank := make([dynamic]Cell, cell_count_x)
-            
-            for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
-            
-            append(buf, blank)
-            
-            if len(buf) > scrollback_limit {
-                delete(buf[0])
-                ordered_remove(buf, 0)
-            }
+    for _ in 0..<lines {
+        if terminal.scroll_top < max_scroll {
+            terminal^.scroll_top += 1
+            terminal^.scroll_bottom += 1
         } else {
-            discarded := buf[region_top]
-            for r := region_top; r < region_bottom; r += 1 {
-                buf[r] = buf[r + 1]
-            }
-            
-            buf[region_bottom] = make([dynamic]Cell, cell_count_x)
-            
-            for &c in buf[region_bottom] { c = Cell{' ', default_fg_color^, default_bg_color^} }
-            
-            delete(discarded)
+            break
         }
     }
 }
@@ -236,30 +240,11 @@ scroll_terminal_down :: proc(lines: int = 1, index: int = current_terminal_idx) 
     buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
 
     for _ in 0..<lines {
-        start_row_in_buf := max(0, len(buf) - cell_count_y)
-        region_top := start_row_in_buf + terminal.scroll_top
-        region_bottom := start_row_in_buf + terminal.scroll_bottom
-
-        if terminal.scroll_top == 0 && !terminal.using_alt_buffer {
-            discarded := buf[len(buf) - 1]
-            ordered_remove(buf, len(buf) - 1)
-            blank := make([dynamic]Cell, cell_count_x)
-            
-            for &c in blank { c = Cell{' ', default_fg_color^, default_bg_color^} }
-            
-            inject_at(buf, 0, blank)
-            delete(discarded)
-        } else {
-            discarded := buf[region_bottom]
-            for r := region_bottom; r > region_top; r -= 1 {
-                buf[r] = buf[r - 1]
-            }
-            buf[region_top] = make([dynamic]Cell, cell_count_x)
-            for &c in buf[region_top] { c = Cell{' ', default_fg_color^, default_bg_color^} }
-            delete(discarded)
-        }
+        terminal^.scroll_top = clamp(terminal.scroll_top - 1, (len(terminal.scrollback_buffer) - cell_count_y) * -1, terminal.scroll_top)
+        terminal^.scroll_bottom = clamp(terminal.scroll_bottom - 1, cell_count_y, terminal.scroll_bottom)
     }
 }
+
 
 when ODIN_OS == .Linux {
     TIOCSCTTY: u64 = 0x540E
@@ -634,69 +619,80 @@ draw_terminal_emulator :: proc() {
     
     z_index *= 2
     
-    buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer;
-    start_row := max(0, len(buf) - cell_count_y);
-    num_displayed := min(len(buf) - start_row, cell_count_y);
+    buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer
     
-    pen_y := margin;
+    // base start of the live window (bottom of buffer by default)
+    base_start := max(0, len(buf) - cell_count_y)
+    
+    // region defined by scroll offsets (relative to base_start)
+    region_top := base_start + terminal.scroll_top
+    region_bottom := base_start + terminal.scroll_bottom
+    
+    // clamp to buffer bounds
+    if region_top < 0 { region_top = 0 }
+    if region_bottom > len(buf) - 1 { region_bottom = len(buf) - 1 }
+    if region_top > region_bottom { return } // nothing to draw
+    
+    num_displayed := region_bottom - region_top + 1
+    pen_y := margin
     
     for local_i in 0..<num_displayed {
-        i := start_row + local_i;
-        row := buf[i];
-        
-        run_start := 0;
-        current_bg := row[0].bg_color;
-        pos_x := x_pos;
-        
+        i := region_top + local_i
+        row := buf[i]
+    
+        // background runs
+        run_start := 0
+        current_bg := row[0].bg_color
+        pos_x := x_pos
+    
         for col in 0..<cell_count_x {
-            cell := row[col];
-            
+            cell := row[col]
+    
             if cell.bg_color != current_bg || col == cell_count_x - 1 {
-                run_len := col - run_start;
-                
+                run_len := col - run_start
                 if cell.bg_color == current_bg {
-                    run_len += 1;
+                    run_len += 1
                 }
-                
+    
                 if run_len > 0 && current_bg != default_bg_color^ {
                     bg_run_rect := rect{
                         pos_x,
                         pen_y,
                         f32(run_len) * cell_width,
                         cell_height,
-                    };
-                    
-                    add_rect(&rect_cache, bg_run_rect, no_texture, current_bg, vec2{}, z_index+3);
+                    }
+    
+                    add_rect(&rect_cache, bg_run_rect, no_texture, current_bg, vec2{}, z_index+3)
                 }
-                
-                pos_x += f32(run_len) * cell_width;
-                run_start = col;
-                current_bg = cell.bg_color;
+    
+                pos_x += f32(run_len) * cell_width
+                run_start = col
+                current_bg = cell.bg_color
             }
         }
-        
-        run_start = 0;
-        current_fg := row[0].fg_color;
-        pos_x = x_pos;
-        
-        sb := strings.builder_make();
-        
+    
+        // foreground/text runs
+        run_start = 0
+        current_fg := row[0].fg_color
+        pos_x = x_pos
+    
+        sb := strings.builder_make()
+    
         for col in 0..<cell_count_x {
-            cell := row[col];
-            
+            cell := row[col]
+    
             if cell.fg_color != current_fg || col == cell_count_x - 1 {
-                run_len := col - run_start;
-                
+                run_len := col - run_start
                 if cell.fg_color == current_fg {
-                    run_len += 1;
+                    run_len += 1
                 }
-                
+    
                 for j in run_start..<run_start + run_len {
-                    strings.write_rune(&sb, row[j].ch);
+                    strings.write_rune(&sb, row[j].ch)
                 }
-                
-                str := strings.to_string(sb);
-                
+    
+                str := strings.to_string(sb)
+    
                 if len(str) > 0 {
                     add_text(
                         &text_rect_cache,
@@ -711,22 +707,22 @@ draw_terminal_emulator :: proc() {
                         str,
                         z_index + 4,
                         true,
-                        -1
-                    );
+                        -1,
+                    )
                 }
-                
-                pos_x += f32(run_len) * cell_width;
-                
-                strings.builder_reset(&sb);
-                
-                run_start = col;
-                current_fg = cell.fg_color;
+    
+                pos_x += f32(run_len) * cell_width
+                strings.builder_reset(&sb)
+    
+                run_start = col
+                current_fg = cell.fg_color
             }
         }
-        strings.builder_destroy(&sb);
-        
-        pen_y += cell_height;
+    
+        strings.builder_destroy(&sb)
+        pen_y += cell_height
     }
+
     
     if (input_mode == .TERMINAL_TEXT_INPUT) && terminal.cursor_visible {
         cursor_rect := rect{
@@ -1228,7 +1224,7 @@ newline :: proc(index: int) {
 
     terminal.cursor_row += 1
     if terminal.cursor_row > terminal.scroll_bottom {
-        scroll_terminal_up(1, index)
+        ensure_row(index)
         terminal.cursor_row = terminal.scroll_bottom
     }
 }

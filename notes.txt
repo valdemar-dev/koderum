@@ -5,3 +5,4 @@ think:
     
 bugs:
     - bad free in edit_alert(?)
+    - nil pointer dereference in set_tokens() when reloading a file
