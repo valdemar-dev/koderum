@@ -90,7 +90,8 @@ message_loop :: proc(thread: ^thread.Thread) {
         obj, ok := parsed.(json.Object)
 
         if !ok {
-            fmt.println(string(bytes))
+            fmt.println("String Rep:", string(bytes))
+            fmt.println("Byte Rep:", bytes)
             
             panic("Malformed LSP JSON.")
         }

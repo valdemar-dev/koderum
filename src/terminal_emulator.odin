@@ -207,8 +207,8 @@ ensure_row :: proc(index: int = current_terminal_idx) {
         delete(discarded)
 
         if terminal.scroll_top > 0 {
-            terminal.scroll_top -= 1
-            terminal.scroll_bottom -= 1
+            terminal^.scroll_top -= 1
+            terminal^.scroll_bottom -= 1
         }
     }
 }
@@ -224,7 +224,7 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
 
     for _ in 0..<lines {
         if terminal.scroll_top < max_scroll {
-            terminal^.scroll_top += 1
+            terminal^.scroll_top = clamp(terminal.scroll_top + 1, terminal.scroll_top, len(buf))
             terminal^.scroll_bottom += 1
         } else {
             break
@@ -590,14 +590,16 @@ draw_terminal_emulator :: proc() {
         add_rect(&rect_cache, bg_rect, no_texture, border_color, vec2{}, z_index)
     }
     
+    bg_rect := rect{
+        x_pos - padding,
+        margin - padding, 
+        width + padding * 2, 
+        height + padding * 2,
+    }
+
     // Draw Terminal Content
     {
-        bg_rect := rect{
-            x_pos - padding,
-            margin - padding, 
-            width + padding * 2, 
-            height + padding * 2,
-        }
+
         
         add_rect(&rect_cache, bg_rect, no_texture, BG_MAIN_10, vec2{}, z_index-2);
     
@@ -639,6 +641,10 @@ draw_terminal_emulator :: proc() {
     for local_i in 0..<num_displayed {
         i := region_top + local_i
         row := buf[i]
+        
+        if pen_y >= (bg_rect.y + bg_rect.height - text) {
+            break
+        }
     
         // background runs
         run_start := 0
@@ -749,7 +755,10 @@ draw_terminal_emulator :: proc() {
 }
 
 @(private="package")
-handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_continue: bool) {
+handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_continue: bool) {    
+    terminal := terminals[current_terminal_idx]
+    if terminal == nil do return
+
     if action == glfw.RELEASE do return true
     
     if key == glfw.KEY_ESCAPE && is_key_down(glfw.KEY_LEFT_CONTROL) {
@@ -757,14 +766,10 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
         
         return false
     }
-        
+    
     seq, did_allocate := map_glfw_key_to_escape_sequence(key, mods)
     
-    
     if seq != "" {
-        terminal := terminals[current_terminal_idx]
-        if terminal == nil do return true
-        
         write_to_shell(terminal^, seq)
     }
     
@@ -790,6 +795,11 @@ handle_terminal_control_input :: proc() -> bool {
     if is_key_pressed(glfw.KEY_I) {
         set_mode(.TERMINAL_TEXT_INPUT, glfw.KEY_I, 'i')
         
+        terminal := terminals[current_terminal_idx]
+        if terminal == nil do return false
+        
+        terminal^.scroll_top = 0
+        
         return false
     }
 
@@ -798,6 +808,7 @@ handle_terminal_control_input :: proc() -> bool {
         
         return false
     }
+    
     if is_key_pressed(glfw.KEY_2) {
         swap_terminal(1)
         
