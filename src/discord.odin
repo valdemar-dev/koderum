@@ -94,7 +94,7 @@ when ODIN_OS == .Linux {
     }
     
     discord_ipc_loop :: proc(t: ^thread.Thread) {
-        context = runtime.default_context()
+        context = global_context
         
         for {
             header: [8]u8
@@ -248,6 +248,8 @@ when ODIN_OS == .Linux {
         connect_discord_ipc()
         
         looper :: proc() {
+            context = global_context
+            
             if discord_socket_fd != -1 {
                 for {
                     if active_buffer != nil {

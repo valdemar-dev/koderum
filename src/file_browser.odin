@@ -55,6 +55,8 @@ renaming_file_name : string
 
 @(private="package")
 handle_browser_input :: proc() {
+    context = global_context
+    
     if attempting_file_deletion {
         if (is_key_pressed(glfw.KEY_ENTER) && is_key_down(glfw.KEY_LEFT_CONTROL)) {
             target := item_offset
@@ -329,6 +331,8 @@ toggle_browser_view :: proc() {
 }
 
 set_found_files :: proc() {
+    context = global_context 
+    
     clear(&cached_dirs)
     clear(&found_files)
 

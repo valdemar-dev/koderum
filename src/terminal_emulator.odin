@@ -930,7 +930,9 @@ when ODIN_OS == .Windows {
     }
 } else {
     @(private="package")
-    terminal_loop :: proc(self: ^thread.Thread) {    
+    terminal_loop :: proc(self: ^thread.Thread) {
+        context = global_context
+        
         defer fmt.println("Terminal loop exited.")
         
         last_time := glfw.GetTime()

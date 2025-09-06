@@ -6,7 +6,8 @@ think:
 bugs:
     - bad free in edit_alert(?)
     - nil pointer dereference in set_tokens() when reloading a file
-    - bad free in reset_completion_hits(), from set_buffer_cursor_pos-
-    - nil pointer dereference in hit_ptr.detail in resolve completion hit
+    // maybe fixed? - bad free in reset_completion_hits(), from set_buffer_cursor_pos-
+    // maybe fixed? - nil pointer dereference in hit_ptr.detail in resolve completion hit
     - malformed LSP json panic sometimes?
     - undo is fucked (?) bad positioning
+    - does not track all allocations? / unnoticed memory leak

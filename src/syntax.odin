@@ -445,6 +445,8 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
 }
 
 init_parser :: proc(language: ^Language) {
+    context = global_context
+    
     message := strings.concatenate({
         "The parser for the language ",
         language.parser_name,
@@ -1688,6 +1690,8 @@ attempt_resolve_request :: proc(idx: int) {
         if active_buffer.version != version {
             return
         }
+        
+        if data == nil do return
         
         sync.lock(&completion_mutex)
         defer sync.unlock(&completion_mutex)
