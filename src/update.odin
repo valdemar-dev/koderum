@@ -27,6 +27,8 @@ requests : [dynamic]LSPRequest
 
 @(private="package")
 update_state :: proc(current_time: f64) {
+    context = global_context
+    
     if do_refresh_buffer_tokens {
         set_buffer_tokens_threaded()
     }
@@ -126,6 +128,8 @@ message_loop :: proc(thread: ^thread.Thread) {
 
 @(private="package")
 clear_lsp_requests :: proc() {
+    context = global_context
+    
     for &request,index in requests {
         delete(request.id, global_context.allocator)
 
@@ -249,10 +253,6 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
         if start_line == end_line {
             if int(start_line) >= len(buffer.lines) {
-                // used to print, safer to just ignore.
-                // can be due to poor LSP handling.
-                // fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
-
                 continue
             }
 
@@ -275,8 +275,6 @@ set_lsp_diagnostics :: proc(errors: json.Array, buffer: ^Buffer) {
 
         for cur_line in start_line..=end_line {
             if int(cur_line) >= len(buffer.lines) {
-                //fmt.println("A BUFFER ERROR WAS OUT OF BOUNDS: ", error_obj)
-
                 continue
             }
 
@@ -339,6 +337,8 @@ send_lsp_message :: proc(
     version: int,
     buffer: ^Buffer,
 ) {
+    context = global_context
+    
     if active_language_server == nil {
         return
     }

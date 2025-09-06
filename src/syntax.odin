@@ -104,10 +104,10 @@ LanguageServer :: struct {
 
 Token :: struct {
     line: i32,
-    char:        i32,
-    length:      i32,
+    char: i32,
+    length: i32,
     color: vec4,
-    modifiers:   []string,
+    modifiers: [dynamic]string,
     priority: u8,
 }
 
@@ -1286,16 +1286,18 @@ lsp_handle_file_open :: proc() {
     do_refresh_buffer_tokens = true
 }
 
-decode_modifiers :: proc(bitset: i32, modifiers: []string) -> []string {
+decode_modifiers :: proc(bitset: i32, modifiers: []string) -> [dynamic]string {
+    context = global_context
+    
     result := make([dynamic]string)
     
     for i in 0..<len(modifiers) {
         if (bitset & (1 << u32(i))) != 0 {
-            append(&result, modifiers[i])
+            append(&result, strings.clone(modifiers[i]))
         }
     }
 
-    return result[:]
+    return result
 }
 
 decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifiers: []string) -> [dynamic]Token {
@@ -1443,7 +1445,7 @@ set_buffer_tokens_threaded :: proc() {
             active_language_server.token_types,
             active_language_server.token_modifiers,  
         )
-       
+        
         assert(active_language_server != nil)
 
         sync.lock(&lsp_tokens_mutex)
@@ -1451,6 +1453,14 @@ set_buffer_tokens_threaded :: proc() {
         set_lsp_tokens(active_buffer, decoded_tokens[:])
 
         sync.unlock(&lsp_tokens_mutex)
+        
+        for token in decoded_tokens {
+            for modifier in token.modifiers {
+                delete(modifier)
+            }
+            
+            delete(token.modifiers)
+        }
         
         delete(decoded_tokens)
     }
@@ -1516,7 +1526,7 @@ notify_server_of_change :: proc(
             remove_range(&active_buffer.undo_stack, 0, amnt_over)
         }
 
-        reset_change_stack(redo_stack)
+        reset_change_stack(redo_stack)        
 
         remove_range(&buffer.content, start_byte, end_byte)
         inject_at(&buffer.content, start_byte, ..new_text)        
@@ -1539,7 +1549,11 @@ notify_server_of_change :: proc(
         ts.tree_edit(buffer.previous_tree, &edit)
     }
     
+    // testing out not having this here
+    /*
     set_buffer_tokens()
+    */
+    
     do_refresh_buffer_tokens = true
     
     if active_language_server.lsp_server_pid == 0 {
@@ -1555,7 +1569,7 @@ notify_server_of_change :: proc(
     
     escaped := escape_json(string(new_text))
     defer delete(escaped)
-
+    
     msg := text_document_did_change_message(
         strings.concatenate({
             "file://",
@@ -1712,6 +1726,8 @@ attempt_resolve_request :: proc(idx: int) {
 
     handle_response :: proc(response: json.Object, data_ptr: rawptr) {
         context = global_context
+        
+        defer free(data_ptr)
         
         data := cast(^Data)data_ptr
         
