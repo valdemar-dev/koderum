@@ -1481,10 +1481,9 @@ handle_text_input :: proc() -> bool {
             
             append(&active_buffer.undo_stack, ..active_buffer.insert_undo_stack[:])
             
-            clear(&active_buffer.redo_stack)
-            
-            clear(&active_buffer.insert_undo_stack)
-            clear(&active_buffer.insert_redo_stack)
+            reset_change_stack(&active_buffer.redo_stack)
+            reset_change_stack(&active_buffer.insert_undo_stack)
+            reset_change_stack(&active_buffer.insert_redo_stack)
         }
     }
 
@@ -3130,7 +3129,7 @@ insert_completion :: proc() {
 @(private="package")
 clean_line :: proc(line: ^BufferLine) {
     context = global_context
-    
+
     delete(line.characters)
     delete(line.ts_tokens)
     delete(line.lsp_tokens)

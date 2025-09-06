@@ -15,13 +15,13 @@ window : glfw.WindowHandle
 fb_size := vec2{}
 
 init :: proc() {
+    context = global_context
+    
     load_configs()
 
     init_window()
     init_opengl()
     init_fonts()
-
-    update_thread_allocator = context.allocator
 
     init_update_thread()
     init_message_thread()
@@ -40,6 +40,11 @@ init :: proc() {
         cwd = default_cwd
     } else {
         cwd = os.get_current_directory()
+    }
+    
+    yank_buffer = SlidingBuffer([50]string){
+        length=50,
+        data=new([50]string, context.allocator)
     }
 }
 

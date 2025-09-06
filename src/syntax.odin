@@ -1473,6 +1473,8 @@ notify_server_of_change :: proc(
     undo_stack_override : ^[dynamic]BufferChange = nil,
     redo_stack_override : ^[dynamic]BufferChange = nil,
 ) {
+    context = global_context
+    
     buffer^.version += 1
     buffer^.is_saved = false
     
@@ -1496,8 +1498,17 @@ notify_server_of_change :: proc(
             0,
             0,
         })
+        
+        if len(undo_stack) > MAX_UNDO_COUNT {
+            oldest := undo_stack[0]
+            
+            delete(oldest.original_content)
+            delete(oldest.new_content)
+            
+            ordered_remove(undo_stack, 0)
+        }
 
-        clear(redo_stack)
+        reset_change_stack(redo_stack)
 
         remove_range(&buffer.content, start_byte, end_byte)
         inject_at(&buffer.content, start_byte, ..new_text)        
@@ -1549,6 +1560,15 @@ notify_server_of_change :: proc(
     defer delete(msg)
         
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+}
+
+reset_change_stack :: proc(stack: ^[dynamic]BufferChange) {
+    for change in stack {
+        delete(change.original_content)
+        delete(change.new_content)
+    }
+    
+    clear(stack)
 }
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {

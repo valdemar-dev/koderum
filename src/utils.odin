@@ -88,7 +88,7 @@ SlidingBuffer :: struct($Type: typeid) {
     count: int,
 }
 
-push :: proc(sb: ^SlidingBuffer($TB), value: $T) {
+push :: proc(sb: ^SlidingBuffer($TB), value: $T) -> (T, bool) {
     if sb.count < sb.length {
         for i := sb.count; i > 0; i -= 1 {
             sb.data[i] = sb.data[i - 1];
@@ -96,14 +96,18 @@ push :: proc(sb: ^SlidingBuffer($TB), value: $T) {
 
         sb.data[0] = value;
         sb.count += 1;
+        return value, false;
     } else {
+        removed := sb.data[sb.length - 1];
         for i := sb.length - 1; i > 0; i -= 1 {
             sb.data[i] = sb.data[i - 1];
         }
 
         sb.data[0] = value;
+        return removed, true;
     }
 }
+
 
 array_find :: proc(arr: []$T, match_proc: proc(value: T) -> bool) -> ^T {
     for value in array {

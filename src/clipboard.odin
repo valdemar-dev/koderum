@@ -7,10 +7,7 @@ import "core:unicode/utf8"
 import "vendor:glfw/bindings"
 
 @(private="package")
-yank_buffer := SlidingBuffer([50]string){
-    length=50,
-    data=new([50]string)
-}
+yank_buffer : SlidingBuffer([50]string)
 
 @(private="package")
 generate_highlight_string :: proc(
@@ -41,7 +38,9 @@ copy_to_yank_buffer :: proc(
 ) {
     result := generate_highlight_string(start_line, end_line, start_char, end_char)
 
-    push(&yank_buffer, result)
+    value,did_delete := push(&yank_buffer, result)
+    
+    if did_delete { delete(value) }
 }
 
 @(private="package")

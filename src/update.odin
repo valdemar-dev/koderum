@@ -392,9 +392,6 @@ send_lsp_init_message :: proc(
 }
 
 @(private="package")
-update_thread_allocator : mem.Allocator
-
-@(private="package")
 update :: proc(thread: ^thread.Thread) {
     last_time := glfw.GetTime()
 

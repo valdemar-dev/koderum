@@ -245,6 +245,8 @@ when ODIN_OS == .Windows {
 
 when ODIN_OS == .Linux {
     discord :: proc() {
+        context = global_context 
+        
         connect_discord_ipc()
         
         looper :: proc() {
