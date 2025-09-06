@@ -1667,7 +1667,9 @@ attempt_resolve_request :: proc(idx: int) {
         version: int,
     }
     
-    data := Data{
+    data := new(Data)
+    
+    data ^= Data{
         hit,
         active_buffer.version,
     }
@@ -1676,11 +1678,11 @@ attempt_resolve_request :: proc(idx: int) {
         msg,
         id,
         handle_response,
-        &data,
+        data,
         active_buffer.version, active_buffer
     )
 
-    handle_response :: proc(response: json.Object, data_ptr: rawptr) { 
+    handle_response :: proc(response: json.Object, data_ptr: rawptr) {
         context = global_context
         
         data := cast(^Data)data_ptr
@@ -1690,8 +1692,6 @@ attempt_resolve_request :: proc(idx: int) {
         if active_buffer.version != version {
             return
         }
-        
-        if data == nil do return
         
         sync.lock(&completion_mutex)
         defer sync.unlock(&completion_mutex)
@@ -1704,7 +1704,6 @@ attempt_resolve_request :: proc(idx: int) {
 
         result,_ := response["result"].(json.Object)
         detail,detail_ok := result["detail"].(string)
-        
         
         if detail_ok {
             if (hit_ptr^.detail != "") {
@@ -1828,9 +1827,9 @@ get_autocomplete_hits :: proc(
             append(&new_hits, hit)
         }
         
-        sync.lock(&completion_mutex)
-        
         reset_completion_hits()
+        
+        sync.lock(&completion_mutex)
         
         delete(completion_hits)
         
@@ -1846,6 +1845,9 @@ get_autocomplete_hits :: proc(
 
 reset_completion_hits :: proc() {
     context = global_context
+    
+    sync.lock(&completion_mutex)
+    defer sync.unlock(&completion_mutex)
     
     for &hit in completion_hits {
         if hit.documentation != "" do delete_string(hit.documentation)
