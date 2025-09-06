@@ -82,7 +82,7 @@ tab_spaces = 4
 do_highlight_current_line = true
 
 [general]
-default_cwd = /home/v/prog/projects/koderum
+default_cwd = /home
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
 delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
 

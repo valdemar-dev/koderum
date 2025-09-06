@@ -1481,13 +1481,19 @@ handle_text_input :: proc() -> bool {
             
             append(&active_buffer.undo_stack, ..active_buffer.insert_undo_stack[:])
             
-            if len(active_buffer.undo_stack) > MAX_UNDO_COUNT {
-                oldest := active_buffer.undo_stack[0]
+            amnt_over := len(active_buffer.undo_stack) - MAX_UNDO_COUNT
+            
+            if amnt_over > 0 {
+                for i in 0..<amnt_over {
+                    oldest := active_buffer.undo_stack[i]
+                    
+                    delete(oldest.original_content)
+                    delete(oldest.new_content)
+                }
                 
-                delete(oldest.original_content)
-                delete(oldest.new_content)
+                fmt.println("Forgot", amnt_over, "undos (undo limit had been reached)")
                 
-                ordered_remove(&active_buffer.undo_stack, 0)
+                remove_range(&active_buffer.undo_stack, 0, amnt_over)
             }
             
             reset_change_stack(&active_buffer.redo_stack)

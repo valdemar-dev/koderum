@@ -290,6 +290,8 @@ main :: proc() {
     for request in requests {
         fmt.println("Cleanup: LSP did not respond to request with ID: ", request.id)
         
+        fmt.println("Proc:", request.response_proc)
+        
         delete(request.id)
     }
 

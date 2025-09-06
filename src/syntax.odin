@@ -1241,6 +1241,8 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 }
 
 lsp_handle_file_open :: proc() {
+    context = global_context
+    
     set_active_language_server(active_buffer.ext)
     
     if active_language_server == nil {
@@ -1372,7 +1374,7 @@ set_buffer_tokens_threaded :: proc() {
         return
     } 
     
-    context = runtime.default_context()
+    context = global_context
     
     do_refresh_buffer_tokens = false
   
@@ -1409,7 +1411,7 @@ set_buffer_tokens_threaded :: proc() {
             return
         }
         
-        context = runtime.default_context()
+        context = global_context
         
         defer free(data)
 
@@ -1499,13 +1501,19 @@ notify_server_of_change :: proc(
             0,
         })
         
-        if len(undo_stack) > MAX_UNDO_COUNT {
-            oldest := undo_stack[0]
+        amnt_over := len(active_buffer.undo_stack) - MAX_UNDO_COUNT
+        
+        if amnt_over > 0 {
+            for i in 0..<amnt_over {
+                oldest := active_buffer.undo_stack[i]
+                
+                delete(oldest.original_content)
+                delete(oldest.new_content)
+            }
             
-            delete(oldest.original_content)
-            delete(oldest.new_content)
+            fmt.println("Forgot", amnt_over, "undos (undo limit had been reached)")
             
-            ordered_remove(undo_stack, 0)
+            remove_range(&active_buffer.undo_stack, 0, amnt_over)
         }
 
         reset_change_stack(redo_stack)

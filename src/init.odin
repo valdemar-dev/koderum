@@ -56,7 +56,7 @@ size_callback :: proc "c" (
     fb_size = vec2{f32(width), f32(height)}
     gl.Viewport(0,0,width,height)
     
-    context = runtime.default_context()
+    context = global_context
         
     resize_terminal()
 }

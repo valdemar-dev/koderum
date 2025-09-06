@@ -490,7 +490,7 @@ toggle_terminal_emulator :: proc() {
         fmt.println("Terminal Debugger: Toggling Terminal Emulator")
     }
 
-    context = runtime.default_context()
+    context = global_context
     
     if is_terminal_open == false {
         suppress = false
@@ -865,7 +865,7 @@ swap_terminal :: proc(index: int) {
         fmt.println("Terminal Debugger: Swapping Terminal")
     }
 
-    context = runtime.default_context()
+    context = global_context
     
     index := clamp(index, 0, 9)
     
