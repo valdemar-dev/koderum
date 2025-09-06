@@ -1481,9 +1481,21 @@ handle_text_input :: proc() -> bool {
             
             append(&active_buffer.undo_stack, ..active_buffer.insert_undo_stack[:])
             
+            if len(active_buffer.undo_stack) > MAX_UNDO_COUNT {
+                oldest := active_buffer.undo_stack[0]
+                
+                delete(oldest.original_content)
+                delete(oldest.new_content)
+                
+                ordered_remove(&active_buffer.undo_stack, 0)
+            }
+            
             reset_change_stack(&active_buffer.redo_stack)
-            reset_change_stack(&active_buffer.insert_undo_stack)
-            reset_change_stack(&active_buffer.insert_redo_stack)
+            
+            // dont reset, because these values are pushed into the buffers own undo stack.
+            // therefore, deleting the strings, would cause double-deletes
+            clear(&active_buffer.insert_undo_stack)
+            clear(&active_buffer.insert_redo_stack)
         }
     }
 
