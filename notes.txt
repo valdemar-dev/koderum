@@ -4,7 +4,6 @@ think:
     - control + escape is a bad keybind for the terminal input mode switching.
     
 bugs:
-    - bad free in edit_alert(?)
     - nil pointer dereference in set_tokens() when reloading a file
     // maybe fixed? - bad free in reset_completion_hits(), from set_buffer_cursor_pos-
     // maybe fixed? - nil pointer dereference in hit_ptr.detail in resolve completion hit

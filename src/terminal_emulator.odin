@@ -203,8 +203,10 @@ ensure_row :: proc(index: int = current_terminal_idx) {
 
     if !terminal.using_alt_buffer && len(buf) > scrollback_limit {
         discarded := buf[0]
-        ordered_remove(buf, 0)
+        
         delete(discarded)
+        
+        ordered_remove(buf, 0)
 
         if terminal.scroll_top > 0 {
             terminal^.scroll_top -= 1

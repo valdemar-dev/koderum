@@ -1680,6 +1680,8 @@ read_lsp_message :: proc(file: ^os2.File, allocator := context.allocator) -> ([]
 }
 
 attempt_resolve_request :: proc(idx: int) {
+    context = global_context
+    
     sync.lock(&completion_mutex)
     defer sync.unlock(&completion_mutex)
     
@@ -1718,7 +1720,7 @@ attempt_resolve_request :: proc(idx: int) {
         msg,
         id,
         handle_response,
-        data,
+        rawptr(data),
         active_buffer.version, active_buffer
     )
 
