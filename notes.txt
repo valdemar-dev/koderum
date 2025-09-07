@@ -12,3 +12,4 @@ bugs:
     - undo is fucked (?) bad positioning
     - does not track all allocations? / unnoticed memory leak
     - draw_text_buffer mutex when hitting F5 to reload lsp
+    - ctrl + e bad free?

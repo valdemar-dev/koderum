@@ -919,9 +919,12 @@ draw_autocomplete :: proc() {
         9,
     )
     
+    // we dont defer this because of *speed*
     sync.lock(&completion_mutex)
     
     if selected_completion_hit >= len(completion_hits) {
+        sync.unlock(&completion_mutex)
+    
         return
     }
     
@@ -1872,7 +1875,6 @@ move_back_word :: proc() {
 
 move_forward_word :: proc() {
     defer reset_completion_hits()
-
     current_line := active_buffer.lines[buffer_cursor_line]
 
     line_str := string(current_line.characters[:])
