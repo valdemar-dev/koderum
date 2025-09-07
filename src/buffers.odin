@@ -1491,8 +1491,6 @@ handle_text_input :: proc() -> bool {
                     delete(oldest.new_content)
                 }
                 
-                fmt.println("Forgot", amnt_over, "undos (undo limit had been reached)")
-                
                 remove_range(&active_buffer.undo_stack, 0, amnt_over)
             }
             
@@ -1676,9 +1674,12 @@ insert_into_buffer :: proc (key: rune) {
     
     font_size := math.round_f32(font_base_px * buffer_text_scale)
     
-    get_char(font_size, u64(key))
-    add_missing_characters()
-
+    // avoids ghost characters
+    {
+        get_char(font_size, u64(key))
+        add_missing_characters()
+    }
+    
     buffer_cursor_accumulated_byte_position := compute_byte_offset(
         active_buffer, 
         buffer_cursor_line,

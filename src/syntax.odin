@@ -1511,19 +1511,17 @@ notify_server_of_change :: proc(
             0,
         })
         
-        amnt_over := len(active_buffer.undo_stack) - MAX_UNDO_COUNT
+        amnt_over := len(undo_stack) - MAX_UNDO_COUNT
         
         if amnt_over > 0 {
             for i in 0..<amnt_over {
-                oldest := active_buffer.undo_stack[i]
+                oldest := undo_stack[i]
                 
                 delete(oldest.original_content)
                 delete(oldest.new_content)
             }
             
-            fmt.println("Forgot", amnt_over, "undos (undo limit had been reached)")
-            
-            remove_range(&active_buffer.undo_stack, 0, amnt_over)
+            remove_range(undo_stack, 0, amnt_over)
         }
 
         reset_change_stack(redo_stack)        
@@ -1826,8 +1824,7 @@ get_autocomplete_hits :: proc(
                 last_delimiter_byte = byte+1
             }
         }
-        
-        
+                
         new_hits := make([dynamic]CompletionHit)
         
         completion_filter_token = line_string[last_delimiter_byte:byte_offset]

@@ -400,6 +400,7 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
         fmt.println("Terminal Debugger: Resizing Terminal")
     }
     
+    
     text := math.round_f32(font_base_px * normal_text_scale)
 
     error := ft.set_pixel_sizes(primary_font, 0, u32(text))
@@ -431,6 +432,9 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
 
     terminal^.scroll_bottom = cell_count_y - 1
     terminal^.scroll_top = 0
+    
+    sync.lock(&terminal.rw_mutex)
+    defer sync.unlock(&terminal.rw_mutex)
     
     for &row in terminal^.scrollback_buffer {
         old_len := len(row)
