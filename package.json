@@ -1,0 +1,25 @@
+{
+  "name": "koderum",
+  "version": "1.0.0",
+  "description": "Keyboard based fully graphical text editor.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valdemar-dev/text-editor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/valdemar-dev/text-editor/issues"
+  },
+  "homepage": "https://github.com/valdemar-dev/text-editor#readme",
+  "dependencies": {
+    "elegance-js": "^1.2.3",
+    "tailwindcss": "^4.1.13"
+  }
+}

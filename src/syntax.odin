@@ -214,6 +214,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         "/tmp",
     })
 
+    defer os2.remove_all(temp_dir)
     defer delete(temp_dir)
 
     dir_error := os.make_directory(temp_dir, u32(os.File_Mode(0o700)))
@@ -222,8 +223,6 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
         fmt.println(dir_error)
         panic("Failed to create temp directory.")
     }
-
-    defer os.remove_directory(temp_dir)
 
     command : []string = {
         "git",
@@ -242,6 +241,7 @@ install_parser :: proc(language: ^Language, parser_dir: string) -> os2.Error {
     compilation_dir : string
     
     defer delete(compilation_dir)
+    defer os2.remove_all(compilation_dir)
     
     when ODIN_OS == .Windows {
         compilation_dir = strings.concatenate({
@@ -590,10 +590,19 @@ init_parser :: proc(language: ^Language) {
     lib, ok := dynlib.load_library(parser_path)
     if !ok {
         fmt.eprintln("Failed to load:", dynlib.last_error())
-
         fmt.eprintln("Path:", parser_path)
         
-        panic("Unrecoverable error.")
+        edit_alert(
+            parser_alert,
+            "Failed to install parser.",
+            strings.concatenate({
+                "The dynamic library could not be loaded. ",
+            }, context.temp_allocator),
+        )
+        
+        os2.remove_all(parser_dir)
+        
+        return
     }
 
     LanguageProc :: proc() -> ts.Language
@@ -601,11 +610,20 @@ init_parser :: proc(language: ^Language) {
     ptr, found := dynlib.symbol_address(lib, language.language_symbol_name)
 
     if !found || ptr == nil {
-        fmt.eprintln("Could not load library: ", dynlib.last_error())
-        
+        fmt.eprintln("Failed to load:", dynlib.last_error())
         fmt.eprintln("Path:", parser_path)
-
-        panic("Unrecoverable error.")
+        
+        edit_alert(
+            parser_alert,
+            "Failed to install parser.",
+            strings.concatenate({
+                "The dynamic library could not be loaded. ",
+            }, context.temp_allocator),
+        )
+        
+        os2.remove_all(parser_dir)
+        
+        return
     }
 
     lang_proc := cast(LanguageProc)ptr
