@@ -1326,6 +1326,11 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
 
     for i in 0..<len(data) / 5 {
         idx := i * 5
+        
+        if idx >= len(data) {
+            return tokens
+        }
+        
         delta_line := data[idx + 0]
         delta_char := data[idx + 1]
         length := data[idx + 2]

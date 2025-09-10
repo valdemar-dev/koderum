@@ -330,16 +330,26 @@ toggle_browser_view :: proc() {
     }
 }
 
+clear_found_files :: proc() {
+    context = global_context
+    
+    for file in found_files {
+        delete(file)
+    }    
+    
+    clear(&found_files)
+}
+
 set_found_files :: proc() {
     context = global_context 
     
-    clear(&cached_dirs)
-    clear(&found_files)
+    clear_found_files()
 
     dirs_searched := 0
     file_index := 0
     
     search_dir : string
+    defer delete(search_dir)
 
     glob := fp.base(search_term)
 
@@ -350,10 +360,11 @@ set_found_files :: proc() {
     } else {
         search_dir = fp.dir(search_term)
     }
-
-    defer delete(search_dir)
     
-    queue: [dynamic]string
+    queue := make([dynamic]string)
+    
+    defer delete(queue)
+    
     append_elem(&queue, search_dir)
 
     for len(queue) > 0 && dirs_searched < 20 && file_index < 100 {
@@ -365,19 +376,21 @@ set_found_files :: proc() {
         defer os.close(fd)
 
         hits: []os.File_Info
-        if cached, ok := cached_dirs[dir]; ok {
-            hits = cached
-        } else {
-            hits, err = os.read_dir(fd, -1)
-            cached_dirs[dir] = hits
+        
+        hits, err = os.read_dir(fd, -1)
+        defer delete(hits)
+        
+        defer for file in hits {
+            delete(file.fullpath)
         }
         
+        
         for hit in hits {
-            if strings.contains(hit.name, glob) || glob == "" {
+            if len(glob) < 2 || fuzzy_includes(hit.name, glob) {
                 if hit.fullpath == search_term {
-                    inject_at(&found_files, 0, hit.fullpath)
+                    inject_at(&found_files, 0, strings.clone(hit.fullpath))
                 } else {
-                    append_elem(&found_files, hit.fullpath)
+                    append_elem(&found_files, strings.clone(hit.fullpath))
                 }
             }
 

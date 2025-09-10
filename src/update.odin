@@ -74,6 +74,8 @@ message_loop :: proc(thread: ^thread.Thread) {
             active_language_server.lsp_stdout_r,
             context.allocator,
         )
+        
+        if len(bytes) == 0 do continue
 
         defer delete(bytes)
 

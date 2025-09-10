@@ -2824,8 +2824,10 @@ handle_movement_input :: proc() -> bool {
 @(private="package")
 buffer_append_to_search_term :: proc(key: rune) {
     buf := make([dynamic]rune)
+    defer delete(buf)
 
     runes := utf8.string_to_runes(buffer_search_term)
+    defer delete(runes)
     
     append_elems(&buf, ..runes)
     append_elem(&buf, key)
@@ -2838,8 +2840,10 @@ buffer_append_to_search_term :: proc(key: rune) {
 @(private="package")
 append_to_go_to_line_input_string :: proc(key: rune) {
     buf := make([dynamic]rune)
+    defer delete(buf)
 
     runes := utf8.string_to_runes(go_to_line_input_string)
+    defer delete(runes)
     
     append_elems(&buf, ..runes)
     append_elem(&buf, key)

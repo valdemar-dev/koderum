@@ -506,3 +506,65 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
 
     return "", false
 }
+
+levenshtein_distance :: proc(s1, s2: string) -> int {
+    len1, len2 := len(s1), len(s2)
+    if len1 == 0 do return len2
+    if len2 == 0 do return len1
+
+    row := make([]int, len2 + 1)
+    defer delete(row)
+
+    for j in 0..=len2 {
+        row[j] = j
+    }
+
+    for i in 1..=len1 {
+        prev_diag := row[0]
+        row[0] = i
+        for j in 1..=len2 {
+            temp := row[j]
+            cost := 1 if s1[i-1] != s2[j-1] else 0
+            row[j] = min(
+                row[j] + 1,
+                min(
+                    row[j-1] + 1,
+                    prev_diag + cost
+                )
+            )
+            prev_diag = temp
+        }
+    }
+    return row[len2]
+}
+
+fuzzy_includes :: proc(haystack, needle: string, threshold: f32 = 0.4) -> bool {
+    if len(needle) == 0 do return true
+    if len(haystack) == 0 do return false
+    if len(needle) > len(haystack) do return false
+    
+    h_lower := strings.to_lower(haystack)
+    n_lower := strings.to_lower(needle)
+    
+    defer delete(h_lower)
+    defer delete(n_lower)
+    
+    if strings.contains(h_lower, n_lower) {
+        return true
+    }
+    
+    min_distance := max(int)
+    needle_len := len(n_lower)
+    haystack_len := len(h_lower)
+    
+    for i in 0..=(haystack_len - needle_len) {
+        substr := h_lower[i:i + needle_len]
+        distance := levenshtein_distance(substr, n_lower)
+        if distance < min_distance {
+            min_distance = distance
+        }
+    }
+    
+    max_distance := f32(needle_len) * threshold
+    return f32(min_distance) <= max_distance
+}
