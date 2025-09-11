@@ -509,7 +509,7 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
 }
 
 // CREDIT: https://github.com/developer-3/fuzzy-odin
-fuzzy :: proc(input: string, dictionary: ^[dynamic]string, results: int = 100) -> []string
+fuzzy :: proc(input: string, dictionary: ^[dynamic]string, results: int = 200) -> []string
 {
     scores := make(map[int][dynamic]string)
     defer delete(scores)

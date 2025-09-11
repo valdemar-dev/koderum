@@ -342,8 +342,6 @@ clear_found_files :: proc() {
 
 set_found_files :: proc() {
     context = global_context 
-    
-    fmt.println(len(found_files))
 
     clear_found_files()
     
@@ -389,8 +387,14 @@ set_found_files :: proc() {
         }
         
         for hit in hits {
-            append_elem(&candidates, strings.clone(hit.fullpath))
-
+            if len(glob) < 0 || strings.contains(hit.name, glob) {
+                if hit.is_dir || hit.fullpath == search_term {
+                    inject_at(&candidates, 0, strings.clone(hit.fullpath))
+                } else {
+                    append_elem(&candidates, strings.clone(hit.fullpath))
+                }
+            }
+            
             if hit.is_dir {
                 skip := false
                 for ign in search_ignored_dirs {
@@ -408,9 +412,7 @@ set_found_files :: proc() {
         file_index += 1
     }
     
-    matches := fuzzy(search_term, &candidates)
-   
-    append(&found_files, ..matches)
+    append(&found_files, ..candidates[:])
 }
 
 @(private="package")
