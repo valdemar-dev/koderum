@@ -343,7 +343,12 @@ clear_found_files :: proc() {
 set_found_files :: proc() {
     context = global_context 
     
+    fmt.println(len(found_files))
+
     clear_found_files()
+    
+    candidates := make([dynamic]string)
+    defer delete(candidates)
 
     dirs_searched := 0
     file_index := 0
@@ -362,12 +367,11 @@ set_found_files :: proc() {
     }
     
     queue := make([dynamic]string)
-    
     defer delete(queue)
     
     append_elem(&queue, search_dir)
 
-    for len(queue) > 0 && dirs_searched < 20 && file_index < 100 {
+    for len(queue) > 0 && dirs_searched < 25 && file_index < 2000 {
         dir := queue[0]
         ordered_remove(&queue, 0)
         dirs_searched += 1
@@ -384,15 +388,8 @@ set_found_files :: proc() {
             delete(file.fullpath)
         }
         
-        
         for hit in hits {
-            if len(glob) < 2 || fuzzy_includes(hit.name, glob) {
-                if hit.fullpath == search_term {
-                    inject_at(&found_files, 0, strings.clone(hit.fullpath))
-                } else {
-                    append_elem(&found_files, strings.clone(hit.fullpath))
-                }
-            }
+            append_elem(&candidates, strings.clone(hit.fullpath))
 
             if hit.is_dir {
                 skip := false
@@ -408,14 +405,12 @@ set_found_files :: proc() {
             }
         }
         
-        // if after reading a directory,
-        // check if we exceeded the maximum limit of files.
-        // this lets big folders get ever hit in.
         file_index += 1
-        if file_index >= 50 {
-            break
-        }
     }
+    
+    matches := fuzzy(search_term, &candidates)
+   
+    append(&found_files, ..matches)
 }
 
 @(private="package")

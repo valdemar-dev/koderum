@@ -12,3 +12,8 @@ bugs:
     - does not track all allocations? / unnoticed memory leak
     - draw_text_buffer mutex when hitting F5 to reload lsp
     - ctrl + e bad free?
+    
+    
+    
+    - annoying shit with moving around.
+      cut a thing, and suddenly you're WAY in the wrong direction. something to do with centering the camera after a large action, cut, paste, x.

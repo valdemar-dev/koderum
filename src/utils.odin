@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 import "core:fmt"
+import "core:sort"
 import ft "../../alt-odin-freetype"
 import "core:math"
 import "core:encoding/json"
@@ -507,64 +508,79 @@ map_glfw_key_to_escape_sequence :: proc(key: i32, mods: i32) -> (ret_val: string
     return "", false
 }
 
-levenshtein_distance :: proc(s1, s2: string) -> int {
-    len1, len2 := len(s1), len(s2)
-    if len1 == 0 do return len2
-    if len2 == 0 do return len1
-
-    row := make([]int, len2 + 1)
-    defer delete(row)
-
-    for j in 0..=len2 {
-        row[j] = j
-    }
-
-    for i in 1..=len1 {
-        prev_diag := row[0]
-        row[0] = i
-        for j in 1..=len2 {
-            temp := row[j]
-            cost := 1 if s1[i-1] != s2[j-1] else 0
-            row[j] = min(
-                row[j] + 1,
-                min(
-                    row[j-1] + 1,
-                    prev_diag + cost
-                )
-            )
-            prev_diag = temp
+// CREDIT: https://github.com/developer-3/fuzzy-odin
+fuzzy :: proc(input: string, dictionary: ^[dynamic]string, results: int = 100) -> []string
+{
+    scores := make(map[int][dynamic]string)
+    defer delete(scores)
+    max_score := 0
+    for word in dictionary {
+        score := levenshtein_dp(input, word)
+        if score in scores {
+            append(&scores[score], word)
+        } else {
+            scores[score] = make([dynamic]string)
+            append(&scores[score], word)
+            max_score = max(max_score, score)
         }
     }
-    return row[len2]
+
+    top := make([dynamic]string)
+    for i in 0..=max_score {
+        if i in scores == false do continue
+        words := scores[i]
+        
+        sort.quick_sort_proc(words[:], proc (a,b:string) -> int {
+            return strings.compare(a,b)
+        })
+        
+        append(&top, ..words[:])
+
+        if results != -1 && len(top) > results {
+            break
+        }
+    }
+
+    if results == -1 || results > len(top) do return top[:]
+    return top[:results]
 }
 
-fuzzy_includes :: proc(haystack, needle: string, threshold: f32 = 0.4) -> bool {
-    if len(needle) == 0 do return true
-    if len(haystack) == 0 do return false
-    if len(needle) > len(haystack) do return false
-    
-    h_lower := strings.to_lower(haystack)
-    n_lower := strings.to_lower(needle)
-    
-    defer delete(h_lower)
-    defer delete(n_lower)
-    
-    if strings.contains(h_lower, n_lower) {
-        return true
+// Levenshtein distance
+// dynamic programming matrix impl
+@private
+levenshtein_dp :: proc(a, b: string) -> int
+{
+    mat_position :: proc(i, j: int, mat: ^[]int, m, n: int) -> int
+    {
+        if min(i, j) == 0 do return max(i, j)
+        return mat[(i-1)*n+(j-1)]
     }
-    
-    min_distance := max(int)
-    needle_len := len(n_lower)
-    haystack_len := len(h_lower)
-    
-    for i in 0..=(haystack_len - needle_len) {
-        substr := h_lower[i:i + needle_len]
-        distance := levenshtein_distance(substr, n_lower)
-        if distance < min_distance {
-            min_distance = distance
+
+    m, n := len(a), len(b)
+    mat := make([]int, m*n)
+
+    if m == 0 do return n
+    if n == 0 do return m
+
+    for i in 1..=m {
+        for j in 1..=n {
+            if min(i, j) == 0 {
+                mat[i*n+j] = max(i, j)
+                continue
+            }
+
+            third := mat_position(i - 1, j - 1, &mat, m, n)
+            if a[i-1] != b[j-1] do third += 1
+
+            val := min(
+                mat_position(i-1, j, &mat, m, n) + 1, 
+                mat_position(i, j - 1, &mat, m, n) + 1, 
+                third
+            )
+
+            mat[(i-1)*n+(j-1)] = val
         }
     }
-    
-    max_distance := f32(needle_len) * threshold
-    return f32(min_distance) <= max_distance
+
+    return mat[len(mat)-1]
 }

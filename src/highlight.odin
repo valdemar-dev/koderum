@@ -11,12 +11,12 @@ import "core:strconv"
 import "core:path/filepath"
 import ft "../../alt-odin-freetype"
 
-highlight_start_line : int
-highlight_start_char : int
+highlight_start_line : int = -1
+highlight_start_char : int = -1
 
 @(private="package")
 is_not_highlighting :: proc() -> bool {
-    if highlight_start_line == 0 && highlight_start_char == 0 do return true
+    if highlight_start_line == -1 && highlight_start_char == -1 do return true
     
     return false
 }
@@ -26,8 +26,8 @@ handle_highlight_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) || is_key_pressed(glfw.KEY_V) {
         input_mode = .COMMAND
         
-        highlight_start_line = 0
-        highlight_start_char = 0
+        highlight_start_line = -1
+        highlight_start_char = -1
 
         return
     } 
@@ -91,8 +91,8 @@ handle_highlight_input :: proc() {
 
         input_mode = .COMMAND
         
-        highlight_start_char = 0
-        highlight_start_line = 0
+        highlight_start_char = -1
+        highlight_start_line = -1
 
         return
     }
@@ -107,8 +107,8 @@ handle_highlight_input :: proc() {
 
         input_mode = .COMMAND
         
-        highlight_start_char = 0
-        highlight_start_line = 0
+        highlight_start_char = -1
+        highlight_start_line = -1
 
         return
     }
@@ -132,8 +132,8 @@ handle_highlight_input :: proc() {
         
         input_mode = .COMMAND
         
-        highlight_start_char = 0
-        highlight_start_line = 0
+        highlight_start_char = -1
+        highlight_start_line = -1
     }
 
     if is_key_pressed(glfw.KEY_G) {
@@ -146,8 +146,8 @@ handle_highlight_input :: proc() {
     
         set_mode(.SEARCH, glfw.KEY_G, 'g')
         
-        highlight_start_line = 0
-        highlight_start_char = 0
+        highlight_start_line = -1
+        highlight_start_char = -1
 
         find_search_hits()
     }

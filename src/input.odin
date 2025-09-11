@@ -384,8 +384,8 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
             
                 input_mode = .COMMAND
                 
-                highlight_start_line = 0
-                highlight_start_char = 0
+                highlight_start_line = -1
+                highlight_start_char = -1
             } else if action == glfw.RELEASE {
                 is_clicking = false
             }

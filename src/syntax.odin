@@ -1260,8 +1260,10 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 
 lsp_handle_file_open :: proc() {
     context = global_context
+
+    buffer := active_buffer^
     
-    set_active_language_server(active_buffer.ext)
+    set_active_language_server(buffer.ext)
     
     if active_language_server == nil {
         return
@@ -1270,14 +1272,14 @@ lsp_handle_file_open :: proc() {
     escaped := escape_json(string(active_buffer.content[:]))
     defer delete(escaped)
 
-    encoded := encode_uri_component(active_buffer.file_name)
+    encoded := encode_uri_component(buffer.file_name)
     defer delete(encoded)
 
     uri := strings.concatenate(
         {"file://", encoded}, context.temp_allocator,
     )
     
-    language := languages[active_buffer.ext]
+    language := languages[buffer.ext]
 
     msg := did_open_message(
         uri,
@@ -1288,16 +1290,16 @@ lsp_handle_file_open :: proc() {
 
     defer delete(msg)
 
-    send_lsp_message(msg, "", nil, nil, active_buffer.version, active_buffer) 
+    send_lsp_message(msg, "", nil, nil, buffer.version, active_buffer) 
     
     sync.lock(&tree_mutex)
 
     new_tree := parse_tree(
-        0, len(active_buffer.lines)
+        0, len(buffer.lines)
     )
 
-    ts.tree_delete(active_buffer.previous_tree)
-    active_buffer.previous_tree = new_tree
+    ts.tree_delete(buffer.previous_tree)
+    buffer.previous_tree = new_tree
     
     sync.unlock(&tree_mutex)
 

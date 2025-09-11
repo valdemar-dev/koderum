@@ -1181,14 +1181,17 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     return true
 }
 
-save_buffer :: proc() {
-    ok := os.write_entire_file(
-        active_buffer.file_name,
-        transmute([]u8)active_buffer.content[:],
+save_buffer :: proc(buffer: ^Buffer) {
+    context = global_context
+    err := os.write_entire_file_or_err(
+        buffer.file_name,
+        transmute([]u8)buffer.content[:],
         true,
     );
 
-    if !ok {
+    if err != os.ERROR_NONE {
+        fmt.println("Save Buffer Error: ", err)
+        
         create_alert(
             "Failed to save file.",
             "This is most likely due to missing permissions, or the file not existing.",
@@ -2499,7 +2502,7 @@ handle_buffer_input :: proc() -> bool {
         key := key_store[glfw.KEY_S]
 
         if key.modifiers == CTRL {
-            save_buffer()
+            save_buffer(active_buffer)
         } else if key.modifiers == 0 {
             show_yank_history()
         }
@@ -2894,8 +2897,8 @@ handle_search_input :: proc() {
         selected_hit = nil
         
         // set just in case we went from highlight to search
-        highlight_start_line = 0
-        highlight_start_char = 0
+        highlight_start_line = -1
+        highlight_start_char = -1
 
         find_search_hits()
         
