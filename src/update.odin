@@ -25,12 +25,21 @@ LSPRequest :: struct {
 @(private="package")
 requests : [dynamic]LSPRequest
 
+Task :: struct{
+    func: proc(data: rawptr),
+    data: rawptr,
+}
+
+update_tasks := make([dynamic]Task)
+
 @(private="package")
 update_state :: proc(current_time: f64) {
     context = global_context
     
-    if do_refresh_buffer_tokens {
-        set_buffer_tokens_threaded()
+    for task, index in update_tasks {
+        task.func(task.data)
+        
+        unordered_remove(&update_tasks, index)
     }
 
     if has_cursor_moved {

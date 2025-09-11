@@ -1,5 +1,8 @@
 todo:
     - add variable font weights
+    - renaming a file should rename and send a didclose/didopen
+    - make task queue for update thread instead of single variable stuff.
+    
 think:
     - control + escape is a bad keybind for the terminal input mode switching.
     

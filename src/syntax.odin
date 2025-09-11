@@ -115,6 +115,8 @@ log_unhandled_treesitter_cases := false
 lsp_request_id := 10
 
 active_language_server : ^LanguageServer
+language_server_mutex : sync.Mutex
+
 active_language_servers : map[string]^LanguageServer = {}
 
 languages : map[string]Language = {}
@@ -643,8 +645,11 @@ init_parser :: proc(language: ^Language) {
 }
 
 set_active_language_server :: proc(ext: string) {
+    sync.lock(&language_server_mutex)
+    defer sync.unlock(&language_server_mutex)
+ 
     active_language_server = nil
-    
+   
     defer {
         init_message_thread()
     }
@@ -1109,21 +1114,13 @@ init_language_server :: proc(ext: string) {
         token_modifiers={},
         language=language,
         completion_trigger_runes={},
-    }
-    
+    }  
+ 
     active_language_server = server
     active_language_servers[ext] = server
+
+    fmt.println("Set Language Server To:", server)
     
-    defer {
-        sync.lock(&tree_mutex)
-
-        active_buffer.previous_tree = parse_tree(0, len(active_buffer.lines))
-        
-        sync.unlock(&tree_mutex)
-
-        do_refresh_buffer_tokens = true
-    }
-
     init_lsp_server(ext, server)
 }
 
@@ -1258,10 +1255,8 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
     }
 }
 
-lsp_handle_file_open :: proc() {
+lsp_handle_file_open :: proc(buffer: ^Buffer) {
     context = global_context
-
-    buffer := active_buffer^
     
     set_active_language_server(buffer.ext)
     
@@ -1269,15 +1264,17 @@ lsp_handle_file_open :: proc() {
         return
     }
     
-    escaped := escape_json(string(active_buffer.content[:]))
+    escaped := escape_json(string(buffer.content[:]))
     defer delete(escaped)
 
     encoded := encode_uri_component(buffer.file_name)
     defer delete(encoded)
 
     uri := strings.concatenate(
-        {"file://", encoded}, context.temp_allocator,
+        {"file://", encoded},
     )
+    
+    defer delete(uri)
     
     language := languages[buffer.ext]
 
@@ -1292,18 +1289,14 @@ lsp_handle_file_open :: proc() {
 
     send_lsp_message(msg, "", nil, nil, buffer.version, active_buffer) 
     
-    sync.lock(&tree_mutex)
-
-    new_tree := parse_tree(
-        0, len(buffer.lines)
-    )
-
-    ts.tree_delete(buffer.previous_tree)
-    buffer.previous_tree = new_tree
-    
-    sync.unlock(&tree_mutex)
-
-    do_refresh_buffer_tokens = true
+    append(&update_tasks, Task{
+        func=proc(data: rawptr) {
+            buffer := cast(^Buffer)data
+            
+            set_buffer_tokens_threaded(buffer)
+        },
+        data=rawptr(buffer)
+    })
 }
 
 decode_modifiers :: proc(bitset: i32, modifiers: []string) -> [dynamic]string {
@@ -1387,6 +1380,7 @@ set_buffer_tokens :: proc() {
     new_tree := parse_tree(
         active_buffer.first_drawn_line,
         active_buffer.last_drawn_line,
+        active_buffer,
     )
 
     ts.tree_delete(active_buffer.previous_tree)
@@ -1396,14 +1390,13 @@ set_buffer_tokens :: proc() {
     sync.unlock(&tree_mutex)
 }
 
-set_buffer_tokens_threaded :: proc() {
+set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
     if active_language_server == nil {
         return
     } 
     
     context = global_context
     
-    do_refresh_buffer_tokens = false
   
     start_version := new(int)
     start_version^ = active_buffer.version
@@ -1428,7 +1421,7 @@ set_buffer_tokens_threaded :: proc() {
     )
 
     sync.lock(&tree_mutex)
-    new_tree := parse_tree(0, len(active_buffer.lines))
+    new_tree := parse_tree(0, len(active_buffer.lines), buffer)
     ts.tree_delete(new_tree)
     
     sync.unlock(&tree_mutex)
@@ -1560,7 +1553,9 @@ notify_server_of_change :: proc(
     }
     
     if buffer.previous_tree != nil {        
-        edit := ts.Input_Edit{
+        edit := new(ts.Input_Edit)
+        
+        edit^ = {
             u32(start_byte),
             u32(end_byte),
             u32(new_end_byte),
@@ -1569,7 +1564,7 @@ notify_server_of_change :: proc(
             ts.Point{},
         }
         
-        ts.tree_edit(buffer.previous_tree, &edit)
+        ts.tree_edit(buffer.previous_tree, edit)
     }
     
     // testing out not having this here
@@ -1577,7 +1572,14 @@ notify_server_of_change :: proc(
     set_buffer_tokens()
     */
     
-    do_refresh_buffer_tokens = true
+    append(&update_tasks, Task{
+        func=proc(data: rawptr) {
+            buffer := cast(^Buffer)data
+            
+            set_buffer_tokens_threaded(buffer)
+        },
+        data=rawptr(active_buffer)
+    })
     
     if active_language_server.lsp_server_pid == 0 {
         return
@@ -1923,12 +1925,16 @@ reset_completion_hits :: proc() {
         if hit.label != "" do delete_string(hit.label)
         if hit.raw_data != "" do delete_string(hit.raw_data)
         if hit.detail != "" do delete_string(hit.detail)
+        
+        delete(hit.additional_text_edits)
     }
     
     clear(&completion_hits)
 }
 
 go_to_definition :: proc() {
+    context = global_context
+    
     if active_language_server == nil {
         return
     }
@@ -1957,6 +1963,8 @@ go_to_definition :: proc() {
     )
 
     handle_response :: proc(response: json.Object, data: rawptr) {
+        context = global_context
+
         results,results_ok := response["result"].(json.Array)
         result : json.Object
         
@@ -2004,6 +2012,8 @@ go_to_definition :: proc() {
         }
 
         handle_file_open :: proc(data: PolyData) {
+            context = global_context
+            
             open_file(data.name)
             
             go_to_line(int(data.line), int(data.char))
@@ -2013,22 +2023,33 @@ go_to_definition :: proc() {
     }
 }
 
-parse_tree :: proc(first_line, last_line: int) -> ts.Tree { 
+parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree { 
+    context = global_context
+    
     if active_language_server == nil {
         return nil
     }
+    
+    if buffer == nil {
+        return nil
+    }
+    
+    if active_language_server.ts_parser == nil {
+        fmt.println(active_language_server)
+        return nil
+    }
 
-    active_buffer_cstring := strings.clone_to_cstring(string(active_buffer.content[:]))
+    active_buffer_cstring := strings.clone_to_cstring(string(buffer.content[:]))
     defer delete(active_buffer_cstring)
 
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
-        active_buffer.previous_tree,
+        buffer.previous_tree,
         active_buffer_cstring,
         u32(len(active_buffer_cstring))
     )
 
-    if active_buffer.previous_tree == nil {
+    if buffer.previous_tree == nil {
         error_offset : u32
         error_type : ts.Query_Error
 
@@ -2059,28 +2080,31 @@ parse_tree :: proc(first_line, last_line: int) -> ts.Tree {
             return nil
         }
         
-        active_buffer.query = query
+        buffer.query = query
     }
     
-    set_tokens(first_line, last_line, &tree)
+    set_tokens(first_line, last_line, &tree, buffer)
     
     return tree
 }
 
-set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) { 
+set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buffer) { 
+    context = global_context
+
+    sync.lock(&language_server_mutex)
+    defer sync.unlock(&language_server_mutex)
+   
     if active_language_server == nil do return
     
     if tree_ptr == nil {
         return
-    }
-    
-    buffer := active_buffer
+    } 
 
     tree := tree_ptr^
 
     cursor := ts.query_cursor_new()
     
-    ts.query_cursor_exec(cursor, active_buffer.query, ts.tree_root_node(tree))
+    ts.query_cursor_exec(cursor, buffer.query, ts.tree_root_node(tree))
 
     defer ts.query_cursor_delete(cursor)
  
@@ -2096,18 +2120,19 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
 
     ts.query_cursor_set_point_range(cursor, start_point, end_point) 
 
-    match : ts.Query_Match
+    match := new(ts.Query_Match)
     capture_index := new(u32)
 
     defer free(capture_index)
+    defer free(match)
    
     line_number : int = -1
-    outer: for ts._query_cursor_next_capture(cursor, &match, capture_index) {
+    outer: for ts._query_cursor_next_capture(cursor, match, capture_index) {
         capture := match.captures[capture_index^]
         predicate_steps_count : u32
 
         predicate_steps := ts._query_predicates_for_pattern(
-            active_buffer.query, 
+            buffer.query, 
             u32(match.pattern_index), 
             &predicate_steps_count
         )
@@ -2118,7 +2143,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
                 value_len : u32
                 
                 step_value := ts._query_string_value_for_id(
-                    active_buffer.query, 
+                    buffer.query, 
                     step.value_id, 
                     &value_len
                 )
@@ -2126,7 +2151,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
         }
 
         name_len: u32
-        name := ts._query_capture_name_for_id(active_buffer.query, capture.index, &name_len)
+        name := ts._query_capture_name_for_id(buffer.query, capture.index, &name_len)
 
         node := capture.node
         node_type := string(name)
@@ -2198,6 +2223,8 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree) {
 }
 
 set_lsp_tokens :: proc(buffer: ^Buffer, lsp_tokens: []Token) {
+    context = global_context
+    
     get_overlapping_token :: proc(tokens: [dynamic]Token, char: i32) -> (t: ^Token, idx: int) {
         for &token, index in tokens {
             if token.char == char {
@@ -2269,6 +2296,8 @@ is_delimiter_rune :: proc(r: rune) -> bool {
 
 @(private="package")
 restart_lsp :: proc() {
+    context = global_context
+    
     if active_language_server == nil {
         return
     }
@@ -2311,8 +2340,8 @@ restart_lsp :: proc() {
     }
     
     delete_key(&active_language_servers, active_buffer.ext)
-    
-    lsp_handle_file_open()
+
+    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
 }
 
 handle_lsp_crash :: proc(server: ^LanguageServer) {
@@ -2329,3 +2358,4 @@ handle_lsp_crash :: proc(server: ^LanguageServer) {
     server^.lsp_server_pid = 0
     server^.lsp_server_process = os2.Process{}
 }
+

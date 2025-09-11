@@ -49,6 +49,22 @@ CompletionHit :: struct {
     insertTextFormat: int,
 
     raw_data: string,
+    
+    additional_text_edits: [dynamic]AdditionalTextEdit,
+}
+
+Position :: struct {
+    line: int,
+    character: int,
+}
+
+AdditionalTextEdit :: struct {
+    new_text: string,
+    
+    range: struct {
+        start: Position,
+        end: Position,
+    },
 }
 
 @(private="package")
@@ -157,9 +173,6 @@ buffers : [dynamic]^Buffer
 
 @(private="package")
 active_buffer : ^Buffer
-
-@(private="package")
-do_refresh_buffer_tokens := false
 
 SearchHit :: struct{
     line: int,
@@ -1044,7 +1057,7 @@ open_file :: proc(file_name: string) {
             existing_file.cursor_char_index,
         )
         
-        thread.run(lsp_handle_file_open)
+        thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
 
         return
     }
@@ -1067,7 +1080,7 @@ open_file :: proc(file_name: string) {
 
     new_buffer := new(Buffer)
     new_buffer^.lines = buffer_lines
-    new_buffer^.file_name = file_name
+    new_buffer^.file_name = strings.clone(file_name)
     
     content := make([dynamic]u8, len(data))
     copy(content[:], data)
@@ -1118,7 +1131,7 @@ open_file :: proc(file_name: string) {
     
     set_buffer_cursor_pos(0,0)
 
-    thread.run(lsp_handle_file_open)
+    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
 }
 
 close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
@@ -1155,6 +1168,7 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     delete(buffer.content)
     delete(buffer.redo_stack)
     delete(buffer.undo_stack)
+    delete(buffer.file_name)
     
     for &line in buffer.lines {
         clean_line(&line)
@@ -1190,6 +1204,7 @@ save_buffer :: proc(buffer: ^Buffer) {
     );
 
     if err != os.ERROR_NONE {
+        fmt.println("Tried to Save:", buffer.file_name)
         fmt.println("Save Buffer Error: ", err)
         
         create_alert(
@@ -2486,7 +2501,7 @@ reload_buffer :: proc(buffer: ^Buffer) {
     
     buffer^ = new_buffer^
     
-    lsp_handle_file_open()
+    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
 }
 
 /*
