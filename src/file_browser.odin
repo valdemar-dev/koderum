@@ -395,6 +395,8 @@ set_found_files :: proc() {
                 }
             }
             
+            file_index += 1
+            
             if hit.is_dir {
                 skip := false
                 for ign in search_ignored_dirs {
@@ -404,12 +406,10 @@ set_found_files :: proc() {
                     }
                 }
                 if !skip {
-                    append_elem(&queue, hit.fullpath)
+                    append_elem(&queue, strings.clone(hit.fullpath))
                 }
             }
         }
-        
-        file_index += 1
     }
     
     append(&found_files, ..candidates[:])
@@ -422,6 +422,7 @@ browser_append_to_search_term :: proc(key: rune) {
     }
 
     buf := make([dynamic]rune)
+    defer delete(buf)
 
     runes := utf8.string_to_runes(search_term)
     
