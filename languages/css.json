@@ -1,0 +1,46 @@
+{
+    "ts_colors": {
+        "string": 2,
+        "string.fragment": 2,
+        "string.special": 0,
+        "comment": 3,
+        "number": 11,
+        "constant": 5,
+        "constant.builtin": 9,
+        "property": 6,
+        "variable": 1,
+        "variable.builtin": 5,
+        "parameter": 6,
+        "type": 8,
+        "type.builtin": 7,
+        "keyword": 0,
+        "keyword.special": 10,
+        "control.flow": 10,
+        "operator": 3,
+        "punctuation.delimiter": 3,
+        "punctuation.bracket": 3,
+        "punctuation.parenthesis": 3,
+        "punctuation.special": 3,
+        "function": 4,
+        "function.method": 4,
+        "escape_sequence": 7,
+        "error": 0
+    },
+    "lsp_colors": {
+        "property": 6,
+        "parameter": 6,
+        "type": 8
+    },
+    "lsp_command": [
+        "vscode-css-language-server",
+        "--stdio"
+    ],
+    "lsp_working_dir": "",
+    "lsp_install_command": "npm install -g vscode-langservers-extracted",
+    "parser_name": "css",
+    "parser_subpath": "",
+    "parser_link": "https://github.com/tree-sitter/tree-sitter-css",
+    "language_symbol_name": "tree_sitter_css",
+    "filler_color": 5,
+    "project_root_markers": ["package.json"]
+}
