@@ -82,13 +82,12 @@ terminal_thread : ^thread.Thread
 @(private="package")
 init_message_thread :: proc() {
     if message_thread != nil {
-        return
-        // when ODIN_DEBUG {
-        //    fmt.println("Destroying existing LSP message thread..")
-        // }
+        when ODIN_DEBUG {
+            fmt.println("Destroying existing LSP message thread..")
+        }
 
-        // thread.terminate(message_thread, 9)
-        // thread.destroy(message_thread)
+        thread.terminate(message_thread, 9)
+        thread.destroy(message_thread)
     }
 
     when ODIN_DEBUG {

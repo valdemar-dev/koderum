@@ -29,17 +29,6 @@ Language :: struct {
     lsp_working_dir: string,
     lsp_command: []string,
     lsp_install_command: string,
-
-    // Function to call in case you need to manually set a tokens type.
-    override_node_type : proc(
-        node_type: ^string,
-        node: ts.Node, 
-        source: []u8,
-        start_point,
-        end_point: ^ts.Point,
-        tokens: ^[dynamic]Token,
-        priority: ^u8,
-    ),
     
     // Files to look for to determine the root of a project.
     // tsconfig.json, ols.json, etc.    

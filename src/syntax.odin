@@ -1152,6 +1152,10 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 
     process, start_err := os2.process_start(desc)
     
+    when ODIN_DEBUG {
+        fmt.println("Started LSP Process")
+    }
+    
     server^.lsp_server_process = process
     server^.lsp_stdin_w = stdin_w
     server^.lsp_stdout_r = stdout_r
@@ -2090,9 +2094,6 @@ parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree {
 
 set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buffer) { 
     context = global_context
-
-    sync.lock(&language_server_mutex)
-    defer sync.unlock(&language_server_mutex)
    
     if active_language_server == nil do return
     

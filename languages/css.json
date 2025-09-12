@@ -1,35 +1,23 @@
 {
     "ts_colors": {
-        "string": 2,
-        "string.fragment": 2,
-        "string.special": 0,
         "comment": 3,
-        "number": 11,
-        "constant": 5,
-        "constant.builtin": 9,
-        "property": 6,
-        "variable": 1,
-        "variable.builtin": 5,
-        "parameter": 6,
-        "type": 8,
-        "type.builtin": 7,
-        "keyword": 0,
-        "keyword.special": 10,
-        "control.flow": 10,
         "operator": 3,
-        "punctuation.delimiter": 3,
-        "punctuation.bracket": 3,
-        "punctuation.parenthesis": 3,
-        "punctuation.special": 3,
+        "string": 2,
+        "variable": 1,
+        "property": 6,
+        "attribute": 7,
         "function": 4,
-        "function.method": 4,
-        "escape_sequence": 7,
-        "error": 0
+        "keyword": 0,
+        "string.special": 0,
+        "number": 11,
+        "punctuation.delimiter": 3,
+        "punctuation.bracket": 3
     },
     "lsp_colors": {
         "property": 6,
-        "parameter": 6,
-        "type": 8
+        "attribute": 7,
+        "function": 4,
+        "variable": 1
     },
     "lsp_command": [
         "vscode-css-language-server",
