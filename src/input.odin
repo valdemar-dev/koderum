@@ -294,10 +294,10 @@ scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) 
         return
     }
     
-    scroll_target_y = scroll_target_y - f32(scroll_y * 20)
+    scroll_target_y = scroll_target_y - f32(scroll_y * 40)
     
     scroll_target_x = max(
-        scroll_target_x - f32(scroll_x * 20),
+        scroll_target_x - f32(scroll_x * 40),
         0
     )
 }

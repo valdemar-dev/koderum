@@ -27,19 +27,20 @@ render :: proc() {
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     
     gl.UseProgram(shader_id)
-    gl.ActiveTexture(gl.TEXTURE0)
-    gl.Uniform1i(first_texture_loc, 0)
-
+    
     gl.Enable(gl.BLEND)
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.Enable(gl.DEPTH_TEST)
     gl.DepthFunc(gl.LESS)
-            
+    
+    
     time := glfw.GetTime()
     frame_time = f32(time - prev_time)
     prev_time = time
 
+    draw_bg()
+    
     draw_cursor()    
     draw_buffer()
 
@@ -58,6 +59,58 @@ render :: proc() {
     when ODIN_DEBUG {
         draw_debug()
     }
+    
+}
+
+draw_bg :: proc() {
+    if len(background_image) == 0 do return
+    
+    gl.Uniform1i(first_texture_loc, 1)
+    
+    gl.Uniform1i(do_sample_rgb, 1)
+    gl.ActiveTexture(gl.TEXTURE1)
+    gl.BindTexture(gl.TEXTURE_2D, general_texture_id)
+    
+    box := rect{
+        0, 0,
+        fb_size.x,
+        fb_size.y,
+    }
+    
+    scale := max(box.width / background_image_size.x, box.height / background_image_size.y)
+    new_size := vec2{ background_image_size.x * scale, background_image_size.y * scale }
+    
+    // How much of the scaled texture extends beyond the box
+    overflow := vec2{
+        new_size.x - box.width,
+        new_size.y - box.height,
+    }
+    
+    // Convert overflow to texture space (UVs in pixels)
+    uv_offset := vec2{
+        overflow.x / 2 / scale,
+        overflow.y / 2 / scale,
+    }
+    
+    uvs := rect{
+        x = uv_offset.x,
+        y = uv_offset.y,
+        width  = background_image_size.x - 2*uv_offset.x,
+        height = background_image_size.y - 2*uv_offset.y
+    }
+
+    reset_rect_cache(&rect_cache)
+    add_rect(&rect_cache, box, uvs, vec4{1,1,1,1}, background_image_size, 0)    
+    draw_rects(&rect_cache)
+    
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.BindTexture(gl.TEXTURE_2D, font_texture_id)
+    gl.Uniform1i(first_texture_loc, 0)
+    gl.Uniform1i(do_sample_rgb, 0)
+    
+    reset_rect_cache(&rect_cache)
+    add_rect(&rect_cache, box, no_texture, vec4{0,0,0,.9}, vec2{}, 1)
+    draw_rects(&rect_cache)    
 }
 
 indices_rawptr := rawptr(uintptr(0))

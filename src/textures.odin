@@ -1,6 +1,8 @@
 package main
 import gl "vendor:OpenGL"
 
+general_texture_id : u32
+
 upload_texture_buffer :: proc(buffer: rawptr, format: u32, width, height: i32, texture_id: u32) -> (id: u32, ok: bool) { 
     gl.ActiveTexture(gl.TEXTURE0)
     gl.BindTexture(gl.TEXTURE_2D, texture_id)

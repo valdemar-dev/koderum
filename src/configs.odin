@@ -11,7 +11,7 @@ import fp "core:path/filepath"
 import "core:unicode/utf8"
 import "core:dynlib"
 
-MAX_UNDO_COUNT :: 1
+MAX_UNDO_COUNT :: 100
 
 font_base_px : f32
 
@@ -79,6 +79,7 @@ search_ignored_dirs : [dynamic]string
 
 do_constrain_cursor_to_scroll : bool = false
 
+background_image : string
 config_dir : string
 init_config :: proc() -> []u8 {
     home := os.get_env("HOME")
@@ -278,10 +279,14 @@ set_option :: proc(options: []string) {
     }
 
     option_name := options[0]
-
+    
     value := options[1]
 
     switch option_name {
+    case "background_image":
+        expanded,_ := expand_env(value)
+
+        background_image = expanded
     case "do_highlight_long_lines":
         do_highlight_long_lines = value == "true"
     case "long_line_required_characters":
@@ -295,7 +300,9 @@ set_option :: proc(options: []string) {
     case "cursor_edge_padding_em":
         cursor_edge_padding_em = f32(strconv.atof(value))
     case "font":
-        append(&font_list, strings.clone(value))
+        expanded,_ := expand_env(value)
+        
+        append(&font_list, expanded)
     case "font_base_px":
         font_size := strconv.atof(value)
         font_base_px = f32(font_size)
@@ -314,7 +321,9 @@ set_option :: proc(options: []string) {
     case "do_highlight_indents":
         do_highlight_indents = value == "true"
     case "default_cwd":
-        default_cwd = strings.clone(value)
+        expanded,_ := expand_env(value)
+        
+        default_cwd = expanded
     case "text_highlight_color":
         text_highlight_color = hex_string_to_vec4(value)
     case "text_highlight_bg":

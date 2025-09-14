@@ -9,6 +9,9 @@ font = /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
 font = /usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf
 font = /usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf
 
+[drawn on buffer background]
+background_image = $HOME/.wallpapers/wallpaper_4.png
+
 [windows fonts]
 font = C:\Windows\Fonts\consola.ttf
 
@@ -82,7 +85,7 @@ tab_spaces = 4
 do_highlight_current_line = true
 
 [general]
-default_cwd = /home
+default_cwd = $HOME
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
 delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
 

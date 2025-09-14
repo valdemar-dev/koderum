@@ -690,6 +690,7 @@ draw_no_buffer :: proc() {
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
 
+    /*
     add_rect(&rect_cache,
         rect{
             0,0,fb_size.x,fb_size.y,
@@ -699,6 +700,7 @@ draw_no_buffer :: proc() {
         vec2{},
         -2,
     )
+    */
     
     big_text := math.round_f32(font_base_px * large_text_scale)
     
@@ -1032,6 +1034,8 @@ draw_autocomplete :: proc() {
 
 @(private="package")
 open_file :: proc(file_name: string) {
+    context = global_context
+    
     if active_buffer != nil {
         active_buffer^.cursor_char_index = buffer_cursor_char_index
         active_buffer^.cursor_line = buffer_cursor_line
@@ -1169,7 +1173,7 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     delete(buffer.redo_stack)
     delete(buffer.undo_stack)
     delete(buffer.file_name)
-    
+
     for &line in buffer.lines {
         clean_line(&line)
     }

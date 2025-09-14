@@ -584,3 +584,60 @@ levenshtein_dp :: proc(a, b: string) -> int
 
     return mat[len(mat)-1]
 }
+
+
+expand_env :: proc(path: string, allocator := context.allocator) -> (string, os2.Error) {
+    builder: strings.Builder;
+    strings.builder_init(&builder, allocator);
+    defer strings.builder_destroy(&builder);
+
+    i := 0;
+    for i < len(path) {
+        if path[i] == '$' {
+            start := i;
+            i += 1;
+            
+            if i < len(path) && path[i] == '{' {
+                brace_start := i;
+                i += 1;
+                end := i;
+                for end < len(path) && path[end] != '}' do end += 1;
+                if end < len(path) {
+                    var_name := path[i:end];
+                    value := os2.get_env(var_name, allocator);
+                    defer delete(value)
+                    
+                    strings.write_string(&builder, value);
+                    i = end + 1;
+                } else {
+                    strings.write_string(&builder, path[start:brace_start+1]);
+                    i = brace_start + 1;
+                }
+            } else {
+                end := i;
+                for end < len(path) && ((path[end] >= 'a' && path[end] <= 'z') ||
+                                        (path[end] >= 'A' && path[end] <= 'Z') ||
+                                        (path[end] >= '0' && path[end] <= '9') ||
+                                        path[end] == '_') { end += 1; }
+                if end > i {
+                    var_name := path[i:end];
+                    value := os2.get_env(var_name, allocator);
+                    defer delete(value)
+                    
+                    strings.write_string(&builder, value);
+                    i = end;
+                } else {
+                    strings.write_rune(&builder, '$');
+                }
+            }
+        } else {
+            // Copy literal characters
+            j := i;
+            for j < len(path) && path[j] != '$' do j += 1;
+            strings.write_string(&builder, path[i:j]);
+            i = j;
+        }
+    }
+
+    return strings.clone(strings.to_string(builder)), os2.ERROR_NONE;
+}

@@ -475,6 +475,9 @@ draw_browser_view :: proc() {
     }
     
     reset_rect_cache(&rect_cache)
+    reset_rect_cache(&text_rect_cache)
+    
+    defer draw_rects(&text_rect_cache)
     defer draw_rects(&rect_cache)
         
     bg_rect := rect{
@@ -552,7 +555,7 @@ draw_browser_view :: proc() {
         // Text
         {
             add_text(
-                &rect_cache,
+                &text_rect_cache,
                 vec2{
                     search_rect.x + padding,
                     search_rect.y + padding,
@@ -567,7 +570,7 @@ draw_browser_view :: proc() {
                 
             if is_cwd {
                 add_text(
-                    &rect_cache,
+                    &text_rect_cache,
                     vec2{
                         search_rect.x + padding,
                         search_rect.y + search_size.y + gap + padding,
@@ -579,7 +582,7 @@ draw_browser_view :: proc() {
                 )
             } else if doesnt_exist {
                 add_text(
-                    &rect_cache,
+                    &text_rect_cache,
                     vec2{
                         search_rect.x + padding,
                         search_rect.y + search_size.y + gap + padding,
@@ -600,7 +603,7 @@ draw_browser_view :: proc() {
         padding := small_text
         
         size := add_text_measure(
-            &rect_cache,
+            &text_rect_cache,
             vec2{
                 bg_rect.x + padding,
                 y_pen + padding,
@@ -624,7 +627,7 @@ draw_browser_view :: proc() {
         max_width := bg_rect.width - padding * 2
         
         if len(search_term) == 0 {
-            add_text(&rect_cache,
+            add_text(&text_rect_cache,
                 vec2{
                     bg_rect.x + padding,
                     y_pen,
@@ -639,7 +642,7 @@ draw_browser_view :: proc() {
         }
     
         if attempting_file_deletion {
-            add_text(&rect_cache,
+            add_text(&text_rect_cache,
                 vec2{
                     bg_rect.x + padding,
                     y_pen,
@@ -658,7 +661,7 @@ draw_browser_view :: proc() {
         }
         
         if attempting_rename {
-            add_text(&rect_cache,
+            add_text(&text_rect_cache,
                 vec2{
                     bg_rect.x + padding,
                     y_pen,
@@ -689,7 +692,7 @@ draw_browser_view :: proc() {
             
             gap := font_size * .5
             
-            add_text(&rect_cache,
+            add_text(&text_rect_cache,
                 vec2{
                     bg_rect.x + padding,
                     y_pen,

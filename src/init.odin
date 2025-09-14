@@ -10,6 +10,9 @@ import "core:thread"
 import "core:time"
 import "core:encoding/json"
 import "core:os"
+import stb_image "vendor:stb/image"
+
+import "core:path/filepath"
 
 window : glfw.WindowHandle
 fb_size := vec2{}
@@ -46,6 +49,64 @@ init :: proc() {
         length=50,
         data=new([50]string, context.allocator)
     }
+    
+    load_background()
+}
+
+background_uvs : rect
+background_image_size : vec2
+load_background :: proc() {
+    if len(background_image) == 0 do return;
+    
+    width : i32
+    height : i32
+    channels : i32
+    desired_channels : i32 = 4
+    
+    cstr := strings.clone_to_cstring(background_image)
+    defer delete(cstr)
+    
+    data := stb_image.load(cstr, &width, &height, &channels, 0)
+    
+    pixel_format : u32
+    
+    switch channels {
+    case 1:
+        pixel_format = gl.RED
+    case 2:
+        pixel_format = gl.RG
+    case 3:
+        pixel_format = gl.RGB
+    case 4:
+        pixel_format = gl.RGBA
+    }
+    
+    fmt.println("BG Loaded:", width, height, channels)
+    
+    background_uvs = rect{
+        0,0,
+        f32(width),
+        f32(height),
+    }
+    
+    background_image_size = vec2{
+        f32(width),
+        f32(height)
+    }
+    
+    gl.ActiveTexture(gl.TEXTURE1)
+    gl.BindTexture(gl.TEXTURE_2D, general_texture_id)
+    
+    gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    
+    data_type : u32 = gl.UNSIGNED_BYTE
+    
+    gl.TexImage2D(gl.TEXTURE_2D, 0, i32(pixel_format), i32(width), i32(height), 0, pixel_format, data_type, data)
+
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    
+    fmt.println("GL Error:", gl.GetError())
 }
 
 size_callback :: proc "c" (
@@ -192,6 +253,9 @@ view_loc : i32
 first_texture_loc : i32
 
 @(private="package")
+do_sample_rgb : i32
+
+@(private="package")
 world_tint_loc : i32
 
 @(private="package")
@@ -230,6 +294,7 @@ init_opengl :: proc() {
     projection_loc = gl.GetUniformLocation(prog_id, "cameraProjection")
     view_loc = gl.GetUniformLocation(prog_id, "cameraView")
     first_texture_loc = gl.GetUniformLocation(prog_id, "firstTexture")
+    do_sample_rgb = gl.GetUniformLocation(prog_id, "doSampleRGB")
 
     gl.BindVertexArray(vao)
     gl.BindBuffer(gl.ARRAY_BUFFER, vbo)

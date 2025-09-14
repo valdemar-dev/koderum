@@ -10,6 +10,7 @@ todo:
     
 think:
     - control + escape is a bad keybind for the terminal input mode switching.
+    - GUI mode with every file opened, listed
     
 bugs:
     - nil pointer dereference in set_tokens() when reloading a file
