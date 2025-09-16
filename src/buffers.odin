@@ -193,6 +193,8 @@ buffer_search_term : string
 go_to_line_input_string : string
 
 undo_change :: proc() {
+    context = global_context
+    
     if len(active_buffer.undo_stack) == 0 {
         return
     }
@@ -252,6 +254,8 @@ undo_change :: proc() {
 }
 
 redo_change :: proc() {
+    context = global_context
+    
     if len(active_buffer.redo_stack) == 0 {
         return
     }
@@ -314,6 +318,8 @@ redo_change :: proc() {
 
 
 update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo:bool) {
+    context = global_context
+    
     start_byte := change.start_byte
 
     text := is_undo ? change.original_content : change.new_content
@@ -405,6 +411,8 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
 }
 
 byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
+    context = global_context
+    
     local_byte: u32 = 0
     for buf_line, i in active_buffer.lines {
         line_len := u32(len(buf_line.characters)) + 1
@@ -423,6 +431,8 @@ byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
 
 
 next_buffer :: proc() {
+    context = global_context
+    
     reset_completion_hits()
     
     set_next_as_current := false
@@ -440,6 +450,8 @@ next_buffer :: proc() {
 }
 
 set_buffer :: proc(number: int) {
+    context = global_context
+    
     idx := number - 1
 
     if idx > len(buffers) - 1 {
@@ -453,6 +465,8 @@ set_buffer :: proc(number: int) {
 }
 
 prev_buffer :: proc() {
+    context = global_context
+    
     reset_completion_hits()
     
     set_next_as_current := false
@@ -470,6 +484,8 @@ prev_buffer :: proc() {
 
 @(private="package")
 get_buffer_index :: proc(buffer: ^Buffer) -> int {
+    context = global_context
+    
     for &local_buffer, index in buffers {
         if local_buffer == buffer {
             return index
@@ -481,6 +497,8 @@ get_buffer_index :: proc(buffer: ^Buffer) -> int {
 
 @(private="package")
 find_search_hits :: proc() {
+    context = global_context
+    
     clear(&search_hits)
 
     for line,i in active_buffer.lines {
@@ -527,6 +545,8 @@ find_search_hits :: proc() {
 
 hit_index := 0
 set_hit_index :: proc(index: int) {
+    context = global_context
+    
     idx := index
 
     if idx > len(search_hits) - 1 {
@@ -581,6 +601,8 @@ draw_buffer_line :: proc(
     char_map: ^CharacterMap,
     font_size: f32,
 ) -> vec2 {
+    context = global_context
+    
     pen := input_pen
 
     true_font_height := (ascender - descender)
@@ -671,7 +693,7 @@ draw_buffer_line :: proc(
         }
 
         line_string := strconv.itoa(line_buffer^[:], index+1)
-
+        
         add_text(&rect_cache,
             line_pos,
             long_line ? TEXT_ERROR : TEXT_DARKER,
@@ -1584,16 +1606,16 @@ handle_text_input :: proc() -> bool {
     }
     
     {
-        if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if (is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_DOWN) {
             move_down()
         }
-        if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if (is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_UP) {
             move_up()
         }
-        if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if (is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_LEFT) {
             move_left()
         }
-        if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        if (is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_RIGHT) {
             move_right()
         }
     }
@@ -2726,6 +2748,7 @@ handle_buffer_input :: proc() -> bool {
  
     return false
 }
+
 @(private="package")
 handle_movement_input :: proc() -> bool {
     if is_key_down(glfw.KEY_J) {
@@ -2744,7 +2767,7 @@ handle_movement_input :: proc() -> bool {
         return false
     }
 
-    if is_key_down(glfw.KEY_K) || is_key_pressed(glfw.KEY_DOWN) {
+    if is_key_down(glfw.KEY_K) {
         key := key_store[glfw.KEY_K]
 
         if key.modifiers == SHIFT {
@@ -2760,7 +2783,7 @@ handle_movement_input :: proc() -> bool {
         return false
     }
 
-    if is_key_down(glfw.KEY_D) || is_key_pressed(glfw.KEY_DOWN) {
+    if is_key_down(glfw.KEY_D) {
         key := key_store[glfw.KEY_D]
 
         if key.modifiers == SHIFT {

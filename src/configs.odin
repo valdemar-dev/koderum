@@ -284,9 +284,21 @@ set_option :: proc(options: []string) {
 
     switch option_name {
     case "background_image":
-        expanded,_ := expand_env(value)
+        exe_path, _ := os2.get_executable_path(context.allocator)
+        defer delete(exe_path)
+        
+        exe_dir := fp.dir(exe_path)
+        defer delete(exe_dir)
+        
+        bg_path := strings.concatenate({
+            exe_dir,
+            "/themes/",
+            value,
+        })
+        
+        defer delete(bg_path)
 
-        background_image = expanded
+        background_image = strings.clone(bg_path)
     case "do_highlight_long_lines":
         do_highlight_long_lines = value == "true"
     case "long_line_required_characters":
@@ -420,8 +432,142 @@ set_option :: proc(options: []string) {
         LSP_COLOR_ERROR = hex_string_to_vec4(value)
     case "lsp_color_warn":
         LSP_COLOR_WARN = hex_string_to_vec4(value)
+    case "theme":
+        load_theme(value)
     case:
         fmt.eprintln("Unknown option,", option_name)
     }
 }
 
+load_theme :: proc(name: string) {
+    context = global_context
+
+    when ODIN_DEBUG {
+        fmt.println("Loading new colorscheme..")
+    }
+        
+    exe_path, _ := os2.get_executable_path(context.allocator)
+    defer delete(exe_path)
+    
+    exe_dir := fp.dir(exe_path)
+    defer delete(exe_dir)
+    
+    themes_path := strings.concatenate({
+        exe_dir,
+        "/themes",
+    })
+    
+    defer delete(themes_path)
+
+    themes_list, error := os2.read_directory_by_path(
+        themes_path,
+        -1, 
+        context.allocator
+    )
+    
+    defer delete(themes_list)
+
+    hit : ^os2.File_Info
+    for &theme in themes_list {
+        if strings.contains(theme.name, name) {
+            hit = &theme
+            
+            break
+        }
+    }
+    
+    if hit == nil {
+        desc := strings.concatenate({
+            "A theme with the name ",
+            name,
+            " could not be found."
+        })
+        
+        defer delete(desc)
+        
+        create_alert(
+            "Theme not found.",
+            desc,
+            10,
+            context.allocator,
+        )
+        
+        return
+    }
+    
+    bytes, err := os2.read_entire_file_from_path(hit.fullpath, context.allocator)
+    defer delete(bytes)
+    
+    if err != os2.ERROR_NONE {
+        desc := strings.concatenate({
+            "Theme ",
+            name,
+            "'s theme file could not be opened."
+        })
+        
+        defer delete(desc)
+        
+        create_alert(
+            "Could not set theme.",
+            desc,
+            10,
+            context.allocator,
+        )
+        
+        return
+    }
+    
+    data_string := string(bytes[:])
+    
+    lines : []string
+    when ODIN_OS == .Windows {
+        lines = strings.split(data_string, "\r\n")
+    }
+
+    when ODIN_OS == .Linux {
+        lines = strings.split(data_string, "\n")
+    }
+
+    category : string
+    values : []string
+
+    for line, index in lines {
+        if len(line) == 0 {
+            continue
+        }
+
+        start_char := line[0]
+        end_char : u8
+
+        when ODIN_OS == .Windows {
+            test_end := line[len(line)-1]
+
+            if rune(test_end) == '\r' {
+                end_char = line[clamp(len(line)-2,0,len(line)-1)]
+            } else {
+                end_char = test_end
+            }
+        }
+
+        when ODIN_OS == .Linux {
+            end_char = line[len(line)-1]
+        }
+
+        if start_char == '[' && end_char == ']' {
+            category = line[1:len(line)-1]
+
+            continue
+        }
+
+        values := strings.split(line, " = ")
+
+        when ODIN_DEBUG {
+            fmt.println("Loading option:", values)
+        }
+
+        set_option(values)
+
+        delete(values)
+    }
+
+}

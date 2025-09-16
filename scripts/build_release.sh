@@ -14,4 +14,4 @@ mkdir -p "$RELEASE_DIR"
 
 odin build src -o:speed -out:koderum
 
-zip -r "$OUTPUT" koderum ./languages ./config
+zip -r "$OUTPUT" koderum ./languages ./config ./themes

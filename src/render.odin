@@ -23,7 +23,7 @@ prev_time : f64
 
 @(private="package")
 render :: proc() {
-    gl.ClearColor(0,0,0,1)
+    gl.ClearColor(BG_MAIN_10.x,BG_MAIN_10.y,BG_MAIN_10.z,1)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     
     gl.UseProgram(shader_id)
@@ -80,13 +80,11 @@ draw_bg :: proc() {
     scale := max(box.width / background_image_size.x, box.height / background_image_size.y)
     new_size := vec2{ background_image_size.x * scale, background_image_size.y * scale }
     
-    // How much of the scaled texture extends beyond the box
     overflow := vec2{
         new_size.x - box.width,
         new_size.y - box.height,
     }
     
-    // Convert overflow to texture space (UVs in pixels)
     uv_offset := vec2{
         overflow.x / 2 / scale,
         overflow.y / 2 / scale,
@@ -109,7 +107,7 @@ draw_bg :: proc() {
     gl.Uniform1i(do_sample_rgb, 0)
     
     reset_rect_cache(&rect_cache)
-    add_rect(&rect_cache, box, no_texture, vec4{0,0,0,.9}, vec2{}, 1)
+    add_rect(&rect_cache, box, no_texture, vec4{0,0,0,.8}, vec2{}, 1)
     draw_rects(&rect_cache)    
 }
 
