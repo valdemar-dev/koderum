@@ -65,17 +65,21 @@ read_lsp_errors :: proc() {
             continue
         }
         
-        if active_language_server == nil {
+        if active_buffer == nil {
             return
         }
         
-        if active_language_server.lsp_server_pid == 0 {            
+        if active_buffer.language_server == nil {
+            return
+        }
+        
+        if active_buffer.language_server.lsp_server_pid == 0 {            
             return
         }
         
         temp := [1024]u8{}
         
-        n, err := os2.read(active_language_server.lsp_stderr_r, temp[:])
+        n, err := os2.read(active_buffer.language_server.lsp_stderr_r, temp[:])
         if err != os2.ERROR_NONE || n != 1 {
             continue
         }
@@ -118,13 +122,20 @@ message_loop :: proc(this_thread: ^thread.Thread) {
 
             continue
         }
+        
+        if active_buffer == nil {
+            fmt.println("Exiting message loop. Reason: No buffer open yet.")
+            
+            return
+        }
 
-        if active_language_server == nil {
+        if active_buffer.language_server == nil {
             fmt.println("Exiting message loop. Reason: The LSP server pointer is nil.")
+            
             return
         }
         
-        if active_language_server.lsp_server_pid == 0 {
+        if active_buffer.language_server.lsp_server_pid == 0 {
             fmt.println("Exiting message loop. Reason: The LSP server's PID is 0.")
             
             return
@@ -133,7 +144,7 @@ message_loop :: proc(this_thread: ^thread.Thread) {
         last_time = current_time
         
         bytes, read_err := read_lsp_message(
-            active_language_server.lsp_stdout_r,
+            active_buffer.language_server.lsp_stdout_r,
             context.allocator,
         )
         
@@ -403,11 +414,11 @@ send_lsp_message :: proc(
 ) {
     context = global_context
     
-    if active_language_server == nil {
+    if buffer.language_server == nil {
         return
     }
     
-    if active_language_server.lsp_server_pid == 0 {
+    if buffer.language_server.lsp_server_pid == 0 {
         return
     }
     
@@ -417,9 +428,9 @@ send_lsp_message :: proc(
         return
     }
     
-    status, _ := os2.process_wait(active_language_server.lsp_server_process, 0)
+    status, _ := os2.process_wait(buffer.language_server.lsp_server_process, 0)
     if status.exited == true {
-        handle_lsp_crash(active_language_server)
+        handle_lsp_crash(buffer.language_server)
         
         return
     }
@@ -428,7 +439,7 @@ send_lsp_message :: proc(
         // fmt.println("LSP Message: Adding a message with ID", id, content)
     }
     
-    os2.write(active_language_server.lsp_stdin_w, transmute([]u8)content)
+    os2.write(buffer.language_server.lsp_stdin_w, transmute([]u8)content)
     
     if id == "" {
         return

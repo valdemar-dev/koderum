@@ -136,6 +136,8 @@ Buffer :: struct {
     
     // Purely for display purposes.
     error_count: int,
+    
+    language_server: ^LanguageServer
 }
 
 @(private="package")
@@ -1168,8 +1170,8 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         buffer.file_name,
     }, context.temp_allocator)
     
-    if active_language_server != nil {
-        encoded := encode_uri_component(active_buffer.file_name)
+    if buffer.language_server != nil {
+        encoded := encode_uri_component(buffer.file_name)
         defer delete(encoded)
     
         uri := strings.concatenate(
@@ -1182,7 +1184,7 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         
         defer delete(msg)
         
-        send_lsp_message(msg, "", nil, nil,  active_buffer.version, active_buffer)
+        send_lsp_message(msg, "", nil, nil, buffer.version, buffer)
     }
     
     buffer_index := get_buffer_index(buffer)
@@ -1207,8 +1209,6 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         0,
         len(buffers) - 1
     )
-    
-    active_language_server = nil
     
     if new_buffer_index == -1 {
         active_buffer = nil
@@ -1243,20 +1243,20 @@ save_buffer :: proc(buffer: ^Buffer) {
         return
     }
     
-    active_buffer^.is_saved = true
+    buffer^.is_saved = true
     
-    if active_language_server == nil {
+    if buffer.language_server == nil {
         return
     }
     
     msg := text_document_did_save_message(
         strings.concatenate({
             "file://",
-            active_buffer.file_name,
+            buffer.file_name,
         }, context.temp_allocator),
     )
     
-    send_lsp_message(msg, "", nil, nil,  active_buffer.version, active_buffer)
+    send_lsp_message(msg, "", nil, nil, buffer.version, buffer)
 }
 
 
@@ -2552,7 +2552,7 @@ handle_buffer_input :: proc() -> bool {
     }
     
     if is_key_pressed(glfw.KEY_F5) {
-        restart_lsp()
+        restart_lsp(active_buffer)
     }
 
     if is_key_pressed (glfw.KEY_R) {

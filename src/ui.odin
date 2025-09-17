@@ -502,10 +502,10 @@ draw_ui :: proc() {
             defer strings.builder_destroy(&sb)
             
             // Language Server Draw
-            if active_language_server != nil {
+            if active_buffer != nil && active_buffer.language_server != nil {
                 strings.write_string(&sb, "Parser: Yes | ")
                 
-                if active_language_server.lsp_server_pid == 0 {
+                if active_buffer.language_server.lsp_server_pid == 0 {
                     strings.write_string(&sb, "LSP: No")
                 } else {
                     strings.write_string(&sb, "LSP: Yes")

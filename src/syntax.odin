@@ -645,18 +645,22 @@ init_parser :: proc(language: ^Language) {
     language.ts_language = ts_lang
 }
 
-set_active_language_server :: proc(ext: string) {
+set_buffer_language_server :: proc(buffer: ^Buffer) {
+    context = global_context
+    
     sync.lock(&language_server_mutex)
-    defer sync.unlock(&language_server_mutex)
+    defer sync.unlock(&language_server_mutex) 
+    
+    ext := buffer.ext
  
-    active_language_server = nil
+    buffer^.language_server = nil
    
     defer {
         init_message_thread()
     }
     
     if ext in active_language_servers {
-        active_language_server = active_language_servers[ext]
+        buffer^.language_server = active_language_servers[ext]
         
         when ODIN_DEBUG {
             fmt.println("Reusing existing language server.")
@@ -733,7 +737,7 @@ set_active_language_server :: proc(ext: string) {
         return
     }
 
-    init_language_server(ext)
+    init_language_server(buffer)
 }
 
 get_project_root :: proc(
@@ -1087,7 +1091,10 @@ read_language_from_file :: proc(
     return true
 }
 
-init_language_server :: proc(ext: string) {
+init_language_server :: proc(buffer: ^Buffer) {
+    context = global_context
+    
+    ext := buffer.ext
     language := &languages[ext]
     
     if language == nil do return
@@ -1117,16 +1124,18 @@ init_language_server :: proc(ext: string) {
         completion_trigger_runes={},
     }  
  
-    active_language_server = server
+    buffer^.language_server = server
     active_language_servers[ext] = server
 
     fmt.println("Set Language Server To:", server)
     
-    init_lsp_server(ext, server)
+    init_lsp_server(buffer, server)
 }
 
-init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
+init_lsp_server :: proc(buffer: ^Buffer, server: ^LanguageServer) {
     context = global_context
+    
+    ext := buffer.ext
 
     language := &languages[ext]
 
@@ -1194,7 +1203,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
         )
     }
     
-    directory, ok := get_project_root(active_buffer.file_name, language.project_root_markers)
+    directory, ok := get_project_root(buffer.file_name, language.project_root_markers)
     
     defer if ok {
         delete(directory)
@@ -1209,7 +1218,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 
     id := "1"
 
-    send_lsp_message(msg, id, set_capabilities, rawptr(server), active_buffer.version, active_buffer)
+    send_lsp_message(msg, id, set_capabilities, rawptr(server), buffer.version, buffer)
 
     set_capabilities :: proc(response: json.Object, data: rawptr) {
         context = global_context
@@ -1267,9 +1276,13 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
 lsp_handle_file_open :: proc(buffer: ^Buffer) {
     context = global_context
     
-    set_active_language_server(buffer.ext)
+    set_buffer_language_server(buffer)
     
-    if active_language_server == nil {
+    if buffer.language_server == nil {
+        when ODIN_DEBUG {
+            fmt.println("WARN: lsp_handle_file_open() -- Failed to set language server.")
+        }
+        
         return
     }
     
@@ -1301,14 +1314,18 @@ lsp_handle_file_open :: proc(buffer: ^Buffer) {
     Data :: struct{
         buffer: ^Buffer,
         version: int,
+        buffer_content: cstring,
     }
+    
+    buffer_content := strings.clone_to_cstring(string(buffer.content[:]))
     
     data := new(Data)
     data ^= {
         buffer=buffer,
         version=buffer.version,
+        buffer_content=buffer_content,
     }
-    
+        
     append(&update_tasks, Task{
         func=proc(raw_data: rawptr) {
             defer free(raw_data)
@@ -1317,15 +1334,22 @@ lsp_handle_file_open :: proc(buffer: ^Buffer) {
             buffer := data.buffer
             version := data.version
             
+            defer delete(data.buffer_content)
+            
             if version != buffer.version {
                 when ODIN_DEBUG {
-                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens. This run will be skipped.")   
+                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens.")   
                     fmt.println("Expected version:", data.version, ". Got version:", buffer.version)
                 }
                 
+                return
+            } else {
+                when ODIN_DEBUG {
+                    fmt.println("DEBUG: Up to date, setting for version:", buffer.version)
+                }
             }
             
-            set_buffer_tokens_threaded(buffer)
+            set_buffer_tokens_threaded(buffer, data.buffer_content)
         },
         data=rawptr(data)
     })
@@ -1345,8 +1369,10 @@ decode_modifiers :: proc(bitset: i32, modifiers: []string) -> [dynamic]string {
     return result
 }
 
-decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifiers: []string) -> [dynamic]Token {
+decode_semantic_tokens :: proc(buffer: ^Buffer, data: []i32, token_types: []string, token_modifiers: []string) -> [dynamic]Token {    
     tokens := make([dynamic]Token)
+    
+    if buffer == nil do return tokens
     
     line: i32 = 0
     char: i32 = 0
@@ -1372,9 +1398,9 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
             char = delta_char
         }
 
-        type := &active_language_server.token_types[token_type_index]
+        type := &buffer.language_server.token_types[token_type_index]
 
-        color := &active_language_server.language.lsp_colors[type^]
+        color := &buffer.language_server.language.lsp_colors[type^]
 
         if color == nil {
             continue
@@ -1424,19 +1450,15 @@ set_buffer_tokens :: proc() {
 }
 */
 
-set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
+set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
+    context = global_context
+    
     sync.lock(&tree_mutex)
     defer sync.unlock(&tree_mutex)
     
-    if active_language_server == nil {
+    if buffer.language_server == nil {
         return
     } 
-    
-    when ODIN_DEBUG {
-        fmt.println("Setting threaded buffer tokens for buffer with version:", buffer.version)
-    }
-    
-    context = global_context
     
     Data :: struct {
         buffer: ^Buffer,
@@ -1471,7 +1493,7 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
         buffer.version, buffer
     )
 
-    new_tree := parse_tree(0, len(buffer.lines), buffer)
+    new_tree := parse_tree(0, len(buffer.lines), buffer, buffer_content)
     
     ts.tree_delete(buffer.previous_tree)
     
@@ -1493,6 +1515,8 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
             
         }
         
+        if data.buffer.language_server == nil do return
+        
         obj,ok := response["result"].(json.Object)
         
         if !ok {
@@ -1513,12 +1537,11 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
         }
 
         decoded_tokens := decode_semantic_tokens(
+            data.buffer,
             lsp_tokens[:],
-            active_language_server.token_types,
-            active_language_server.token_modifiers,  
+            data.buffer.language_server.token_types,
+            data.buffer.language_server.token_modifiers,  
         )
-        
-        assert(active_language_server != nil)
 
         sync.lock(&lsp_tokens_mutex)
         
@@ -1602,7 +1625,7 @@ notify_server_of_change :: proc(
         inject_at(&buffer.content, start_byte, ..new_text)        
     }
 
-    if active_language_server == nil {
+    if buffer.language_server == nil {
         return
     }
     
@@ -1618,7 +1641,11 @@ notify_server_of_change :: proc(
             ts.Point{},
         }
         
+        sync.lock(&tree_mutex)
+        
         ts.tree_edit(buffer.previous_tree, edit)
+        
+        sync.unlock(&tree_mutex)
     }
     
     // testing out not having this here
@@ -1629,14 +1656,18 @@ notify_server_of_change :: proc(
     Data :: struct{
         buffer: ^Buffer,
         version: int,
+        buffer_content: cstring,
     }
+    
+    buffer_content := strings.clone_to_cstring(string(buffer.content[:]))
     
     data := new(Data)
     data ^= {
         buffer=buffer,
         version=buffer.version,
+        buffer_content=buffer_content,
     }
-    
+        
     append(&update_tasks, Task{
         func=proc(raw_data: rawptr) {
             defer free(raw_data)
@@ -1645,27 +1676,33 @@ notify_server_of_change :: proc(
             buffer := data.buffer
             version := data.version
             
+            defer delete(data.buffer_content)
+            
             if version != buffer.version {
                 when ODIN_DEBUG {
-                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens. This run will be skipped.")   
+                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens.")   
                     fmt.println("Expected version:", data.version, ". Got version:", buffer.version)
                 }
                 
                 return
+            } else {
+                when ODIN_DEBUG {
+                    fmt.println("DEBUG: Up to date, setting for version:", buffer.version)
+                }
             }
             
-            set_buffer_tokens_threaded(buffer)
+            set_buffer_tokens_threaded(buffer, data.buffer_content)
         },
         data=rawptr(data)
     })
     
-    if active_language_server.lsp_server_pid == 0 {
+    if buffer.language_server.lsp_server_pid == 0 {
         return
     }
     
-    status, _ := os2.process_wait(active_language_server.lsp_server_process, 0)
+    status, _ := os2.process_wait(buffer.language_server.lsp_server_process, 0)
     if status.exited == true {
-        handle_lsp_crash(active_language_server)
+        handle_lsp_crash(buffer.language_server)
         
         return
     }
@@ -1687,14 +1724,16 @@ notify_server_of_change :: proc(
 
     defer delete(msg)
         
-    _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+    _, write_err := os2.write(buffer.language_server.lsp_stdin_w, transmute([]u8)msg)
     
     if write_err != os2.ERROR_NONE {
-        handle_lsp_crash(active_language_server)
+        handle_lsp_crash(buffer.language_server)
     }
 }
 
 reset_change_stack :: proc(stack: ^[dynamic]BufferChange) {
+    context = global_context
+    
     for change in stack {
         delete(change.original_content)
         delete(change.new_content)
@@ -1819,6 +1858,7 @@ attempt_resolve_request :: proc(idx: int) {
     Data :: struct {
         hit_ptr: ^CompletionHit,
         version: int,
+        buffer: ^Buffer,
     }
     
     data := new(Data)
@@ -1826,6 +1866,7 @@ attempt_resolve_request :: proc(idx: int) {
     data ^= Data{
         hit,
         active_buffer.version,
+        active_buffer,
     }
     
     send_lsp_message(
@@ -1844,8 +1885,9 @@ attempt_resolve_request :: proc(idx: int) {
         data := cast(^Data)data_ptr
         
         version := data.version
+        buffer := data.buffer
         
-        if active_buffer.version != version {
+        if buffer.version != version {
             return
         }
         
@@ -1879,7 +1921,7 @@ get_autocomplete_hits :: proc(
 ) {
     context = global_context
     
-    if active_language_server == nil {
+    if active_buffer.language_server == nil {
         return
     }
     
@@ -1961,15 +2003,15 @@ get_autocomplete_hits :: proc(
             }
             
             hit = CompletionHit{
-                raw_data = strings.clone(string(buf), global_context.allocator),
+                raw_data = strings.clone(string(buf)),
             }
             
             if label_ok {
-                hit.label = strings.clone(label, global_context.allocator)
+                hit.label = strings.clone(label)
             }
 
             if documentation_ok {
-                hit.documentation = strings.clone(documentation, global_context.allocator)
+                hit.documentation = strings.clone(documentation)
             }
             
             
@@ -2020,7 +2062,7 @@ reset_completion_hits :: proc() {
 go_to_definition :: proc() {
     context = global_context
     
-    if active_language_server == nil {
+    if active_buffer.language_server == nil {
         return
     }
     
@@ -2079,11 +2121,6 @@ go_to_definition :: proc() {
         cached_buffer_cursor_line = buffer_cursor_line
         cached_buffer_cursor_char_index = buffer_cursor_char_index
 
-        // below is scuffed.
-        // here is a short explanation.
-        // open_file() kills the update thread
-        // we are in the update thread.
-        // therefore, run a separate thread.
         PolyData :: struct {
             name: string,
             line: json.Float,
@@ -2108,24 +2145,20 @@ go_to_definition :: proc() {
     }
 }
 
-parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree { 
+parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer, buffer_content: cstring) -> ts.Tree { 
     context = global_context
-    
-    if active_language_server == nil {
-        return nil
-    }
     
     if buffer == nil {
         return nil
     }
     
-    if active_language_server.ts_parser == nil {
-        fmt.println(active_language_server)
+    if buffer.language_server == nil {
         return nil
     }
-
-    active_buffer_cstring := strings.clone_to_cstring(string(buffer.content[:]))
-    defer delete(active_buffer_cstring)
+    
+    if buffer.language_server.ts_parser == nil {
+        return nil
+    }
 
     when ODIN_DEBUG {
         if buffer.previous_tree == nil {
@@ -2134,17 +2167,17 @@ parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree {
     }
     
     tree := ts._parser_parse_string(
-        active_language_server.ts_parser,
+        buffer.language_server.ts_parser,
         buffer.previous_tree,
-        active_buffer_cstring,
-        u32(len(active_buffer_cstring))
+        buffer_content,
+        u32(len(buffer_content))
     )
 
     if buffer.previous_tree == nil {
         error_offset : u32
         error_type : ts.Query_Error
 
-        language := &languages[active_buffer.ext]
+        language := &languages[buffer.ext]
         if language == nil do return nil
         
         query := ts._query_new(
@@ -2166,7 +2199,7 @@ parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree {
                 context.allocator,
             )
             
-            active_language_server = nil
+            handle_lsp_crash(buffer.language_server)
             
             return nil
         }
@@ -2182,7 +2215,7 @@ parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree {
 set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buffer) { 
     context = global_context
    
-    if active_language_server == nil do return
+    if buffer.language_server == nil do return
     
     if tree_ptr == nil {
         return
@@ -2275,20 +2308,11 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buff
             current_node_type := node_type
             current_priority: u8 
 
-            if active_language_server.override_node_type != nil {
-                active_language_server.override_node_type(
-                    &current_node_type, node,
-                    active_buffer.content[:],
-                    &start_point, &end_point,
-                    &line.ts_tokens, &current_priority,
-                )
-            }
-
             if current_node_type == "SKIP" {
                 continue
             }
 
-            color := &active_language_server.language.ts_colors[current_node_type]
+            color := &buffer.language_server.language.ts_colors[current_node_type]
 
             if color == nil {
                 if log_unhandled_treesitter_cases {
@@ -2387,10 +2411,10 @@ is_delimiter_rune :: proc(r: rune) -> bool {
 }
 
 @(private="package")
-restart_lsp :: proc() {
+restart_lsp :: proc(buffer: ^Buffer) {
     context = global_context
     
-    if active_language_server == nil {
+    if buffer.language_server == nil {
         return
     }
     
@@ -2403,12 +2427,18 @@ restart_lsp :: proc() {
         context.allocator,
     )
     
-    fmt.println(active_language_server)
-    
     placeholder := new(LanguageServer)
-    placeholder^ = active_language_server^
+    placeholder^ = buffer.language_server^
     
-    active_language_server = nil
+    {
+        language_server := buffer.language_server
+        
+        for &buffer in buffers {
+            if buffer.language_server == language_server {
+                buffer^.language_server = nil
+            }
+        }
+    }
     
     if placeholder.lsp_server_pid != 0 {
         state,_ := os2.process_wait(placeholder.lsp_server_process, 0)
@@ -2429,11 +2459,30 @@ restart_lsp :: proc() {
         
         os2.close(placeholder.lsp_stdin_w)
         os2.close(placeholder.lsp_stdout_r)
+        os2.close(placeholder.lsp_stderr_r)
+        
+        delete(placeholder.token_types)
+        delete(placeholder.token_modifiers)
+        delete(placeholder.completion_trigger_runes)
+        
+        when ODIN_DEBUG {
+            fmt.println("DEBUG: Successfully killed LSP during restart.")
+        }
     }
     
-    delete_key(&active_language_servers, active_buffer.ext)
-
-    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
+    delete_key(&active_language_servers, buffer.ext)
+    
+    when ODIN_DEBUG {
+        fmt.println("DEBUG: Re-opening all files after LSP-restart")
+    }
+    
+    for buffer in buffers {
+        thread.run_with_poly_data(buffer, lsp_handle_file_open)
+    }
+    
+    when ODIN_DEBUG {
+        fmt.println("DEBUG: Completed re-opening all files after LSP-restart.")
+    }
 }
 
 handle_lsp_crash :: proc(server: ^LanguageServer) {
