@@ -1513,6 +1513,7 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
                 fmt.println("DEBUG: Not setting LSP tokens because buffer version is out of date.")
             }
             
+            return
         }
         
         if data.buffer.language_server == nil do return
@@ -2068,12 +2069,16 @@ go_to_definition :: proc() {
     
     lsp_request_id += 1
 
+    file_name := strings.concatenate({
+        "file://",
+        active_buffer.file_name,
+    })
+    
+    defer delete(file_name)
+    
     msg,id := goto_definition_request_message(
         lsp_request_id,
-        strings.concatenate({
-            "file://",
-            active_buffer.file_name,
-        }, context.temp_allocator),
+        file_name,
         buffer_cursor_line,
         buffer_cursor_char_index,
     )
