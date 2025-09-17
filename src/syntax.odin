@@ -2125,6 +2125,17 @@ go_to_definition :: proc() {
 
         url := uri[7:]
         decoded,ok := net.percent_decode(url)
+        
+        if !ok {
+            create_alert(
+                "Failed to decode URL.",
+                "This error is not recoverable.",
+                5,
+                context.allocator
+            )
+            
+            return
+        }
 
         cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
@@ -2259,6 +2270,8 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buff
     line_number : int = -1
     outer: for ts._query_cursor_next_capture(cursor, match, capture_index) {
         capture := match.captures[capture_index^]
+        
+        /*
         predicate_steps_count : u32
 
         predicate_steps := ts._query_predicates_for_pattern(
@@ -2279,6 +2292,7 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buff
                 )
             }
         }
+        */
 
         name_len: u32
         name := ts._query_capture_name_for_id(buffer.query, capture.index, &name_len)
@@ -2288,8 +2302,6 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buff
 
         start_point := ts.node_start_point(node)
         end_point := ts.node_end_point(node)
-        start_byte := ts.node_start_byte(node)
-        end_byte := ts.node_end_byte(node)
 
         start_row := int(start_point.row)
         end_row := int(end_point.row)

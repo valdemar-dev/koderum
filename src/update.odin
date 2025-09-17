@@ -177,6 +177,8 @@ message_loop :: proc(this_thread: ^thread.Thread) {
 
         if id_value != nil {
             id, ok := id_value^.(string)
+            
+            if !ok do continue
 
             for &request,index in requests {
                 if request.id == id {

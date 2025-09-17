@@ -282,9 +282,9 @@ scroll_callback :: proc "c" (handle: glfw.WindowHandle, scroll_x,scroll_y: f64) 
     
     if input_mode == .TERMINAL {
         if scroll_y > 0 {
-            scroll_terminal_down(1)
+            scroll_terminal_down(4)
         } else if scroll_y < 0 {
-            scroll_terminal_up(1)
+            scroll_terminal_up(4)
         }
         
         return

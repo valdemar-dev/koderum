@@ -61,7 +61,6 @@ load_background :: proc() {
     width : i32
     height : i32
     channels : i32
-    desired_channels : i32 = 4
     
     cstr := strings.clone_to_cstring(background_image)
     defer delete(cstr)
@@ -196,9 +195,10 @@ init_window :: proc() {
     glfw.WindowHintString(glfw.X11_INSTANCE_NAME, "Koderum")
 
     primary_monitor := glfw.GetPrimaryMonitor()
-    mode := glfw.GetVideoMode(primary_monitor)
 
     when ODIN_DEBUG {
+        mode := glfw.GetVideoMode(primary_monitor)
+        
         fmt.println("Mode:",mode)
         fmt.println("Primary Monitor:",primary_monitor)
     }

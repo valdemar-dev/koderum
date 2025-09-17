@@ -2528,7 +2528,6 @@ paste_string :: proc(str: string, line: int, char: int) {
         return
     }
 
-    pre := active_buffer.lines[line].characters[:char]
     post := strings.clone(string(active_buffer.lines[line].characters[char:]))
 
     for i in 0..<len(split) {
@@ -2559,8 +2558,7 @@ paste_string :: proc(str: string, line: int, char: int) {
 
 
 reload_buffer :: proc(buffer: ^Buffer) {
-    sync.lock(&tree_mutex)
-    
+    sync.lock(&tree_mutex)    
     defer sync.unlock(&tree_mutex)
     
     old_byte_length := len(buffer.content)
@@ -2649,7 +2647,7 @@ reload_buffer :: proc(buffer: ^Buffer) {
     
     buffer^ = new_buffer^
     
-    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
+    thread.run_with_poly_data(buffer, lsp_handle_file_open)
 }
 
 /*

@@ -201,8 +201,6 @@ add_missing_characters :: proc() {
 
     atlas_size := width * height 
 
-    has_atlas_grown := int(atlas_size) != len(atlas)
-
     atlas = make([dynamic]u8, width * height)
     defer delete(atlas)
 
@@ -215,7 +213,7 @@ add_missing_characters :: proc() {
 
     rp.init_target(&ctx, width, height, &nodes[0], i32(num_nodes))
 
-    success := rp.pack_rects(
+    rp.pack_rects(
         &ctx, 
         raw_data(char_rects),
         i32(len(char_rects))

@@ -130,7 +130,7 @@ run_command_output :: proc(cmd: []string, env: []string) -> (output: string, ok:
         nil,
     }
 
-    state, stdout, stderr, err := os2.process_exec(desc, context.allocator)
+    _, stdout, stderr, err := os2.process_exec(desc, context.allocator)
     
     defer delete(stderr)
     defer delete(stdout)

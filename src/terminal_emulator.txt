@@ -163,9 +163,6 @@ TtyHandle :: struct {
     current_fg_color: vec4,
     current_bg_color: vec4,
     current_bold: bool,
-    
-    view_scroll: int,
-    stored_view_scroll: int,
 }
 
 current_terminal_idx : int
@@ -227,12 +224,16 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
     max_scroll := max(0, len(buf) - cell_count_y)
 
     for _ in 0..<lines {
-        if terminal.view_scroll < 0 {
-            terminal^.view_scroll += 1
+        if terminal.scroll_top < max_scroll {
+            terminal^.scroll_top += 1
         } else {
             break
         }
     }
+
+    terminal^.scroll_bottom = terminal.scroll_top + cell_count_y - 1
+    terminal^.scroll_top = clamp(terminal.scroll_top, -max_scroll, 0)
+    terminal^.scroll_bottom = clamp(terminal.scroll_bottom, cell_count_y - 1, len(buf) - 1)
 }
 
 @(private="package")
@@ -244,12 +245,16 @@ scroll_terminal_down :: proc(lines: int = 1, index: int = current_terminal_idx) 
     max_scroll := max(0, len(buf) - cell_count_y)
 
     for _ in 0..<lines {
-        if terminal.view_scroll > -max_scroll {
-            terminal^.view_scroll -= 1
+        if terminal.scroll_top > -max_scroll {
+            terminal^.scroll_top -= 1
         } else {
             break
         }
     }
+
+    terminal^.scroll_bottom = terminal.scroll_top + cell_count_y - 1
+    terminal^.scroll_top = clamp(terminal.scroll_top, -max_scroll, 0)
+    terminal^.scroll_bottom = clamp(terminal.scroll_bottom, cell_count_y - 1, len(buf) - 1)
 }
 
 
@@ -379,8 +384,6 @@ when ODIN_OS == .Linux {
             default_fg_color^,
             default_bg_color^,
             false,
-            0,
-            0,
         }
     
         init_terminal_thread()
@@ -495,9 +498,6 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
         
         linux.ioctl(linux.Fd(terminal.master_fd), TIOCSWINSZ, uintptr(&size))
     }
-    
-    max_scroll := max(0, len(terminal.scrollback_buffer) - cell_count_y)
-    terminal^.view_scroll = clamp(terminal.view_scroll, -max_scroll, 0)
 }
 
 @(private="package")
@@ -639,12 +639,17 @@ draw_terminal_emulator :: proc() {
     
     buf := terminal.using_alt_buffer ? terminal.alt_buffer : terminal.scrollback_buffer
     
+    // base start of the live window (bottom of buffer by default)
     base_start := max(0, len(buf) - cell_count_y)
-    region_top := base_start + terminal.view_scroll
-    region_bottom := region_top + cell_count_y - 1
     
+    // region defined by scroll offsets (relative to base_start)
+    region_top := base_start + terminal.scroll_top
+    region_bottom := base_start + terminal.scroll_bottom
+    
+    // clamp to buffer bounds
     if region_top < 0 { region_top = 0 }
     if region_bottom > len(buf) - 1 { region_bottom = len(buf) - 1 }
+    if region_top > region_bottom { return } // nothing to draw
     
     num_displayed := region_bottom - region_top + 1
     pen_y := margin
@@ -809,7 +814,7 @@ handle_terminal_control_input :: proc() -> bool {
         terminal := terminals[current_terminal_idx]
         if terminal == nil do return false
         
-        terminal^.view_scroll = 0
+        terminal^.scroll_top = 0
         
         return false
     }
@@ -1242,56 +1247,13 @@ handle_designator :: proc(seq: string, index: int) {
 }
 
 
-@(private="package")
-scroll_region_up :: proc(index: int) {
-    terminal := terminals[index]
-    if terminal == nil { return }
-
-    buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
-
-    start_row_in_buf := max(0, len(buf^) - cell_count_y)
-    region_top_idx := start_row_in_buf + terminal.scroll_top
-    region_bottom_idx := start_row_in_buf + terminal.scroll_bottom
-
-    if !terminal.using_alt_buffer && terminal.scroll_top == 0 {
-        // For main buffer full screen scroll: append blank to grow scrollback
-        blank := make([dynamic]Cell, cell_count_x)
-        for i in 0..<cell_count_x {
-            blank[i] = Cell{' ', default_fg_color^, default_bg_color^}
-        }
-        append(buf, blank)
-
-        if len(buf^) > scrollback_limit {
-            discarded := buf^[0]
-            delete(discarded)
-            ordered_remove(buf, 0)
-            max_scroll := max(0, len(buf^) - cell_count_y)
-            terminal^.view_scroll = clamp(terminal.view_scroll + 1, -max_scroll, 0)
-        }
-    } else {
-        // For alt buffer or partial regions: shift up, discard top, add blank at bottom
-        discarded := buf^[region_top_idx]
-        delete(discarded)
-
-        for i := region_top_idx; i < region_bottom_idx; i += 1 {
-            buf^[i] = buf^[i + 1]
-        }
-
-        blank := make([dynamic]Cell, cell_count_x)
-        for i in 0..<cell_count_x {
-            blank[i] = Cell{' ', default_fg_color^, default_bg_color^}
-        }
-        buf^[region_bottom_idx] = blank
-    }
-}
-
 newline :: proc(index: int) {
     terminal := terminals[index]
     if terminal == nil { return }
 
     terminal.cursor_row += 1
     if terminal.cursor_row > terminal.scroll_bottom {
-        scroll_region_up(index)
+        ensure_row(index)
         terminal.cursor_row = terminal.scroll_bottom
     }
 }
@@ -1383,14 +1345,27 @@ handle_normal_char :: proc(r: rune, index: int) {
 
     buf: ^[dynamic][dynamic]Cell = terminal.using_alt_buffer ? &terminal.alt_buffer : &terminal.scrollback_buffer
 
+    clear_needed := false
+
     if terminal.cursor_col >= cell_count_x {
         terminal.cursor_col = 0
         newline(index)
+        clear_needed = true
     }
 
+    if terminal.cursor_row >= cell_count_y {
+        scroll_terminal_up(1, index)
+        terminal.cursor_row = cell_count_y - 1
+    }
 
     start_row_in_buf := max(0, len(buf^) - cell_count_y)
     row_idx := start_row_in_buf + terminal.cursor_row
+
+    if clear_needed {
+        for &c in buf^[row_idx] {
+            c = Cell{' ', default_fg_color^, default_bg_color^}
+        }
+    }
 
     buf^[row_idx][terminal.cursor_col] = Cell{effective_r, terminal.current_fg_color, terminal.current_bg_color}
     terminal.cursor_col += 1
@@ -1607,64 +1582,31 @@ insert_lines :: proc(n: int, index: int) {
     terminal := terminals[index]
     if terminal == nil { return }
 
-    buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
-    start_row_in_buf := max(0, len(buf^) - cell_count_y)
-    cursor_idx := start_row_in_buf + terminal.cursor_row
-    region_bottom_idx := start_row_in_buf + terminal.scroll_bottom
+    saved_top := terminal.scroll_top
+    saved_bottom := terminal.scroll_bottom
+    terminal.scroll_top = terminal.cursor_row
+    terminal.scroll_bottom = cell_count_y - 1
 
-    effective_n := min(n, terminal.scroll_bottom - terminal.cursor_row + 1)
-    src_start := cursor_idx
-    src_len := (region_bottom_idx - src_start + 1) - effective_n
-    dst_start := src_start + effective_n
+    scroll_terminal_down(n, index)
 
-    for k := 0; k < effective_n; k += 1 {
-        delete(buf^[region_bottom_idx - k])
-    }
-
-    for i := src_len - 1; i >= 0; i -= 1 {
-        buf^[dst_start + i] = buf^[src_start + i]
-    }
-
-    for k := 0; k < effective_n; k += 1 {
-        blank := make([dynamic]Cell, cell_count_x)
-        for i in 0..<cell_count_x {
-            blank[i] = Cell{' ', default_fg_color^, default_bg_color^}
-        }
-        buf^[cursor_idx + k] = blank
-    }
+    terminal.scroll_top = saved_top
+    terminal.scroll_bottom = saved_bottom
 }
 
 delete_lines :: proc(n: int, index: int) {
     terminal := terminals[index]
     if terminal == nil { return }
 
-    buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
-    start_row_in_buf := max(0, len(buf^) - cell_count_y)
-    cursor_idx := start_row_in_buf + terminal.cursor_row
-    region_bottom_idx := start_row_in_buf + terminal.scroll_bottom
+    saved_top := terminal.scroll_top
+    saved_bottom := terminal.scroll_bottom
+    terminal.scroll_top = terminal.cursor_row
+    terminal.scroll_bottom = cell_count_y - 1
 
-    effective_n := min(n, terminal.scroll_bottom - terminal.cursor_row + 1)
-    shift_start := cursor_idx + effective_n
-    shift_len := (region_bottom_idx - shift_start + 1)
+    scroll_terminal_up(n, index)
 
-    for k := 0; k < effective_n; k += 1 {
-        delete(buf^[cursor_idx + k])
-    }
-
-    for i := 0; i < shift_len; i += 1 {
-        buf^[cursor_idx + i] = buf^[shift_start + i]
-    }
-
-    clear_start := cursor_idx + shift_len
-    for k := 0; k < effective_n; k += 1 {
-        blank := make([dynamic]Cell, cell_count_x)
-        for i in 0..<cell_count_x {
-            blank[i] = Cell{' ', default_fg_color^, default_bg_color^}
-        }
-        buf^[clear_start + k] = blank
-    }
+    terminal.scroll_top = saved_top
+    terminal.scroll_bottom = saved_bottom
 }
-
 
 insert_chars :: proc(n: int, index: int) {
     terminal := terminals[index]
@@ -1714,13 +1656,11 @@ enable_alt_buffer :: proc(index: int) {
 
     terminal.stored_cursor_row = terminal.cursor_row
     terminal.stored_cursor_col = terminal.cursor_col
-    terminal.stored_view_scroll = terminal.view_scroll
     terminal.using_alt_buffer = true
     terminal.cursor_row = 0
     terminal.cursor_col = 0
     terminal.scroll_top = 0
     terminal.scroll_bottom = cell_count_y - 1
-    terminal.view_scroll = 0
 
     for &row in terminal.alt_buffer {
         for &c in row {
@@ -1738,7 +1678,6 @@ disable_alt_buffer :: proc(index: int) {
     terminal.using_alt_buffer = false;
     terminal.cursor_row = clamp(terminal.stored_cursor_row, 0, cell_count_y - 1);
     terminal.cursor_col = clamp(terminal.stored_cursor_col, 0, cell_count_x - 1);
-    terminal.view_scroll = terminal.stored_view_scroll
     
     terminal.current_fg_color = default_fg_color^;
     terminal.current_bg_color = default_bg_color^;

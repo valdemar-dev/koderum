@@ -90,7 +90,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
 
     // looping through a string gives index as byte_index
     rune_index := 0
-    for r,byte_index in characters { 
+    for r,_ in characters { 
         if rune_index >= char_index {
             break 
         }
