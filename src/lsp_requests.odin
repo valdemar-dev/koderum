@@ -198,7 +198,9 @@ did_change_workspace_folders_message :: proc(folder_uri: string, folder_name: st
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -264,7 +266,9 @@ initialize_message :: proc(pid: int, project_dir: string) -> string {
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     len_buf := make([dynamic]u8, 32)
     length := strconv.itoa(len_buf[:], len(json))
@@ -297,7 +301,8 @@ did_open_message :: proc(uri: string, languageId: string, version: int, text: st
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     defer delete(buf)
@@ -320,7 +325,9 @@ text_document_did_close_message :: proc(doc_uri: string) -> string {
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -371,17 +378,25 @@ completion_request_message :: proc(
         "    },\n",
         "    \"context\": {\n",
         "      \"triggerKind\": ", trigger_kind
-    }, context.temp_allocator)
+    })
+    
+    defer delete(body)
 
     if trigger_kind == "2" {
+        delete(body)
+        
         body = strings.concatenate({
             body,
             ",\n",
             "      \"triggerCharacter\": \"", trigger_character, "\""
-        }, context.temp_allocator)
+        })
     }
 
-    body = strings.concatenate({body, "\n    }\n  }\n}\n"}, context.temp_allocator)
+    new_body := strings.concatenate({body, "\n    }\n  }\n}\n"})
+    
+    delete(body)
+    
+    body = new_body
 
     len_buf := make([dynamic]u8, 32)
     defer delete(len_buf)
@@ -419,13 +434,15 @@ semantic_tokens_request_message :: proc(
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
 
+    defer delete(buf)
+    
     length := strconv.itoa(buf[:], len(json))
 
-    defer delete(buf)
 
     return strings.concatenate({
         "Content-Length: ", length, "\r\n",
@@ -477,7 +494,9 @@ completion_item_resolve_request_message :: proc(
         "  \"method\": \"completionItem/resolve\",\n",
         "  \"params\": ", completion_item_json, "\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -518,7 +537,9 @@ goto_definition_request_message :: proc(
         "    \"position\": { \"line\": ", str_line, ", \"character\": ", str_char, " }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))

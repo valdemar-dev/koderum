@@ -150,7 +150,6 @@ add_missing_characters :: proc() {
     }
 
     for missing_char in missing_characters {
-        //char := get_char(missing_char.font_height, missing_char.char_code)
         char := try_adding_character(missing_char)
 
         // some chars didnt get added probably

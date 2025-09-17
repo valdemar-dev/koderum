@@ -22,7 +22,6 @@
   "onready"
   "export"
   "setget"
-  "static"
 ] @keyword
 
 (remote_keyword) @keyword.special

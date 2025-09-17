@@ -1298,13 +1298,36 @@ lsp_handle_file_open :: proc(buffer: ^Buffer) {
 
     send_lsp_message(msg, "", nil, nil, buffer.version, active_buffer) 
     
+    Data :: struct{
+        buffer: ^Buffer,
+        version: int,
+    }
+    
+    data := new(Data)
+    data ^= {
+        buffer=buffer,
+        version=buffer.version,
+    }
+    
     append(&update_tasks, Task{
-        func=proc(data: rawptr) {
-            buffer := cast(^Buffer)data
+        func=proc(raw_data: rawptr) {
+            defer free(raw_data)
+            
+            data := cast(^Data)raw_data
+            buffer := data.buffer
+            version := data.version
+            
+            if version != buffer.version {
+                when ODIN_DEBUG {
+                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens. This run will be skipped.")   
+                    fmt.println("Expected version:", data.version, ". Got version:", buffer.version)
+                }
+                
+            }
             
             set_buffer_tokens_threaded(buffer)
         },
-        data=rawptr(buffer)
+        data=rawptr(data)
     })
 }
 
@@ -1372,6 +1395,7 @@ decode_semantic_tokens :: proc(data: []i32, token_types: []string, token_modifie
     return tokens
 }
 
+/*
 set_buffer_tokens :: proc() {
     if active_language_server == nil {
         return
@@ -1398,24 +1422,42 @@ set_buffer_tokens :: proc() {
     
     sync.unlock(&tree_mutex)
 }
+*/
 
 set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
+    sync.lock(&tree_mutex)
+    defer sync.unlock(&tree_mutex)
+    
     if active_language_server == nil {
         return
     } 
     
+    when ODIN_DEBUG {
+        fmt.println("Setting threaded buffer tokens for buffer with version:", buffer.version)
+    }
+    
     context = global_context
     
-  
-    start_version := new(int)
-    start_version^ = active_buffer.version
+    Data :: struct {
+        buffer: ^Buffer,
+        version: int,
+    }
+    
+    data := new(Data)
+    data ^= {
+        buffer=buffer,
+        version=buffer.version
+    }
 
     lsp_request_id += 1 
     
+    file := strings.concatenate({"file://",buffer.file_name})
+    defer delete(file)
+    
     msg,req_id_string := semantic_tokens_request_message(
         lsp_request_id,
-        strings.concatenate({"file://",active_buffer.file_name}, context.temp_allocator),
-        0, len(active_buffer.lines)
+        file,
+        0, len(buffer.lines)
     )
 
     defer delete(msg)
@@ -1425,28 +1467,31 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
         msg,
         req_id_string,
         handle_response,
-        rawptr(start_version),
-        active_buffer.version, active_buffer
+        rawptr(data),
+        buffer.version, buffer
     )
 
-    sync.lock(&tree_mutex)
-    new_tree := parse_tree(0, len(active_buffer.lines), buffer)
-    ts.tree_delete(new_tree)
+    new_tree := parse_tree(0, len(buffer.lines), buffer)
     
-    sync.unlock(&tree_mutex)
+    ts.tree_delete(buffer.previous_tree)
+    
+    buffer^.previous_tree = new_tree
 
-    handle_response :: proc(response: json.Object, data: rawptr) {
-        if active_buffer == nil {
-            return
-        }
-        
+    handle_response :: proc(response: json.Object, raw_data: rawptr) {
         context = global_context
         
-        defer free(data)
+        defer free(raw_data)
 
-        start_version_ptr := (cast(^int)data)
+        data := (cast(^Data)raw_data)
 
-        start_version := (start_version_ptr^)
+        start_version := (data.version)
+        
+        if data.version != data.buffer.version {
+            when ODIN_DEBUG {
+                fmt.println("DEBUG: Not setting LSP tokens because buffer version is out of date.")
+            }
+            
+        }
         
         obj,ok := response["result"].(json.Object)
         
@@ -1477,7 +1522,7 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer) {
 
         sync.lock(&lsp_tokens_mutex)
         
-        set_lsp_tokens(active_buffer, decoded_tokens[:])
+        set_lsp_tokens(data.buffer, decoded_tokens[:])
 
         sync.unlock(&lsp_tokens_mutex)
         
@@ -1581,13 +1626,37 @@ notify_server_of_change :: proc(
     set_buffer_tokens()
     */
     
+    Data :: struct{
+        buffer: ^Buffer,
+        version: int,
+    }
+    
+    data := new(Data)
+    data ^= {
+        buffer=buffer,
+        version=buffer.version,
+    }
+    
     append(&update_tasks, Task{
-        func=proc(data: rawptr) {
-            buffer := cast(^Buffer)data
+        func=proc(raw_data: rawptr) {
+            defer free(raw_data)
+            
+            data := cast(^Data)raw_data
+            buffer := data.buffer
+            version := data.version
+            
+            if version != buffer.version {
+                when ODIN_DEBUG {
+                    fmt.println("DEBUG: Out of date when setting threaded buffer tokens. This run will be skipped.")   
+                    fmt.println("Expected version:", data.version, ". Got version:", buffer.version)
+                }
+                
+                return
+            }
             
             set_buffer_tokens_threaded(buffer)
         },
-        data=rawptr(active_buffer)
+        data=rawptr(data)
     })
     
     if active_language_server.lsp_server_pid == 0 {
@@ -2058,6 +2127,12 @@ parse_tree :: proc(first_line, last_line: int, buffer: ^Buffer) -> ts.Tree {
     active_buffer_cstring := strings.clone_to_cstring(string(buffer.content[:]))
     defer delete(active_buffer_cstring)
 
+    when ODIN_DEBUG {
+        if buffer.previous_tree == nil {
+            fmt.println("WARNING: Parsing buffer: buffer has no previous tree.")
+        }
+    }
+    
     tree := ts._parser_parse_string(
         active_language_server.ts_parser,
         buffer.previous_tree,
@@ -2375,4 +2450,3 @@ handle_lsp_crash :: proc(server: ^LanguageServer) {
     server^.lsp_server_pid = 0
     server^.lsp_server_process = os2.Process{}
 }
-

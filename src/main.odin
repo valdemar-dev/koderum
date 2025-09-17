@@ -3,7 +3,6 @@ package main
 import "core:fmt"
 import gl "vendor:OpenGL"
 import freetype "../../alt-odin-freetype"
-
 import "vendor:glfw"
 import "core:mem"
 import "base:runtime"
