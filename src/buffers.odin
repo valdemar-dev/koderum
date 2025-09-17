@@ -328,14 +328,12 @@ undo_change :: proc() {
     idx := len(active_buffer.undo_stack) - 1
     change := active_buffer.undo_stack[idx]
 
-    // Compute end position before modifying content
     end, end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
     end_rune := byte_offset_to_rune_index(
         string(active_buffer.lines[end].characters[:]),
         int(end_byte),
     )
 
-    // Modify content after position calculations
     remove_range(
         &active_buffer.content,
         change.start_byte,
@@ -439,8 +437,7 @@ redo_change :: proc() {
     }
 }
 
-
-
+@(private="package")
 update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, is_undo:bool) {
     context = global_context
     
@@ -534,6 +531,7 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
 
 }
 
+@(private="package")
 byte_to_pos :: proc(byte: u32) -> (line_index: int, byte_in_line: u32) {
     context = global_context
     
@@ -2474,6 +2472,8 @@ inject_line :: proc() {
 
 @(private="package")
 paste_string :: proc(str: string, line: int, char: int) {
+    context = global_context
+    
     split := strings.split(str, "\n")
 
     defer delete(split)

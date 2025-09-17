@@ -5,6 +5,7 @@ import "vendor:glfw"
 import "core:strings"
 import "core:unicode/utf8"
 import "core:math"
+import "core:fmt"
 
 search_term: string
 replace_text: string
@@ -40,6 +41,16 @@ handle_find_and_replace_input :: proc() {
         current_target^ = utf8.runes_to_string(runes)
     
         return
+    }
+    
+    if is_key_pressed(glfw.KEY_ENTER) {
+        if current_target == &search_term {
+            current_target = &replace_text
+            
+            return
+        }
+        
+        replace_selection()
     }
 }
 
@@ -108,6 +119,7 @@ draw_find_and_replace :: proc() {
 @(private="package")
 handle_find_and_replace_text_input :: proc(key: rune) {
     buf := make([dynamic]rune)
+    defer delete(buf)
 
     runes := utf8.string_to_runes(current_target^)
     
@@ -115,10 +127,100 @@ handle_find_and_replace_text_input :: proc(key: rune) {
     append_elem(&buf, key)
     
     delete(current_target^)
-    
     current_target^ = utf8.runes_to_string(buf[:])
 }
 
 replace_selection :: proc() {
+    context = global_context
     
+    start_line, start_char := highlight_start_line, highlight_start_char
+    end_line, end_char := buffer_cursor_line, buffer_cursor_char_index
+    
+    if end_line < start_line {
+        temp_line := start_line
+        temp_char := start_char
+        
+        start_line = end_line
+        start_char = end_char
+        
+        end_line = temp_line
+        end_char = temp_char
+    }
+    
+    selection := generate_highlight_string(
+        start_line,
+        end_line,
+        start_char,
+        end_char,
+    )
+    
+    new_content := string_replace(selection, search_term, replace_text)
+    
+    // Update Buffer
+    {
+        hl_start_byte := compute_byte_offset(
+            active_buffer,
+            start_line,
+            start_char,
+        )
+        
+        hl_end_byte := compute_byte_offset(
+            active_buffer,
+            end_line,
+            end_char,
+        )
+        
+        end, end_byte := byte_to_pos(u32(hl_start_byte + len(selection)))
+        end_rune := byte_offset_to_rune_index(
+            string(active_buffer.lines[end].characters[:]),
+            int(end_byte),
+        )
+    
+        remove_range(&active_buffer.content, hl_start_byte, hl_start_byte + len(selection))
+        inject_at(&active_buffer.content, hl_start_byte, ..transmute([]u8)new_content)
+        
+        change := BufferChange{
+            u32(hl_start_byte),
+            u32(hl_end_byte),
+            
+            start_line,
+            start_char,
+            
+            end_line,
+            end_char,
+            
+            transmute([]u8)selection,
+            transmute([]u8)new_content,
+            
+            0,
+            0,
+        }
+        
+        append(&active_buffer.undo_stack, change)
+        reset_change_stack(&active_buffer.redo_stack)
+        
+        update_buffer_lines_after_change(active_buffer, change, false)
+        
+        notify_server_of_change(
+            active_buffer,
+            hl_start_byte,
+            hl_start_byte + len(selection),
+            start_line,
+            start_char,
+            end,
+            end_rune,
+            transmute([]u8)new_content,
+            false,
+        )
+    }
+    
+    search_term = strings.clone("")
+    replace_text = strings.clone("")
+        
+    current_target = &search_term
+        
+    input_mode = .COMMAND
+    
+    highlight_start_line = -1
+    highlight_start_char = -1
 }

@@ -641,3 +641,38 @@ expand_env :: proc(path: string, allocator := context.allocator) -> (string, os2
 
     return strings.clone(strings.to_string(builder)), os2.ERROR_NONE;
 }
+
+string_replace :: proc(input, search_term, replace_term: string) -> string {
+    if len(search_term) == 0 {
+        return strings.clone(input)
+    }
+
+    count := 0
+    pos := 0
+    for {
+        idx := strings.index(input[pos:], search_term)
+        if idx == -1 {
+            break
+        }
+        count += 1
+        pos += idx + len(search_term)
+    }
+    
+    builder := strings.builder_make()
+    defer strings.builder_destroy(&builder)
+    
+    pos = 0
+    for {
+        idx := strings.index(input[pos:], search_term)
+        if idx == -1 {
+            strings.write_string(&builder, input[pos:])
+            break
+        }
+        
+        strings.write_string(&builder, input[pos:pos + idx])
+        strings.write_string(&builder, replace_term)
+        pos += idx + len(search_term)
+    }
+
+    return strings.clone(strings.to_string(builder))
+}

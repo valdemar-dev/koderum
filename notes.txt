@@ -24,6 +24,7 @@ bugs:
     - draw_text_buffer mutex when hitting F5 to reload lsp
     - ctrl + e bad free?
     
+    - something calls compute_byte_offset() with rune_index -1
     
     
     - annoying shit with moving around.

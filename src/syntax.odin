@@ -1744,6 +1744,10 @@ reset_change_stack :: proc(stack: ^[dynamic]BufferChange) {
 }
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
+    if line == -1 {
+        panic("CANNOT COMPUTE BYTE OFFSET FOR LINE -1")
+    }
+    
     byte_offset := 0
     for i in 0..<line {
         byte_offset += len(buffer.lines[i].characters[:])
