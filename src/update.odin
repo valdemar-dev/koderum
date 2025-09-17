@@ -49,11 +49,64 @@ update_state :: proc(current_time: f64) {
     }
 }
 
+read_lsp_errors :: proc() {
+    context = global_context
+    
+    last_time := glfw.GetTime()
+    
+    for !glfw.WindowShouldClose(window) {
+        current_time := glfw.GetTime()
+        local_frame_time := current_time - last_time
+
+        if local_frame_time < target_frame_time {
+            sleep_duration := (target_frame_time - local_frame_time) * f64(second)
+            time.sleep(time.Duration(sleep_duration))
+
+            continue
+        }
+        
+        if active_language_server == nil {
+            return
+        }
+        
+        if active_language_server.lsp_server_pid == 0 {            
+            return
+        }
+        
+        temp := [1024]u8{}
+        
+        n, err := os2.read(active_language_server.lsp_stderr_r, temp[:])
+        if err != os2.ERROR_NONE || n != 1 {
+            continue
+        }
+        
+        if n == 0 {
+            continue
+        }
+        
+        create_alert(
+            "Error",
+            "Received an error from the LSP. Please check the stdout of the current process for more information.",
+            4,
+            context.allocator,
+        )
+        
+        fmt.println("READ AN ERROR FROM THE LSP:")
+        fmt.println("--- START OF ERROR ---")
+        
+        fmt.println(string(temp[:n]))
+        
+        fmt.println("--- END OF ERROR ---")
+    }
+}
+
 @(private="package")
-message_loop :: proc(thread: ^thread.Thread) {
+message_loop :: proc(this_thread: ^thread.Thread) {
     last_time := glfw.GetTime()
     
     context = global_context
+    
+    thread.run(read_lsp_errors)
     
     for !glfw.WindowShouldClose(window) {
         current_time := glfw.GetTime()

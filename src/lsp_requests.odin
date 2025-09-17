@@ -37,8 +37,11 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
         "    }\n",
         "  }\n",
         "}\n",
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
+    delete(buf)
     buf = make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
 
@@ -55,12 +58,20 @@ text_document_hover_message :: proc(doc_uri: string, line: int, character: int, 
 text_document_did_change_message :: proc(doc_uri: string, version: int, start_line: int, start_char: int, end_line: int, end_char: int, new_text: string) -> string {
     buf := make([dynamic]u8, 32)
 
-    version_str := strings.clone(strconv.itoa(buf[:], version), context.temp_allocator)
+    version_str := strings.clone(strconv.itoa(buf[:], version))
+    defer delete(version_str)
     
-    start_line_str := strings.clone(strconv.itoa(buf[:], start_line), context.temp_allocator)
-    start_char_str := strings.clone(strconv.itoa(buf[:], start_char), context.temp_allocator)
-    end_line_str := strings.clone(strconv.itoa(buf[:], end_line), context.temp_allocator)
-    end_char_str := strings.clone(strconv.itoa(buf[:], end_char), context.temp_allocator)
+    start_line_str := strings.clone(strconv.itoa(buf[:], start_line))
+    defer delete(start_line_str)
+    
+    start_char_str := strings.clone(strconv.itoa(buf[:], start_char))
+    defer delete(start_char_str)
+    
+    end_line_str := strings.clone(strconv.itoa(buf[:], end_line))
+    defer delete(end_line_str)
+    
+    end_char_str := strings.clone(strconv.itoa(buf[:], end_char))
+    defer delete(end_char_str)
 
     json := strings.concatenate({
         "{\n",
@@ -82,20 +93,26 @@ text_document_did_change_message :: proc(doc_uri: string, version: int, start_li
         "    ]\n",
         "  }\n",
         "}\n"
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     delete(buf)
 
     buf = make([dynamic]u8, 32)
+    
+    defer delete(buf)
+    
     length := strconv.itoa(buf[:], len(json))
 
     header := strings.concatenate({
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    }, context.temp_allocator)
+    })
+    
+    defer delete(header)
 
-    defer delete(buf)
 
     return strings.clone(header)
 }
@@ -111,7 +128,9 @@ text_document_did_save_message :: proc(doc_uri: string) -> string {
         "    }\n",
         "  }\n",
         "}\n"
-    }, context.temp_allocator)
+    })
+    
+    defer delete(json)
 
     buf := make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))
@@ -120,9 +139,13 @@ text_document_did_save_message :: proc(doc_uri: string) -> string {
         "Content-Length: ", length, "\r\n",
         "\r\n",
         json,
-    }, context.temp_allocator)
+    })
+    
+    defer delete(header)
+    
 
     delete(buf)
+    
     return strings.clone(header)
 }
 
@@ -141,6 +164,8 @@ get_project_info_message :: proc(id: int) -> string {
         "  }\n",
         "}\n",
     })
+    
+    defer delete(json)
 
     buf = make([dynamic]u8, 32)
     length := strconv.itoa(buf[:], len(json))

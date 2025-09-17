@@ -79,6 +79,7 @@ LanguageServer :: struct {
 
     lsp_stdin_w : ^os2.File,
     lsp_stdout_r : ^os2.File,
+    lsp_stderr_r: ^os2.File,
     lsp_server_pid : int,
     
     token_types : []string,
@@ -1134,9 +1135,12 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
     
     stdin_r, stdin_w, _ := os2.pipe()
     stdout_r, stdout_w, _ := os2.pipe()
+    
+    stderr_r, stderr_w, _ := os2.pipe()
 
     defer os2.close(stdout_w)
     defer os2.close(stdin_r)
+    defer os2.close(stderr_w)
     
     dir := fp.dir(active_buffer.file_name)
     defer delete(dir)
@@ -1147,7 +1151,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
         working_dir = language.lsp_working_dir,
         stdin  = stdin_r,
         stdout = stdout_w,
-        stderr = os2.stdout,
+        stderr = stderr_w,
     }
 
     process, start_err := os2.process_start(desc)
@@ -1160,6 +1164,7 @@ init_lsp_server :: proc(ext: string, server: ^LanguageServer) {
     server^.lsp_stdin_w = stdin_w
     server^.lsp_stdout_r = stdout_r
     server^.lsp_server_pid = process.pid
+    server^.lsp_stderr_r = stderr_r
     
     if start_err == .Not_Exist {
         notification := new(Notification)
@@ -1599,11 +1604,14 @@ notify_server_of_change :: proc(
     escaped := escape_json(string(new_text))
     defer delete(escaped)
     
+    file := strings.concatenate({
+        "file://",
+        buffer.file_name,
+    })
+    defer delete(file)
+    
     msg := text_document_did_change_message(
-        strings.concatenate({
-            "file://",
-            buffer.file_name,
-        }, context.temp_allocator),
+        file,
         buffer.version,
         start_line, start_char, end_line, end_char, escaped,
     )
@@ -1611,6 +1619,10 @@ notify_server_of_change :: proc(
     defer delete(msg)
         
     _, write_err := os2.write(active_language_server.lsp_stdin_w, transmute([]u8)msg)
+    
+    if write_err != os2.ERROR_NONE {
+        handle_lsp_crash(active_language_server)
+    }
 }
 
 reset_change_stack :: proc(stack: ^[dynamic]BufferChange) {
@@ -2204,6 +2216,10 @@ set_tokens :: proc(first_line, last_line: int, tree_ptr: ^ts.Tree, buffer: ^Buff
             color := &active_language_server.language.ts_colors[current_node_type]
 
             if color == nil {
+                if log_unhandled_treesitter_cases {
+                    fmt.println("MISSING TS COLOR:", current_node_type)
+                }
+                
                 continue
             }
             
