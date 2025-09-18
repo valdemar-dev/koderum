@@ -226,7 +226,7 @@ load_configs :: proc() {
 
     category : string
 
-    for line, index in lines {
+    for line, _ in lines {
         if len(line) == 0 {
             continue
         }

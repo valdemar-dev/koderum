@@ -2,7 +2,6 @@
 *.bin
 *.png
 *.args
-*.conf
 src.bin
 
 releases

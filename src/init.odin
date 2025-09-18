@@ -194,9 +194,9 @@ init_window :: proc() {
     glfw.WindowHintString(glfw.X11_CLASS_NAME,    "Koderum")
     glfw.WindowHintString(glfw.X11_INSTANCE_NAME, "Koderum")
 
-    primary_monitor := glfw.GetPrimaryMonitor()
-
     when ODIN_DEBUG {
+        primary_monitor := glfw.GetPrimaryMonitor()
+
         mode := glfw.GetVideoMode(primary_monitor)
         
         fmt.println("Mode:",mode)

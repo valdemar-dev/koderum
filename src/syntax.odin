@@ -1077,13 +1077,22 @@ read_language_from_file :: proc(
         language.filler_color = color^
     }
     
-    // Get SCM TS Query
     if os.exists(scm_file_path) {
         bytes, ok := os.read_entire_file_from_filename(scm_file_path)
+        if !ok {
+            return false
+        }
         
         language.ts_query_src = strings.clone_to_cstring(string(bytes[:]))
         
         delete(bytes)
+    } else {
+        create_alert(
+            "Could not load language.",
+            "Language is missing a .scm query file.",
+            5,
+            context.allocator,
+        ) 
     }
     
     languages[ext] = language
@@ -1232,6 +1241,9 @@ init_lsp_server :: proc(buffer: ^Buffer, server: ^LanguageServer) {
         server := cast(^LanguageServer)data
 
         capabilities_obj, capabilities_ok := result_obj["capabilities"].(json.Object)
+        if !capabilities_ok {
+            return
+        }
 
         when ODIN_DEBUG {
             fmt.println("Settings capabilities for LSP..")
@@ -1253,11 +1265,19 @@ init_lsp_server :: proc(buffer: ^Buffer, server: ^LanguageServer) {
         }
        
         provider_obj, provider_ok := capabilities_obj["semanticTokensProvider"].(json.Object)
+        if !provider_ok {
+            return
+        }
         
         legend_obj, legend_ok := provider_obj["legend"].(json.Object)
 
         if legend_ok {
             modifiers_arr, modifiers_ok := legend_obj["tokenModifiers"].(json.Array)
+            
+            if !modifiers_ok {
+                return
+            }
+            
             types_arr := legend_obj["tokenTypes"].(json.Array)
             
             modifiers := value_to_str_array(modifiers_arr)
@@ -1505,8 +1525,6 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
         defer free(raw_data)
 
         data := (cast(^Data)raw_data)
-
-        start_version := (data.version)
         
         if data.version != data.buffer.version {
             when ODIN_DEBUG {
@@ -1964,7 +1982,15 @@ get_autocomplete_hits :: proc(
         context = global_context
         
         result,result_ok := response["result"].(json.Object)
+        if !result_ok {
+            return
+        }
+        
         items,ok := result["items"].(json.Array)
+        
+        if !ok {
+            return
+        }
 
         cur_line := active_buffer.lines[buffer_cursor_line]
         line_string := string(cur_line.characters[:])
@@ -2462,7 +2488,7 @@ restart_lsp :: proc(buffer: ^Buffer) {
     }
     
     if placeholder.lsp_server_pid != 0 {
-        state,_ := os2.process_wait(placeholder.lsp_server_process, 0)
+        _,_ = os2.process_wait(placeholder.lsp_server_process, 0)
         
         error := os2.process_kill(placeholder.lsp_server_process)
         _ = os2.process_close(placeholder.lsp_server_process)

@@ -1187,11 +1187,19 @@ open_file :: proc(file_name: string) {
 
     existing_file : ^Buffer
 
+    when ODIN_DEBUG {
+        fmt.println("-- Comparing existing buffers with new name ---")
+    }
+    
     for buffer in buffers {
         if buffer.file_name == file_name {
             existing_file = buffer
+            
+            fmt.println("Names", buffer.file_name, "and", file_name, "are equivalent.")
             break
         }
+        
+        fmt.println("Names", buffer.file_name, "and", file_name, "are not equivalent.")
     }
     
     if existing_file != nil {
@@ -1284,12 +1292,7 @@ open_file :: proc(file_name: string) {
 
 close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     context = global_context
-    
-    file_uri := strings.concatenate({
-        "file://",
-        buffer.file_name,
-    }, context.temp_allocator)
-    
+        
     if buffer.language_server != nil {
         encoded := encode_uri_component(buffer.file_name)
         defer delete(encoded)
@@ -1385,9 +1388,6 @@ insert_tab_as_spaces:: proc() {
 
     tab_chars : []rune = {' ',' ',' ',' '}
     tab_string := utf8.runes_to_string(tab_chars)
-
-    old_length := len(line.characters)
-    old_byte_length := len(line.characters)
     
     inject_at(&line.characters, buffer_cursor_char_index, ..transmute([]u8)tab_string)
     
@@ -1493,7 +1493,7 @@ remove_char :: proc() {
     current_indent := get_line_indent_level(buffer_cursor_line) 
 
     if target < current_indent * tab_spaces {
-        for i in 0..<tab_spaces {
+        for _ in 0..<tab_spaces {
             ordered_remove(&line.characters, 0)
         }
 
@@ -1530,10 +1530,7 @@ remove_char :: proc() {
 
         return
     }
-
-    old_line_length := len(line_string)
-    old_byte_length := len(line.characters)
-
+    
     target_rune := utf8.rune_at_pos(line_string, char_index - 1)
 
     target_rune_size := utf8.rune_size(target_rune)
@@ -1604,8 +1601,6 @@ determine_line_indent :: proc(line_num: int) -> int {
 
     index := length - 1
 
-    indent_runes := make([dynamic]rune)
-
     ext := filepath.ext(active_buffer.file_name)
 
     language_rules := indent_rule_language_list[ext]
@@ -1632,8 +1627,6 @@ determine_line_indent :: proc(line_num: int) -> int {
 handle_text_input :: proc() -> bool {
     line := &active_buffer.lines[buffer_cursor_line] 
     
-    char_index := buffer_cursor_char_index
-
     if is_key_pressed(glfw.KEY_ESCAPE) {
         input_mode = .COMMAND
         
@@ -1754,10 +1747,7 @@ handle_text_input :: proc() -> bool {
         
         after_cursor := line.characters[index:]
         before_cursor := line.characters[:index] 
-        
-        old_line_length := len(line.characters)
-        old_byte_length := len(line.characters)
-        
+                
         resize(&line.characters, len(before_cursor))
         
         new_chars := make([dynamic]u8)
@@ -1774,7 +1764,7 @@ handle_text_input :: proc() -> bool {
         bytes, _ := utf8.encode_rune(' ')
         size := utf8.rune_size(' ')
         
-        for i in 0..<(indent_level) {
+        for _ in 0..<(indent_level) {
             inject_at(&buffer_line.characters, 0, ..bytes[:size])
         }
         
@@ -1958,8 +1948,6 @@ move_left :: proc() {
     buffer_cursor_desired_char_index = -1
 
     if buffer_cursor_char_index > 0 {
-        line := active_buffer.lines[buffer_cursor_line]
-
         new := buffer_cursor_char_index - 1
 
         set_buffer_cursor_pos(
@@ -2173,6 +2161,10 @@ indent_selection :: proc(start_line: int, end_line: int) {
 unindent_selection :: proc(start_line: int, end_line: int) {
     start_line : int = start_line
     end_line : int = end_line
+    
+    if start_line == -1 || end_line == -1 {
+        return
+    }
 
     if end_line < start_line {
         temp := end_line
@@ -2429,7 +2421,7 @@ inject_line :: proc() {
     bytes, _ := utf8.encode_rune(' ')
     space_size := utf8.rune_size(' ')
     
-    for i in 0..<indent_spaces {
+    for _ in 0..<indent_spaces {
         inject_at(&buffer_line.characters, 0, ..bytes[:space_size])
     }
    
@@ -3265,7 +3257,6 @@ insert_completion :: proc() {
     }
 
     filter_token_byte_size := len(completion_filter_token)
-    completion_token_byte_size := len(completion.label)
 
     start_idx := byte_offset - filter_token_byte_size
 
@@ -3306,8 +3297,6 @@ insert_completion :: proc() {
         &active_buffer.insert_redo_stack,
     )
 
-    count := utf8.rune_count(insert_string)
-
     set_buffer_cursor_pos(
         buffer_cursor_line,
         (buffer_cursor_char_index - utf8.rune_count(completion_filter_token)) + utf8.rune_count(insert_string)
@@ -3333,8 +3322,6 @@ escape_json :: proc(text: string) -> string {
     builder := strings.builder_make()
     
     defer strings.builder_destroy(&builder)
-
-    strings.builder_reset(&builder)
 
     for c in text {
         switch c {

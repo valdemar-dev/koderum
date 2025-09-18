@@ -199,8 +199,6 @@ add_missing_characters :: proc() {
     width = i32(next_power_of_two(int(side * 2)))
     height = i32(next_power_of_two(int(side * 2)))
 
-    atlas_size := width * height 
-
     atlas = make([dynamic]u8, width * height)
     defer delete(atlas)
 

@@ -224,7 +224,6 @@ scroll_terminal_up :: proc(lines: int = 1, index: int = current_terminal_idx) {
     if terminal == nil { return }
 
     buf := &terminal.scrollback_buffer if !terminal.using_alt_buffer else &terminal.alt_buffer
-    max_scroll := max(0, len(buf) - cell_count_y)
 
     for _ in 0..<lines {
         if terminal.view_scroll < 0 {
