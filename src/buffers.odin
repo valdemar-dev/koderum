@@ -848,7 +848,13 @@ draw_no_buffer :: proc() {
     
     big_text := math.round_f32(font_base_px * large_text_scale)
     
-    size := measure_text(big_text, "Press O to open a file.")
+    content := strings.concatenate({
+        "Welcome to Koderum!\n",
+        "Press . to see the list of keybinds.",
+    })
+    defer delete(content)
+    
+    size := measure_text(big_text, content)
 
     add_text(&text_rect_cache,
         vec2{
@@ -857,7 +863,13 @@ draw_no_buffer :: proc() {
         },
         TEXT_MAIN,
         big_text,
-        "Press O to open a file.",
+        content,
+        1,
+        false,
+        -1,
+        false,
+        true,
+        -1,
     )
 
     draw_rects(&rect_cache)

@@ -40,6 +40,7 @@ InputMode :: enum {
     TERMINAL_TEXT_INPUT,
     GREP_SEARCH,
     FIND_AND_REPLACE,
+    HELP,
 }
 
 @(private="package")
@@ -92,6 +93,8 @@ check_inputs :: proc() -> bool {
         handle_grep_input()
     case .FIND_AND_REPLACE:
         handle_find_and_replace_input()
+    case .HELP:
+        handle_help_input()
     }
 
     return false
@@ -394,6 +397,12 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
 }
 
 handle_command_input :: proc() -> bool {
+    if is_key_pressed(glfw.KEY_PERIOD) {
+        set_mode(mode = .HELP, key = glfw.KEY_PERIOD, char = '.')
+        
+        return false
+    }
+    
     if is_key_pressed(glfw.KEY_F) && is_terminal_open {
         key := key_store[glfw.KEY_F]
         

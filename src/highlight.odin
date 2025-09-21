@@ -65,7 +65,7 @@ handle_highlight_input :: proc() {
     }
     
     if is_key_pressed(glfw.KEY_H) {
-        set_mode(.FIND_AND_REPLACE, glfw.KEY_H, 'h')
+        show_find_and_replace()
         
         input_mode_return_callback = proc() {
             input_mode = .HIGHLIGHT

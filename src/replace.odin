@@ -15,12 +15,7 @@ current_target := &search_term
 @(private="package")
 handle_find_and_replace_input :: proc() {
     if is_key_pressed(glfw.KEY_ESCAPE) {
-        search_term = strings.clone("")
-        replace_text = strings.clone("")
-        
-        current_target = &search_term
-        
-        input_mode = .COMMAND
+        hide_find_and_replace()
         
         if input_mode_return_callback != nil {
             input_mode_return_callback()
@@ -54,8 +49,56 @@ handle_find_and_replace_input :: proc() {
     }
 }
 
+suppress := true
+do_show := false
+
+x_pos : f32 = 0
+last_width : f32 = 0
+
+@(private="package")
+show_find_and_replace :: proc() {
+    suppress = false
+    do_show = true
+    
+    set_mode(.FIND_AND_REPLACE, glfw.KEY_H, 'h')
+}
+
+hide_find_and_replace :: proc() {
+    search_term = strings.clone("")
+    replace_text = strings.clone("")
+    
+    current_target = &search_term
+    
+    input_mode = .COMMAND
+    
+    do_show = false
+}
+
+@(private="package")
+tick_find_and_replace :: proc() {
+    if suppress {
+        x_pos = 0 - last_width
+        
+        return
+    }
+    
+    padding := math.round_f32(font_base_px * small_text_scale)
+    
+    if do_show {
+        x_pos = smooth_lerp(x_pos, (padding * 2), 100, frame_time)
+    } else {
+        x_pos = smooth_lerp(x_pos, 0 - last_width, 100, frame_time)
+        
+        if int(x_pos) >= int(fb_size.x - 5) {
+            suppress = true
+        }
+    }
+}
+
 @(private="package")
 draw_find_and_replace :: proc() {
+    if suppress do return
+    
     title : string
     content := current_target^
     
@@ -82,7 +125,7 @@ draw_find_and_replace :: proc() {
     box_height : f32 = 0
     box_width : f32 = 0
     
-    box := rect{padding * 2, font_base_px * 5, 0,0}
+    box := rect{x_pos, font_base_px * 5, 0,0}
 
     pen_y := box.y
     
@@ -138,6 +181,8 @@ draw_find_and_replace :: proc() {
         // shift by padding to create padding
         box.x -= padding
         box.y -= padding
+        
+        last_width = box.width
     }
     
     bg_box := rect{
@@ -146,6 +191,7 @@ draw_find_and_replace :: proc() {
         box.width + (line_thickness * 2),
         box.height + (line_thickness * 2),
     }
+    
     
     // Draw Box
     {
@@ -267,12 +313,7 @@ replace_selection :: proc() {
         )
     }
     
-    search_term = strings.clone("")
-    replace_text = strings.clone("")
-        
-    current_target = &search_term
-        
-    input_mode = .COMMAND
+    hide_find_and_replace()
     
     highlight_start_line = -1
     highlight_start_char = -1

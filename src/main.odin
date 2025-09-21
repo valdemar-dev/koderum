@@ -184,18 +184,20 @@ main :: proc() {
         set_camera_ui()
         set_view_ui()
 
-        tick_buffer_cursor()
-        tick_buffer_info_view()
-
-        tick_browser_view()
-        tick_grep_view()
-
-        tick_notifications()
-        tick_alerts()
-        
-        tick_smooth_scroll()
-        tick_yank_history()
-        tick_terminal_emulator()
+        // these are mostly animations
+        {
+            tick_buffer_cursor()
+            tick_buffer_info_view()
+            tick_browser_view()
+            tick_grep_view()
+            tick_notifications()
+            tick_alerts()
+            tick_help()
+            tick_smooth_scroll()
+            tick_yank_history()
+            tick_terminal_emulator()
+            tick_find_and_replace()
+        }
         
         update_fonts()
         update_camera()

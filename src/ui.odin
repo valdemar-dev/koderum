@@ -121,6 +121,9 @@ draw_ui :: proc() {
     case .FIND_AND_REPLACE:
         mode_string = "Find & Replace"
         mode_text_color = TOKEN_COLOR_10
+    case .HELP:
+        mode_string = "Help"
+        mode_bg_color = TOKEN_COLOR_02
     }
     
     // Draw Input Mode
@@ -572,8 +575,4 @@ draw_ui :: proc() {
 
     draw_rects(&text_rect_cache)
     reset_rect_cache(&text_rect_cache)
-    
-    if input_mode == .FIND_AND_REPLACE {
-        draw_find_and_replace()
-    }
 }

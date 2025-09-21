@@ -52,6 +52,7 @@ render :: proc() {
     draw_grep_view()
     
     draw_yank_history()
+    draw_find_and_replace()
     
     draw_ui()
     draw_terminal_emulator()

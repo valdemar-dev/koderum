@@ -288,6 +288,10 @@ set_option :: proc(options: []string) {
     option_name := options[0]
     
     value := options[1]
+    
+    do_continue := check_for_keybind(option_name, value)
+    
+    if !do_continue do return
 
     switch option_name {
     case "background_image":
