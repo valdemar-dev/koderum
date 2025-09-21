@@ -106,7 +106,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
                 continue
             }
 
-            advance_amount := (character.advance.x) * f32(tab_spaces)
+            advance_amount := (character.advance.x) * f32(tab_width)
 
             new_x += advance_amount
             

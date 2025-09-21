@@ -25,6 +25,7 @@ line_thickness_em = 0.05
 line_count_padding_em = .5
 cursor_edge_padding_em = 10
 ui_scale = 1
+theme = default
 
 [cursor]
 do_animate_cursor = true
@@ -37,8 +38,14 @@ do_draw_line_count = true
 do_highlight_current_line = false
 do_highlight_indents = true
 differentiate_tab_and_spaces = true
-tab_spaces = 4
 do_highlight_current_line = true
+
+[indent]
+indent_size = 4
+indent_mode = spaces
+[how many spaces = one tab]
+tab_width = 4
+
 
 [general]
 default_cwd = $HOME

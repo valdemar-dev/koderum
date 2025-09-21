@@ -364,7 +364,7 @@ add_text :: proc(
                 continue
             }
 
-            advance_amount := (character.advance.x) * f32(tab_spaces)
+            advance_amount := (character.advance.x) * f32(tab_width)
             pen.x += advance_amount
 
             continue
@@ -645,7 +645,7 @@ add_code_text :: proc(
             if is_space {
                 advance_amount = character.advance.x
             } else {
-                advance_amount = character.advance.x * f32(tab_spaces)
+                advance_amount = character.advance.x * f32(tab_width)
             }
 
             was_highlighted := process_highlights(
@@ -665,7 +665,7 @@ add_code_text :: proc(
                     pen.y + (highlight_height / 2) - 1,
                     2, 2
                 }, no_texture, text_highlight_color, vec2{}, z_index)
-            } else if do_highlight_indents && rune_index % tab_spaces == 0 {
+            } else if do_highlight_indents && rune_index % tab_width == 0 {
                 add_rect(&rect_cache, rect{
                     pen.x, pen.y, font_base_px * line_thickness_em, highlight_height
                 }, no_texture, BG_MAIN_30, vec2{}, z_index)

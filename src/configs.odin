@@ -65,7 +65,15 @@ do_highlight_current_line : bool
 differentiate_tab_and_spaces : bool
 do_highlight_indents : bool
 
-tab_spaces : int
+indent_size : int = 4
+tab_width : int = 4
+
+IndentMode :: enum {
+    SPACES=1,
+    TABS=2,
+}
+
+indent_mode := IndentMode.SPACES
 
 default_cwd : string
 
@@ -306,8 +314,10 @@ set_option :: proc(options: []string) {
         do_draw_line_count = value == "true"
     case "differentiate_tab_and_spaces":
         differentiate_tab_and_spaces = value == "true"
-    case "tab_spaces":
-        tab_spaces = strconv.atoi(value)
+    case "indent_size":
+        indent_size = strconv.atoi(value)
+    case "tab_width":
+        tab_width = strconv.atoi(value)
     case "cursor_edge_padding_em":
         cursor_edge_padding_em = f32(strconv.atof(value))
     case "font":
@@ -331,6 +341,12 @@ set_option :: proc(options: []string) {
         buffer_text_scale = f32(font_size)
     case "do_highlight_indents":
         do_highlight_indents = value == "true"
+    case "indent_mode":
+        if value == "spaces" {
+            indent_mode = IndentMode.SPACES
+        } else {
+            indent_mode = IndentMode.TABS
+        }
     case "default_cwd":
         expanded,_ := expand_env(value)
         

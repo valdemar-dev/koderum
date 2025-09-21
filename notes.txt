@@ -6,9 +6,7 @@ reminders:
 todo:
     - add variable font weights
     - renaming a file should rename and send a didclose/didopen
-    - holy shit get rid of active_language server it is a spawn of satan
-      each buffer should have a field that is a pointer to a LanguageServer
-        (for this remember when closing to like clear via a loop of the buffers)
+    - add swap between 2-4 space indentation, highlight "autofix" for indents
     
 think:
     - control + escape is a bad keybind for the terminal input mode switching.

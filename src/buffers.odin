@@ -1382,32 +1382,77 @@ save_buffer :: proc(buffer: ^Buffer) {
     send_lsp_message(msg, "", nil, nil, buffer.version, buffer)
 }
 
-
 insert_tab_as_spaces:: proc() {
     line := &active_buffer.lines[buffer_cursor_line]
+    
+    line_indent_mode : IndentMode
+    
+    {
+        if len(line.characters) == 0 {
+            // use default aka user preference
+            line_indent_mode = indent_mode
+        } else {
+            first_character := line.characters[0]
+            
+            if first_character == ' ' {
+                line_indent_mode = .SPACES
+            } else if first_character == '\t' {
+                line_indent_mode = .TABS
+            } else {
+                line_indent_mode = indent_mode
+            }
+        }
+    }
 
-    tab_chars : []rune = {' ',' ',' ',' '}
-    tab_string := utf8.runes_to_string(tab_chars)
-    
-    inject_at(&line.characters, buffer_cursor_char_index, ..transmute([]u8)tab_string)
-    
     buffer_cursor_accumulated_byte_position := compute_byte_offset(
         active_buffer, 
         buffer_cursor_line,
         buffer_cursor_char_index,
     )
+    
+    tab_string : string
+    defer delete(tab_string)
+    
+    line_num := buffer_cursor_line
+    char_num := buffer_cursor_char_index
 
+    if line_indent_mode == .SPACES {
+        col := buffer_cursor_char_index
+        add_amount := tab_width if col % tab_width == 0 else tab_width - (col % tab_width)
+        
+        tab_string = strings.repeat(" ", add_amount)
+        
+        inject_at(&line.characters, buffer_cursor_char_index, ..transmute([]u8)tab_string)
+
+        defer set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index + add_amount,
+        )    
+    } else {
+        inject_at(&line.characters, buffer_cursor_char_index, u8('\t'))
+        
+        runes := []rune{'\t'}
+        defer delete(runes)
+        
+        tab_string = utf8.runes_to_string(runes)
+        
+        defer set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index + 1,
+        )
+    }
+    
     notify_server_of_change(
         active_buffer,
 
         buffer_cursor_accumulated_byte_position,
         buffer_cursor_accumulated_byte_position,
 
-        buffer_cursor_line,
-        buffer_cursor_char_index,
+        line_num,
+        char_num,
 
-        buffer_cursor_line,
-        buffer_cursor_char_index,
+        line_num,
+        char_num,
 
         transmute([]u8)tab_string,
         
@@ -1417,10 +1462,6 @@ insert_tab_as_spaces:: proc() {
         &active_buffer.insert_redo_stack,
     )    
 
-    set_buffer_cursor_pos(
-        buffer_cursor_line,
-        buffer_cursor_char_index+tab_spaces,
-    )
 }
 
 remove_char :: proc() {
@@ -1490,46 +1531,91 @@ remove_char :: proc() {
         return
     }
 
-    current_indent := get_line_indent_level(buffer_cursor_line) 
+    current_indent, line_indent_mode := get_line_indent_level(buffer_cursor_line) 
 
-    if target < current_indent * tab_spaces {
-        for _ in 0..<tab_spaces {
-            ordered_remove(&line.characters, 0)
+    switch line_indent_mode {
+    case .SPACES:
+        if target < current_indent * indent_size {
+            for _ in 0..<indent_size {
+                ordered_remove(&line.characters, 0)
+            }
+    
+            set_buffer_cursor_pos(
+                buffer_cursor_line,
+                char_index-indent_size,
+            )
+    
+            buffer_cursor_accumulated_byte_position := compute_byte_offset(
+                active_buffer, 
+                buffer_cursor_line,
+                buffer_cursor_char_index,
+            )
+    
+            notify_server_of_change(
+                active_buffer,
+    
+                buffer_cursor_accumulated_byte_position,
+                buffer_cursor_accumulated_byte_position + indent_size,
+    
+                buffer_cursor_line,
+                buffer_cursor_char_index,
+    
+                buffer_cursor_line,
+                buffer_cursor_char_index + indent_size,
+    
+                {},
+                
+                true,
+                
+                &active_buffer.insert_undo_stack,
+                &active_buffer.insert_redo_stack,
+            )
+    
+            return
         }
-
-        set_buffer_cursor_pos(
-            buffer_cursor_line,
-            char_index-tab_spaces,
-        )
-
-        buffer_cursor_accumulated_byte_position := compute_byte_offset(
-            active_buffer, 
-            buffer_cursor_line,
-            buffer_cursor_char_index,
-        )
-
-        notify_server_of_change(
-            active_buffer,
-
-            buffer_cursor_accumulated_byte_position,
-            buffer_cursor_accumulated_byte_position + tab_spaces,
-
-            buffer_cursor_line,
-            buffer_cursor_char_index,
-
-            buffer_cursor_line,
-            buffer_cursor_char_index + tab_spaces,
-
-            {},
+        
+        break
+        
+    case .TABS:
+        if target < current_indent {
+            ordered_remove(&line.characters, 0)
             
-            true,
+            set_buffer_cursor_pos(
+                buffer_cursor_line,
+                char_index-1,
+            )
+    
+            buffer_cursor_accumulated_byte_position := compute_byte_offset(
+                active_buffer, 
+                buffer_cursor_line,
+                buffer_cursor_char_index,
+            )
+    
+            notify_server_of_change(
+                active_buffer,
+    
+                buffer_cursor_accumulated_byte_position,
+                buffer_cursor_accumulated_byte_position + 1,
+    
+                buffer_cursor_line,
+                buffer_cursor_char_index,
+    
+                buffer_cursor_line,
+                buffer_cursor_char_index + 1,
+    
+                {},
+                
+                true,
+                
+                &active_buffer.insert_undo_stack,
+                &active_buffer.insert_redo_stack,
+            )
             
-            &active_buffer.insert_undo_stack,
-            &active_buffer.insert_redo_stack,
-        )
-
-        return
+            return
+        }
+        break
     }
+
     
     target_rune := utf8.rune_at_pos(line_string, char_index - 1)
 
@@ -1566,12 +1652,30 @@ remove_char :: proc() {
     set_buffer_cursor_pos(buffer_cursor_line, char_index - 1)
 }
 
-get_line_indent_level :: proc(line_num: int) -> int {
+get_line_indent_level :: proc(line_num: int) -> (level: int, line_indent_mode: IndentMode) {
     line := active_buffer.lines[line_num]
-
+    
+    if len(line.characters) == 0 {
+        return 0, indent_mode
+    }
+    
+    if line.characters[0] == u8('\t') {
+        indent_level := 0
+        
+        for char in string(line.characters[:]) {
+            if char != '\t' {
+                break
+            }
+            
+            indent_level += 1
+        }
+        
+        return indent_level, .TABS
+    }
+    
     indent_spaces := 0
 
-    for char in line.characters {
+    for char in string(line.characters[:]) {
         if char != ' ' {
             break
         }
@@ -1579,9 +1683,9 @@ get_line_indent_level :: proc(line_num: int) -> int {
         indent_spaces += 1
     }
 
-    indent_level := indent_spaces / tab_spaces
+    indent_level := indent_spaces / indent_size
 
-    return indent_level
+    return indent_level, .SPACES
 }
 
 determine_line_indent :: proc(line_num: int) -> int {
@@ -1591,35 +1695,13 @@ determine_line_indent :: proc(line_num: int) -> int {
 
     prev_line := active_buffer.lines[line_num-1]
 
-    prev_line_indent_level := get_line_indent_level(line_num-1)
+    prev_line_indent_level, line_indent_mode := get_line_indent_level(line_num-1)
 
-    length := len(string(prev_line.characters[:]))
-
-    if length == 0 {
-        return 0
+    if line_indent_mode == .SPACES {
+        return prev_line_indent_level * indent_size
+    } else {
+        return prev_line_indent_level
     }
-
-    index := length - 1
-
-    ext := filepath.ext(active_buffer.file_name)
-
-    language_rules := indent_rule_language_list[ext]
-
-    if language_rules == nil {
-        return prev_line_indent_level * tab_spaces
-    }
-
-    prev_line_last_char := string(prev_line.characters[index:index])
-
-    if prev_line_last_char in language_rules {
-        rule := language_rules[prev_line_last_char]
-
-        if rule.type == .FORWARD {
-            prev_line_indent_level += 1
-        }       
-    }
-
-    return prev_line_indent_level*tab_spaces
 }
 
 
@@ -1757,16 +1839,44 @@ handle_text_input :: proc() -> bool {
             characters=new_chars,
         }
         
-        new_line_num := buffer_cursor_line+1
+        prev_line_indent_level, prev_line_indent_mode := get_line_indent_level(buffer_cursor_line)
         
-        indent_level := determine_line_indent(new_line_num)
+        indent_level : int
         
-        bytes, _ := utf8.encode_rune(' ')
-        size := utf8.rune_size(' ')
+        new_text : string
+        defer delete(new_text)
         
-        for _ in 0..<(indent_level) {
-            inject_at(&buffer_line.characters, 0, ..bytes[:size])
+        switch prev_line_indent_mode {
+        case .SPACES:
+            indent_level = prev_line_indent_level * indent_size
+            new_text = strings.concatenate({
+                "\n",
+                strings.repeat(" ", indent_level)
+            })
+            
+            bytes, _ := utf8.encode_rune(' ')            
+            size := utf8.rune_size(' ')
+            
+            for _ in 0..<(indent_level) {
+                inject_at(&buffer_line.characters, 0, ..bytes[:size])
+            }
+        case .TABS:
+            indent_level = prev_line_indent_level
+            
+            new_text = strings.concatenate({
+                "\n",
+                strings.repeat("\t", indent_level)
+            })
+            
+            bytes, _ := utf8.encode_rune('\t')
+            size := utf8.rune_size('\t')
+            
+            for _ in 0..<(indent_level) {
+                inject_at(&buffer_line.characters, 0, ..bytes[:size])
+            }
         }
+        
+        new_line_num := buffer_cursor_line+1
         
         inject_at(active_buffer.lines, new_line_num, buffer_line)
 
@@ -1777,10 +1887,6 @@ handle_text_input :: proc() -> bool {
             cur_line_end_char,
         ) 
  
-        new_text := strings.concatenate({
-            "\n",
-            strings.repeat(" ", indent_level )
-        })
 
         notify_server_of_change(
             active_buffer,
@@ -2119,10 +2225,6 @@ indent_selection :: proc(start_line: int, end_line: int) {
         start_line = temp
     }
     
-    chars := []rune{' ', ' ', ' ', ' '}
-    chars_string := utf8.runes_to_string(chars)
-    defer delete(chars_string)
-
     start_byte := compute_byte_offset(active_buffer, start_line, 0)
     old_rune_count := utf8.rune_count(active_buffer.lines[end_line].characters[:])
         
@@ -2134,7 +2236,46 @@ indent_selection :: proc(start_line: int, end_line: int) {
         old_line_str := string(line.characters[:])
         old_bytes += len(old_line_str)
         
-        inject_at(&line.characters, 0, ..transmute([]u8)chars_string[:])
+        // Count leading spaces and tabs
+        leading_spaces := 0
+        leading_tabs := 0
+        j := 0
+        for j < len(line.characters) {
+            r, size := utf8.decode_rune(line.characters[j:])
+            if r == ' ' {
+                leading_spaces += 1
+                j += size
+            } else if r == '\t' {
+                leading_tabs += 1
+                j += size
+            } else {
+                break
+            }
+        }
+        
+        line_mode: IndentMode
+        if leading_tabs > 0 && leading_spaces == 0 {
+            line_mode = .TABS
+        } else if leading_spaces > 0 && leading_tabs == 0 {
+            line_mode = .SPACES
+        } else {
+            line_mode = indent_mode
+        }
+        
+        indent_char: string
+        add_amount: int
+        if line_mode == .TABS {
+            indent_char = "\t"
+            add_amount = 1
+        } else {
+            indent_char = " "
+            add_amount = indent_size if leading_spaces % indent_size == 0 else indent_size - (leading_spaces % indent_size)
+        }
+        
+        indent_string := strings.repeat(indent_char, add_amount)
+        defer delete(indent_string)
+        
+        inject_at(&line.characters, 0, ..transmute([]u8)indent_string[:])
 
         new_line_str := string(line.characters[:])
         
@@ -2183,17 +2324,45 @@ unindent_selection :: proc(start_line: int, end_line: int) {
         old_line_str := string(line.characters[:])
         old_bytes += len(old_line_str)
 
-        count := 0
-        for c in line.characters {
-            if c == ' ' && count < 4 {
-                count += 1
+        // Count leading spaces and tabs
+        leading_spaces := 0
+        leading_tabs := 0
+        j := 0
+        for j < len(line.characters) {
+            r, size := utf8.decode_rune(line.characters[j:])
+            if r == ' ' {
+                leading_spaces += 1
+                j += size
+            } else if r == '\t' {
+                leading_tabs += 1
+                j += size
             } else {
                 break
             }
         }
+        
+        line_mode: IndentMode
+        if leading_tabs > 0 && leading_spaces == 0 {
+            line_mode = .TABS
+        } else if leading_spaces > 0 && leading_tabs == 0 {
+            line_mode = .SPACES
+        } else {
+            line_mode = indent_mode
+        }
+        
+        remove_amount: int
+        if line_mode == .TABS {
+            remove_amount = 1 if leading_tabs > 0 else 0
+        } else {
+            if leading_spaces % indent_size == 0 {
+                remove_amount = indent_size if leading_spaces >= indent_size else 0
+            } else {
+                remove_amount = leading_spaces % indent_size
+            }
+        }
 
-        if count > 0 {
-            remove_range(&line.characters, 0, count)
+        if remove_amount > 0 {
+            remove_range(&line.characters, 0, remove_amount)
         }
 
         new_line_str := string(line.characters[:])
@@ -3211,7 +3380,7 @@ buffer_go_to_cursor_pos :: proc() {
                 continue
             }
 
-            advance_amount := (character.advance.x) * f32(tab_spaces)
+            advance_amount := (character.advance.x) * f32(tab_width)
             pen.x += advance_amount
 
             continue
