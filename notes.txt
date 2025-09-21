@@ -6,7 +6,10 @@ reminders:
 todo:
     - add variable font weights
     - renaming a file should rename and send a didclose/didopen
-    - add swap between 2-4 space indentation, highlight "autofix" for indents
+    - add "show trailing spaces" config option
+    - add warning for mixing tabs and spaces within a file
+    - add procedure for fixing indents within a highlight
+      eg. set to tab or space, set indent level for spaces, etc
     
 think:
     - control + escape is a bad keybind for the terminal input mode switching.

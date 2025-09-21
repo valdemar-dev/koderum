@@ -2879,10 +2879,10 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(glfw.KEY_V) {
-        input_mode = .HIGHLIGHT
-
         highlight_start_line = buffer_cursor_line 
         highlight_start_char = buffer_cursor_char_index
+        
+        input_mode = .HIGHLIGHT
 
         return true
     }

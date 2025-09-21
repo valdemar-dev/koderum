@@ -30,7 +30,7 @@ handle_highlight_input :: proc() {
         highlight_start_char = -1
 
         return
-    } 
+    }
 
     if is_key_pressed(glfw.KEY_Y) {
         key := key_store[glfw.KEY_Y]

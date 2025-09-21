@@ -342,12 +342,12 @@ cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {
     #partial switch input_mode {
     case .COMMAND:
         if is_clicking == true {
+            highlight_start_line = buffer_cursor_line
+            highlight_start_char = buffer_cursor_char_index
+            
             input_mode = .HIGHLIGHT
             
             buffer_go_to_cursor_pos()
-            
-            highlight_start_line = buffer_cursor_line
-            highlight_start_char = buffer_cursor_char_index
         }
     case .HIGHLIGHT:
         if is_clicking == true {
