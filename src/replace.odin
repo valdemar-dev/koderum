@@ -77,40 +77,93 @@ draw_find_and_replace :: proc() {
     small_text := math.round_f32(font_base_px * small_text_scale)
     
     padding := math.round_f32(font_base_px * small_text_scale)
+    line_thickness := math.round_f32(font_base_px * line_thickness_em)
     
     box_height : f32 = 0
     box_width : f32 = 0
     
-    // Calculate Box Size
-    title_size := measure_text(normal_text, title)
-    box_height += title_size.y
-    box_width = max(box_width, title_size.x)
+    box := rect{padding * 2, font_base_px * 5, 0,0}
+
+    pen_y := box.y
     
-    content_size := measure_text(normal_text, content)
-    box_height += content_size.y
-    box_width = max(box_width, content_size.x)
-    
-    box := rect{
-        0,0,
-        box_width,
-        box_height,
+    // Add Title
+    {
+        size := add_text_measure(
+            &text_rect_cache,
+            vec2{box.x, box.y},
+            TEXT_MAIN,
+            normal_text,
+            title,
+            z_index +1,
+        )
+        
+        box_width = max(box_width, size.x)
+        pen_y += size.y + size.y / 2
     }
     
-    bg_box := rect{
-        box.x - padding,
-        box.y - padding,
-        box.width - (padding * 2),
-        box.height - (padding * 2),
+    // Add Content
+    {
+        size := add_text_measure(
+            &text_rect_cache,
+            vec2{box.x, pen_y},
+            TEXT_MAIN,
+            normal_text,
+            content,
+            z_index +1,
+        )
+        
+        add_rect(&text_rect_cache,
+            rect{
+                box.x + size.x,
+                pen_y,
+                cursor_width,
+                size.y
+            },
+            no_texture,
+            TEXT_MAIN,
+            vec2{},
+            z_index + 2,
+        )
+        
+        box_width = max(box_width, size.x)
+        pen_y += size.y        
     }
     
     {
-        add_rect(&rect_cache, bg_box, no_texture, BG_MAIN_30, vec2{}, z_index-1)
+        box_height = pen_y - box.y
         
-        title_pos := vec2{box.x, box.y}
-        add_text(&text_rect_cache, title_pos, TEXT_MAIN, normal_text, title, z_index+1)
+        box.width = box_width + padding * 2
+        box.height = box_height + padding * 2
         
-        content_pos := vec2{title_pos.x, title_pos.y + title_size.y}
-        add_text(&text_rect_cache, content_pos, TEXT_MAIN, normal_text, content, z_index+1)
+        // shift by padding to create padding
+        box.x -= padding
+        box.y -= padding
+    }
+    
+    bg_box := rect{
+        box.x - line_thickness,
+        box.y - line_thickness,
+        box.width + (line_thickness * 2),
+        box.height + (line_thickness * 2),
+    }
+    
+    // Draw Box
+    {
+        add_rect(&rect_cache,
+            box,
+            no_texture,
+            BG_MAIN_10,
+            vec2{},
+            z_index,
+        )
+        
+        add_rect(&rect_cache,
+            bg_box,
+            no_texture,
+            BG_MAIN_30,
+            vec2{},
+            z_index - 1,
+        )
     }
     
     return
