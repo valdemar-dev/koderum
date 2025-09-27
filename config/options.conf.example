@@ -1,3 +1,6 @@
+[meta]
+version = BETA_1_1_0
+
 [fonts]
 font = /usr/share/fonts/CascadiaMono/CaskaydiaCoveNerdFontMono-Regular.ttf
 font = /usr/share/fonts/noto/NotoSansMono-Regular.ttf
@@ -46,7 +49,6 @@ indent_mode = spaces
 [how many spaces = one tab]
 tab_width = 4
 
-
 [general]
 default_cwd = $HOME
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
@@ -55,3 +57,69 @@ delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
 [search]
 search_ignored_dir = node_modules
 search_ignored_dir = .git
+
+
+
+[input, reference: https://www.glfw.org/docs/3.3/group__keys.html]
+move_up = k
+move_down = j
+move_left = d
+move_right = f
+
+move_forward_word = u
+move_backward_word = r
+
+toggle_yank_history_mode = s
+toggle_highlight_mode = v
+toggle_help_mode = f1
+toggle_buffer_info = q
+
+go_to_end_of_line = a
+go_to_start_of_line = z
+
+[these require shift + key to use]
+go_to_end_of_file = a
+go_to_start_of_file = z
+
+enter_insert_mode = i
+enter_grep_search_mode = m
+enter_search_mode = g
+enter_file_browser_mode = o
+enter_go_to_line_mode = n
+enter_find_and_replace_mode = h
+
+next_file = comma
+previous_file = m
+
+[these require ctrl + shift + key to use]
+reload_file = r
+close_file = w
+
+go_to_definition = period
+
+[autocomplete, these require ctrl + key to use]
+previous_completion = w
+next_completion = e
+insert_completion = r
+
+[ctrl + key = copy to clipboard]
+[key = copy to yank buffer]
+yank = y
+
+cut = c
+delete = x
+
+[ctrl + key = paste from clipboard]
+paste = p
+
+[used for most things like leaving the file browser]
+escape = esc
+
+[quits the program]
+exit = f10
+
+[this requires ctrl + key]
+toggle_terminal = t
+
+enter_terminal_insert_mode = i
+exit_terminal_insert_mode = escape

@@ -17,8 +17,10 @@ import "core:path/filepath"
 window : glfw.WindowHandle
 fb_size := vec2{}
 
+PROGRAM_VERSION := "BETA_1_1_0"
+
 init :: proc() {
-    context = global_context
+    context = global_context    
     
     load_configs()
 
@@ -51,6 +53,10 @@ init :: proc() {
     }
     
     load_background()
+}
+
+load_version :: proc() {
+    
 }
 
 background_uvs : rect

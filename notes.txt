@@ -8,6 +8,10 @@ todo:
     - renaming a file should rename and send a didclose/didopen
     - add "show trailing spaces" config option
     - add warning for mixing tabs and spaces within a file
+    - file browser needs more improvements.
+      something like a list view.
+      folders should be shown before files
+      accuracy should be prioritized within folders
     - add procedure for fixing indents within a highlight
       eg. set to tab or space, set indent level for spaces, etc
     
@@ -20,13 +24,8 @@ bugs:
     // maybe fixed? - bad free in reset_completion_hits(), from set_buffer_cursor_pos-
     // maybe fixed? - nil pointer dereference in hit_ptr.detail in resolve completion hit
     - malformed LSP json panic sometimes?
-    - undo is fucked (?) bad positioning
-    - does not track all allocations? / unnoticed memory leak
     - draw_text_buffer mutex when hitting F5 to reload lsp
     - ctrl + e bad free?
-    
-    - something calls compute_byte_offset() with rune_index -1
-    
-    
+        
     - annoying shit with moving around.
       cut a thing, and suddenly you're WAY in the wrong direction. something to do with centering the camera after a large action, cut, paste, x.

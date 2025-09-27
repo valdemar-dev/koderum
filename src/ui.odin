@@ -123,7 +123,7 @@ draw_ui :: proc() {
         mode_text_color = TOKEN_COLOR_10
     case .HELP:
         mode_string = "Help"
-        mode_bg_color = TOKEN_COLOR_02
+        mode_text_color = TOKEN_COLOR_02
     }
     
     // Draw Input Mode

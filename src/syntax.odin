@@ -1604,7 +1604,7 @@ notify_server_of_change :: proc(
     buffer^.version += 1
     buffer^.is_saved = false
     
-    constrain_scroll_to_cursor()
+    defer constrain_scroll_to_cursor()
     
     new_end_byte := start_byte + len(new_text)
 

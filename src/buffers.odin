@@ -194,130 +194,6 @@ buffer_search_term : string
 @(private="package")
 go_to_line_input_string : string
 
-/*
-undo_change :: proc() {
-    context = global_context
-    
-    if len(active_buffer.undo_stack) == 0 {
-        return
-    }
-
-    idx := len(active_buffer.undo_stack) - 1
-    change := active_buffer.undo_stack[idx]
-
-    remove_range(
-        &active_buffer.content,
-        change.start_byte,
-        change.start_byte + u32(len(change.new_content)),
-    )
-
-    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
-
-    end_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[end].characters[:]),
-        int(end_byte),
-    )
-    
-    inject_at(&active_buffer.content, change.start_byte, ..change.original_content)
-
-    ordered_remove(&active_buffer.undo_stack, idx)
-    append(&active_buffer.redo_stack, change)
-
-    update_buffer_lines_after_change(active_buffer, change, true)
-
-    notify_server_of_change(
-        active_buffer,
-        int(change.start_byte),
-        int(change.start_byte + u32(len(change.new_content))),
-        change.start_line,
-        change.start_char,
-        end,
-        end_rune,
-        change.original_content,
-        false,
-    )
-
-    // buffer curosr
-    line, char_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
-    char_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[line].characters[:]),
-        int(char_byte),
-    )
-    
-    set_buffer_cursor_pos(
-        line,
-        char_rune,
-    )
-
-    if change.undo_for > 0 {
-        for i in 0..<change.undo_for {
-            undo_change()
-        }
-    }
-}
-
-redo_change :: proc() {
-    context = global_context
-    
-    if len(active_buffer.redo_stack) == 0 {
-        return
-    }
-
-    idx := len(active_buffer.redo_stack) - 1
-    change := active_buffer.redo_stack[idx]
-
-    remove_range(
-        &active_buffer.content,
-        change.start_byte,
-        change.start_byte + u32(len(change.original_content)),
-    )
-
-    inject_at(&active_buffer.content, change.start_byte, ..change.new_content)
-
-    end, end_byte := byte_to_pos(change.start_byte + u32(len(change.original_content)))
-
-    end_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[end].characters[:]),
-        int(end_byte),
-    )
-
-    ordered_remove(&active_buffer.redo_stack, idx)
-    append(&active_buffer.undo_stack, change)
-
-    update_buffer_lines_after_change(active_buffer, change, false)
-
-    notify_server_of_change(
-        active_buffer,
-        int(change.start_byte),
-        int(change.start_byte + u32(len(change.original_content))),
-        change.start_line,
-        change.start_char,
-        end,
-        end_rune,
-        change.new_content,
-        false,
-    )
-    
-    
-    // Buffer Cursor    
-    line, char_byte := byte_to_pos(change.start_byte + u32(len(change.new_content)))
-    char_rune := byte_offset_to_rune_index(
-        string(active_buffer.lines[line].characters[:]),
-        int(char_byte),
-    )
-    
-    set_buffer_cursor_pos(
-        line,
-        char_rune,
-    )
-
-    if change.redo_for > 0 {
-        for i in 0..<change.redo_for {
-            redo_change()
-        }
-    }
-}
-*/
 undo_change :: proc() {
     context = global_context
     
@@ -850,7 +726,7 @@ draw_no_buffer :: proc() {
     
     content := strings.concatenate({
         "Welcome to Koderum!\n",
-        "Press . to see the list of keybinds.",
+        "Press F1 to see the list of keybinds.",
     })
     defer delete(content)
     
@@ -910,10 +786,8 @@ draw_text_buffer :: proc() {
     line_height := (ascender - descender)
     
     sb := strings.builder_make()
-    
     defer strings.builder_destroy(&sb)
-
-    strings.builder_reset(&sb)
+    
     strings.write_int(&sb, len(buffer_lines))
 
     highest_line_string := strings.to_string(sb)

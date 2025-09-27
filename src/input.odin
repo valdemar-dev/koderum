@@ -397,8 +397,8 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
 }
 
 handle_command_input :: proc() -> bool {
-    if is_key_pressed(glfw.KEY_PERIOD) {
-        set_mode(mode = .HELP, key = glfw.KEY_PERIOD, char = '.')
+    if is_key_pressed(glfw.KEY_F1) {
+        toggle_help_menu()
         
         return false
     }

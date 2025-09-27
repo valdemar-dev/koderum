@@ -294,6 +294,23 @@ set_option :: proc(options: []string) {
     if !do_continue do return
 
     switch option_name {
+    case "version":
+        if value != PROGRAM_VERSION {
+            desc := strings.concatenate({
+                "Config version: ", value,
+                "\nKoderum version: ", PROGRAM_VERSION,
+                "\n\nThis could cause unexpected behavior!",
+            })
+            
+            defer delete(desc)
+            
+            create_alert(
+                "Config out of date!",
+                desc,
+                20,
+                context.allocator
+            )
+        }
     case "background_image":
         exe_path, _ := os2.get_executable_path(context.allocator)
         defer delete(exe_path)
