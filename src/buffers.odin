@@ -1595,7 +1595,7 @@ determine_line_indent :: proc(line_num: int) -> int {
 handle_text_input :: proc() -> bool {
     line := &active_buffer.lines[buffer_cursor_line] 
     
-    if is_key_pressed(glfw.KEY_ESCAPE) {
+    if is_key_pressed(mapped_keybinds[.ESCAPE]) {
         input_mode = .COMMAND
         
         if len(completion_hits) > 0 {
@@ -1649,7 +1649,7 @@ handle_text_input :: proc() -> bool {
     
     // Auto completion stuff
     {
-        if is_key_pressed(glfw.KEY_W) {
+        if is_key_pressed(mapped_keybinds[.PREVIOUS_COMPLETION]) {
             key := key_store[glfw.KEY_W]
     
             if key.modifiers == CTRL {
@@ -1663,7 +1663,7 @@ handle_text_input :: proc() -> bool {
             }
         } 
     
-        if is_key_pressed(glfw.KEY_E) {
+        if is_key_pressed(mapped_keybinds[.NEXT_COMPLETION]) {
             key := key_store[glfw.KEY_E]
     
             if key.modifiers == CTRL {
@@ -1677,8 +1677,8 @@ handle_text_input :: proc() -> bool {
             }
         }
         
-        if is_key_pressed(glfw.KEY_R) {
-            key := key_store[glfw.KEY_R]
+        if is_key_pressed(mapped_keybinds[.INSERT_COMPLETION]) {
+            key := key_store[i32(mapped_keybinds[.INSERT_COMPLETION])]
     
             if key.modifiers == CTRL {
                 insert_completion()
@@ -1687,16 +1687,16 @@ handle_text_input :: proc() -> bool {
     }
     
     {
-        if (is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_DOWN) {
+        if (is_key_pressed(mapped_keybinds[.MOVE_DOWN]) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_DOWN) {
             move_down()
         }
-        if (is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_UP) {
+        if (is_key_pressed(mapped_keybinds[.MOVE_UP]) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_UP) {
             move_up()
         }
-        if (is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_LEFT) {
+        if (is_key_pressed(mapped_keybinds[.MOVE_LEFT]) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_LEFT) {
             move_left()
         }
-        if (is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_RIGHT) {
+        if (is_key_pressed(mapped_keybinds[.MOVE_RIGHT]) && is_key_down(glfw.KEY_LEFT_CONTROL)) || is_key_pressed(glfw.KEY_RIGHT) {
             move_right()
         }
     }
@@ -2514,7 +2514,7 @@ inject_line :: proc() {
         indent_spaces, 
     )
 
-    set_mode(.BUFFER_INPUT, glfw.KEY_L, 'l')
+    set_mode(.BUFFER_INPUT, mapped_keybinds[.INJECT_LINE], 'l')
 }
 
 @(private="package")
@@ -2718,36 +2718,36 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
     
-    if is_key_pressed(glfw.KEY_F5) {
+    if is_key_pressed(mapped_keybinds[.RESTART_LSP]) {
         restart_lsp(active_buffer)
     }
 
-    if is_key_pressed (glfw.KEY_R) {
-        if key_store[glfw.KEY_R].modifiers == CTRL_SHIFT {
+    if is_key_pressed (mapped_keybinds[.RELOAD_FILE]) {
+        if key_store[i32(mapped_keybinds[.RELOAD_FILE])].modifiers == CTRL_SHIFT {
             reload_buffer(active_buffer)
         }
     }
 
-    if is_key_pressed(glfw.KEY_PERIOD) {
+    if is_key_pressed(mapped_keybinds[.GO_TO_DEFINITION]) {
         go_to_definition()
     }
 
-    if is_key_pressed(glfw.KEY_W) {
-        if key_store[glfw.KEY_W].modifiers == CTRL_SHIFT {
+    if is_key_pressed(mapped_keybinds[.CLOSE_FILE]) {
+        if key_store[i32(mapped_keybinds[.CLOSE_FILE])].modifiers == CTRL_SHIFT {
             close_file(active_buffer)
         }
     }
 
-    if is_key_pressed(glfw.KEY_C) {
-        key := key_store[glfw.KEY_C]
+    if is_key_pressed(mapped_keybinds[.CUT]) {
+        key := key_store[i32(mapped_keybinds[.CUT])]
 
         if key.modifiers == SHIFT {
             cut_line(buffer_cursor_line)
         }
     }
 
-    if is_key_pressed(glfw.KEY_X) {        
-        key := key_store[glfw.KEY_X]
+    if is_key_pressed((mapped_keybinds[.DELETE])) {
+        key := key_store[i32(mapped_keybinds[.DELETE])]
     
         if key.modifiers == SHIFT {
             delete_line(buffer_cursor_line)
@@ -2756,15 +2756,15 @@ handle_buffer_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_C) {
+    if is_key_pressed(mapped_keybinds[.REDO]) {
         redo_change()
     }
     
-    if is_key_pressed(glfw.KEY_L) {
+    if is_key_pressed(mapped_keybinds[.INJECT_LINE]) {
         inject_line()
     }
 
-    if is_key_pressed(glfw.KEY_V) {
+    if is_key_pressed(mapped_keybinds[.TOGGLE_HIGHLIGHT_MODE]) {
         highlight_start_line = buffer_cursor_line 
         highlight_start_char = buffer_cursor_char_index
         
@@ -2773,8 +2773,8 @@ handle_buffer_input :: proc() -> bool {
         return true
     }
 
-    if is_key_pressed(glfw.KEY_P) {
-        key := key_store[glfw.KEY_P]
+    if is_key_pressed(mapped_keybinds[.PASTE]) {
+        key := key_store[i32(mapped_keybinds[.PASTE])]
 
         if key.modifiers == 2 {
             paste_string(glfw.GetClipboardString(window), buffer_cursor_line, buffer_cursor_char_index)
@@ -2785,8 +2785,8 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_pressed(glfw.KEY_G) {
-        set_mode(.SEARCH, glfw.KEY_G, 'g')
+    if is_key_pressed(mapped_keybinds[.ENTER_SEARCH_MODE]) {
+        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE], 'g')
         
         cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
@@ -2795,7 +2795,7 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
     
-    if is_key_pressed(glfw.KEY_N) {
+    if is_key_pressed(mapped_keybinds[.ENTER_GO_TO_LINE_MODE]) {
         set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
         
         cached_buffer_index = get_buffer_index(active_buffer)
@@ -2805,7 +2805,7 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_pressed(glfw.KEY_I) {
+    if is_key_pressed(mapped_keybinds[.ENTER_INSERT_MODE]) {
         set_mode(.BUFFER_INPUT, glfw.KEY_I, 'i')
         
         constrain_scroll_to_cursor()
@@ -2820,13 +2820,13 @@ handle_buffer_input :: proc() -> bool {
         return false
     }
 
-    if is_key_pressed(glfw.KEY_M) {
+    if is_key_pressed(mapped_keybinds[.PREVIOUS_FILE]) {
         prev_buffer()
 
         return false
     }
 
-    if is_key_pressed(glfw.KEY_COMMA) {
+    if is_key_pressed(mapped_keybinds[.NEXT_FILE]) {
         next_buffer()
 
         return false
@@ -2834,7 +2834,7 @@ handle_buffer_input :: proc() -> bool {
 
     handle_movement_input()
 
-    if is_key_pressed(glfw.KEY_Q) {
+    if is_key_pressed(mapped_keybinds[.TOGGLE_BUFFER_INFO]) {
         toggle_buffer_info_view()
 
         return false
@@ -2880,8 +2880,8 @@ handle_buffer_input :: proc() -> bool {
         set_buffer(10)
     }
   
-    if is_key_pressed(glfw.KEY_B) {
-        key := key_store[glfw.KEY_B]
+    if is_key_pressed(mapped_keybinds[.GO_BACK]) {
+        key := key_store[i32(mapped_keybinds[.GO_BACK])]
         
         if key.modifiers != CTRL {
             return false
@@ -2918,8 +2918,8 @@ handle_buffer_input :: proc() -> bool {
 
 @(private="package")
 handle_movement_input :: proc() -> bool {
-    if is_key_down(glfw.KEY_J) {
-        key := key_store[glfw.KEY_J]
+    if is_key_down(mapped_keybinds[.MOVE_DOWN]) {
+        key := key_store[i32(mapped_keybinds[.MOVE_DOWN])]
 
         if key.modifiers == SHIFT {
             scroll_down()
@@ -2928,14 +2928,14 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_J) || is_key_pressed(glfw.KEY_DOWN) {
+    if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) || is_key_pressed(glfw.KEY_DOWN) {
         move_down()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_K) {
-        key := key_store[glfw.KEY_K]
+    if is_key_down(mapped_keybinds[.MOVE_UP]) {
+        key := key_store[i32(mapped_keybinds[.MOVE_UP])]
 
         if key.modifiers == SHIFT {
             scroll_up()
@@ -2944,14 +2944,14 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_K) || is_key_pressed(glfw.KEY_UP) {
+    if is_key_pressed(mapped_keybinds[.MOVE_UP]) || is_key_pressed(glfw.KEY_UP) {
         move_up()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_D) {
-        key := key_store[glfw.KEY_D]
+    if is_key_down(mapped_keybinds[.MOVE_LEFT]) {
+        key := key_store[i32(mapped_keybinds[.MOVE_LEFT])]
 
         if key.modifiers == SHIFT {
             scroll_left()
@@ -2960,14 +2960,14 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_D) || is_key_pressed(glfw.KEY_LEFT) {
+    if is_key_pressed(mapped_keybinds[.MOVE_LEFT]) || is_key_pressed(glfw.KEY_LEFT) {
         move_left()
 
         return false
     }
 
-    if is_key_down(glfw.KEY_F){
-        key := key_store[glfw.KEY_F]
+    if is_key_down(mapped_keybinds[.MOVE_RIGHT]){
+        key := key_store[i32(mapped_keybinds[.MOVE_RIGHT])]
 
         if key.modifiers == SHIFT {
             scroll_right()
@@ -2976,32 +2976,32 @@ handle_movement_input :: proc() -> bool {
         }
     }
 
-    if is_key_pressed(glfw.KEY_F) || is_key_pressed(glfw.KEY_RIGHT) {
+    if is_key_pressed(mapped_keybinds[.MOVE_RIGHT]) || is_key_pressed(glfw.KEY_RIGHT) {
         move_right()
 
         return false
     }
 
-    if is_key_pressed(glfw.KEY_R) {
+    if is_key_pressed(mapped_keybinds[.MOVE_BACKWARD_WORD]) {
         move_back_word()
 
         return false
     }
 
-    if is_key_pressed(glfw.KEY_U) {
+    if is_key_pressed(mapped_keybinds[.MOVE_FORWARD_WORD]) {
         move_forward_word()
 
         return false
     }
     
-    if is_key_pressed(glfw.KEY_A) {
-        key := key_store[glfw.KEY_A]
+    if is_key_pressed(mapped_keybinds[.GO_TO_END]) {
+        key := key_store[i32(mapped_keybinds[.GO_TO_END])]
         
         if key.modifiers == SHIFT {
             target := len(active_buffer.lines) - 1
             
             line := active_buffer.lines[target]
-            target_rune := byte_offset_to_rune_index(string(line.characters[:]), 0)
+            target_rune := byte_offset_to_rune_index(string(line.characters[:]), len(line.characters))
             
             set_buffer_cursor_pos(
                 target,
@@ -3021,8 +3021,8 @@ handle_movement_input :: proc() -> bool {
         return true
     }
     
-    if is_key_pressed(glfw.KEY_Z) {
-        key := key_store[glfw.KEY_Z]
+    if is_key_pressed(mapped_keybinds[.GO_TO_START]) {
+        key := key_store[i32(mapped_keybinds[.GO_TO_START])]
 
         set_buffer_cursor_pos(
             key.modifiers == SHIFT ? 0 : buffer_cursor_line,
@@ -3114,8 +3114,8 @@ handle_search_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_B) {
-        key := key_store[glfw.KEY_B]
+    if is_key_pressed(mapped_keybinds[.GO_BACK]) {
+        key := key_store[i32(mapped_keybinds[.GO_BACK])]
         
         if key.modifiers != CTRL {
             return
@@ -3137,8 +3137,8 @@ handle_search_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_J) {
-        key := key_store[glfw.KEY_J]
+    if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) {
+        key := key_store[i32(mapped_keybinds[.MOVE_DOWN])]
 
         if key.modifiers == 2 {
             set_hit_index(hit_index + 1)
@@ -3147,8 +3147,8 @@ handle_search_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_K) {
-        key := key_store[glfw.KEY_K]
+    if is_key_pressed(mapped_keybinds[.MOVE_UP]) {
+        key := key_store[i32(mapped_keybinds[.MOVE_UP])]
 
         if key.modifiers == 2 {
             set_hit_index(hit_index - 1)
@@ -3157,7 +3157,7 @@ handle_search_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_V) && selected_hit != nil {
+    if is_key_pressed(mapped_keybinds[.TOGGLE_HIGHLIGHT_MODE]) && selected_hit != nil {
         input_mode = .HIGHLIGHT
 
         highlight_start_line = selected_hit.line
@@ -3186,7 +3186,7 @@ handle_go_to_line_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_BACKSPACE) {
+    if is_key_pressed(mapped_keybinds[.REMOVE_CHARACTER]) {
         runes := utf8.string_to_runes(go_to_line_input_string)
 
         end_idx := len(runes)-1        
@@ -3198,7 +3198,7 @@ handle_go_to_line_input :: proc() {
         delete(runes)
     }
 
-    if is_key_pressed(glfw.KEY_ENTER) {
+    if is_key_pressed(mapped_keybinds[.ENTER]) {
         target_line := clamp(
             strconv.atoi(go_to_line_input_string)-1,
             0,

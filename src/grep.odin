@@ -38,7 +38,7 @@ item_offset := 0
 
 @(private="package")
 handle_grep_input :: proc() {
-    if is_key_pressed(glfw.KEY_BACKSPACE) {
+    if is_key_pressed(mapped_keybinds[.REMOVE_CHARACTER]) {
         runes := utf8.string_to_runes(search_term)
 
         end_idx := len(runes)-1
@@ -58,19 +58,21 @@ handle_grep_input :: proc() {
         set_found_files()
     }
    
-    if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    is_pressing_control := is_key_down(glfw.KEY_LEFT_CONTROL) || is_key_down(glfw.KEY_RIGHT_CONTROL)
+    
+    if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) && is_pressing_control {
         item_offset = clamp(item_offset + 1, 0, len(grep_found_files)-1)
 
         return
     }
 
-    if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.MOVE_UP]) && is_pressing_control {
         item_offset = clamp(item_offset - 1, 0, len(grep_found_files)-1)
 
         return
     }
 
-    if is_key_pressed(glfw.KEY_ENTER) {
+    if is_key_pressed(mapped_keybinds[.ENTER]) {
         if len(grep_found_files) < 1 {
             return
         }
@@ -89,7 +91,7 @@ handle_grep_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_ESCAPE) {
+    if is_key_pressed(mapped_keybinds[.ESCAPE]) {
         toggle_grep_view()
  
         return
@@ -105,7 +107,7 @@ toggle_grep_view :: proc() {
 
         return
     } else {
-        set_mode(.GREP_SEARCH, glfw.KEY_O, 'o')
+        set_mode(.GREP_SEARCH, mapped_keybinds[.ENTER_FILE_BROWSER_MODE], 'o')
 
         suppress = false
         show_browser_view = true

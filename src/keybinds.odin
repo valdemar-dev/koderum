@@ -24,7 +24,7 @@ KODERUM_KEY :: enum {
     TOGGLE_HIGHLIGHT_MODE,
     TOGGLE_HELP_MODE,
     TOGGLE_BUFFER_INFO,
-    TOGGLE_TERMINAL_VIEW,
+    TOGGLE_TERMINAL,
     
     ENTER_GREP_SEARCH_MODE,
     GREP_SEARCH_MODIFIER,
@@ -35,7 +35,16 @@ KODERUM_KEY :: enum {
     ENTER_GO_TO_LINE_MODE,
     ENTER_FIND_AND_REPLACE_MODE,
     ENTER_TERMINAL_INSERT_MODE,
-
+    
+    /*
+        FILE BROWSER
+    */
+    RENAME_FILE,
+    DELETE_FILE,
+    CREATE_FILE,
+    GO_UP_DIRECTORY,
+    SET_CWD,
+    
     /*
         SWAP BETWEEN FILES
     */
@@ -45,14 +54,14 @@ KODERUM_KEY :: enum {
     RELOAD_FILE,
     CLOSE_FILE,
     
+    /*
+        LSP
+    */
     RESTART_LSP,
-    
     GO_TO_DEFINITION,
-    
     PREVIOUS_COMPLETION,
     NEXT_COMPLETION,
     INSERT_COMPLETION,
-    
     CUT_LINE,
     DELETE_LINE,
     
@@ -60,17 +69,42 @@ KODERUM_KEY :: enum {
     CUT,
     DELETE,
     PASTE,
+    INJECT_LINE,
+    
+    GO_TO_END,
+    GO_TO_START,
+    
+    GO_BACK,
+    
+    REDO,
+    UNDO,
+    
+    INDENT,
+    UNINDENT,
     
     ESCAPE,
     EXIT,
+    
+    /*
+        non-configurable,
+        might be in the future though
+    */
+    REMOVE_CHARACTER,
+    ENTER,
 }
 
 @(private="package")
-mapped_keybinds : map[KODERUM_KEY]i32 = {}
+KEY_CODE :: distinct i32
+
+@(private="package")
+mapped_keybinds : map[KODERUM_KEY]KEY_CODE = {
+    .REMOVE_CHARACTER = glfw.KEY_BACKSPACE,
+    .ENTER = glfw.KEY_ENTER,
+}
 
 @(private="package")
 check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: bool = true) {
-    key := GLFW_Keymap[value]
+    key := KEY_CODE(GLFW_Keymap[value])
     
     switch option_name {
     case "move_up":
@@ -84,7 +118,7 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
     case "move_forward_word":
         mapped_keybinds[.MOVE_FORWARD_WORD] = key
     case "move_backward_word":
-        mapped_keybinds[.MOVE_UP] = key
+        mapped_keybinds[.MOVE_BACKWARD_WORD] = key
     case "toggle_yank_history_mode":
         mapped_keybinds[.TOGGLE_YANK_HISTORY_MODE] = key
     case "toggle_highlight_mode":
@@ -137,6 +171,22 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
         mapped_keybinds[.PASTE] = key
     case "toggle_terminal":
         mapped_keybinds[.TOGGLE_TERMINAL] = key
+    case "inject_line":
+        mapped_keybinds[.INJECT_LINE] = key
+    case "go_to_end":
+        mapped_keybinds[.GO_TO_END] = key
+    case "go_to_start":
+        mapped_keybinds[.GO_TO_START] = key
+    case "go_back":
+        mapped_keybinds[.GO_BACK] = key
+    case "indent":
+        mapped_keybinds[.INDENT] = key
+    case "unindent":
+        mapped_keybinds[.UNINDENT] = key
+    case "redo":
+        mapped_keybinds[.REDO] = key
+    case "undo":
+        mapped_keybinds[.UNDO] = key
     case "escape":
         mapped_keybinds[.ESCAPE] = key
     case "exit":

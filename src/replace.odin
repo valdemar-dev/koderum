@@ -14,7 +14,7 @@ current_target := &search_term
 
 @(private="package")
 handle_find_and_replace_input :: proc() {
-    if is_key_pressed(glfw.KEY_ESCAPE) {
+    if is_key_pressed(mapped_keybinds[.ESCAPE]) {
         hide_find_and_replace()
         
         if input_mode_return_callback != nil {
@@ -22,7 +22,7 @@ handle_find_and_replace_input :: proc() {
         }
     }
     
-    if is_key_pressed(glfw.KEY_BACKSPACE) {
+    if is_key_pressed(mapped_keybinds[.ESCAPE]) {
         if len(current_target^) == 0 {
             return
         }
@@ -38,7 +38,7 @@ handle_find_and_replace_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_ENTER) {
+    if is_key_pressed(mapped_keybinds[.ENTER]) {
         if current_target == &search_term {
             current_target = &replace_text
             
@@ -60,7 +60,7 @@ show_find_and_replace :: proc() {
     suppress = false
     do_show = true
     
-    set_mode(.FIND_AND_REPLACE, glfw.KEY_H, 'h')
+    set_mode(.FIND_AND_REPLACE, mapped_keybinds[.ENTER_FIND_AND_REPLACE_MODE], 'h')
 }
 
 hide_find_and_replace :: proc() {

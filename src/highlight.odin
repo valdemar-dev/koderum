@@ -23,7 +23,7 @@ is_not_highlighting :: proc() -> bool {
 
 @(private="package")
 handle_highlight_input :: proc() {
-    if is_key_pressed(glfw.KEY_ESCAPE) || is_key_pressed(glfw.KEY_V) {
+    if is_key_pressed(mapped_keybinds[.TOGGLE_HIGHLIGHT_MODE]) {
         input_mode = .COMMAND
         
         highlight_start_line = -1
@@ -32,8 +32,8 @@ handle_highlight_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_Y) {
-        key := key_store[glfw.KEY_Y]
+    if is_key_pressed(mapped_keybinds[.YANK]) {
+        key := key_store[i32(mapped_keybinds[.YANK])]
 
         if key.modifiers == 2 {
             copy_to_clipboard(
@@ -54,7 +54,7 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_N) {
+    if is_key_pressed(mapped_keybinds[.ENTER_GO_TO_LINE_MODE]) {
         set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
         
         input_mode_return_callback = proc() {
@@ -64,7 +64,7 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_H) {
+    if is_key_pressed(mapped_keybinds[.ENTER_FIND_AND_REPLACE_MODE]) {
         show_find_and_replace()
         
         input_mode_return_callback = proc() {
@@ -74,7 +74,7 @@ handle_highlight_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_C) {
+    if is_key_pressed(mapped_keybinds[.CUT]) {
         copy_to_yank_buffer(
             highlight_start_line,
             buffer_cursor_line,
@@ -97,7 +97,7 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_X) {
+    if is_key_pressed(mapped_keybinds[.DELETE]) {
         remove_selection(
             highlight_start_line,
             buffer_cursor_line,
@@ -113,8 +113,8 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_P) {
-        key := key_store[glfw.KEY_P]
+    if is_key_pressed(mapped_keybinds[.PASTE]) {
+        key := key_store[i32(mapped_keybinds[.PASTE])]
         
         
         remove_selection(
@@ -136,7 +136,7 @@ handle_highlight_input :: proc() {
         highlight_start_line = -1
     }
 
-    if is_key_pressed(glfw.KEY_G) {
+    if is_key_pressed(mapped_keybinds[.ENTER_SEARCH_MODE]) {
         buffer_search_term = generate_highlight_string(
             highlight_start_line,
             buffer_cursor_line,
@@ -144,7 +144,7 @@ handle_highlight_input :: proc() {
             buffer_cursor_char_index,
         ) 
     
-        set_mode(.SEARCH, glfw.KEY_G, 'g')
+        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE], 'g')
         
         highlight_start_line = -1
         highlight_start_char = -1
@@ -152,7 +152,7 @@ handle_highlight_input :: proc() {
         find_search_hits()
     }
     
-    if is_key_pressed(glfw.KEY_E) {
+    if is_key_pressed(mapped_keybinds[.INDENT]) {
         indent_selection(
             highlight_start_line,
             buffer_cursor_line,
@@ -161,7 +161,7 @@ handle_highlight_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_W) {
+    if is_key_pressed(mapped_keybinds[.UNINDENT]) {
         unindent_selection(
             highlight_start_line,
             buffer_cursor_line,

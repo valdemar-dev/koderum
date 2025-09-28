@@ -771,7 +771,9 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
 
     if action == glfw.RELEASE do return true
     
-    if key == glfw.KEY_ESCAPE && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    is_pressing_control := is_key_down(glfw.KEY_LEFT_CONTROL) || is_key_down(glfw.KEY_RIGHT_CONTROL)
+    
+    if (KEY_CODE(key) == mapped_keybinds[.ESCAPE]) && is_pressing_control == true {
         input_mode = .TERMINAL
         
         return false
@@ -792,8 +794,8 @@ handle_terminal_emulator_input :: proc(key, scancode, action, mods: i32) -> (do_
 
 @(private="package")
 handle_terminal_control_input :: proc() -> bool {
-    if is_key_pressed(glfw.KEY_T) {
-        key := key_store[glfw.KEY_T]
+    if is_key_pressed(mapped_keybinds[.TOGGLE_TERMINAL]) {
+        key := key_store[i32(mapped_keybinds[.TOGGLE_TERMINAL])]
         
         if key.modifiers == CTRL {
             toggle_terminal_emulator()
@@ -802,8 +804,8 @@ handle_terminal_control_input :: proc() -> bool {
         }
     }
     
-    if is_key_pressed(glfw.KEY_I) {
-        set_mode(.TERMINAL_TEXT_INPUT, glfw.KEY_I, 'i')
+    if is_key_pressed(mapped_keybinds[.ENTER_INSERT_MODE]) {
+        set_mode(.TERMINAL_TEXT_INPUT, mapped_keybinds[.ENTER_INSERT_MODE], 'i')
         
         terminal := terminals[current_terminal_idx]
         if terminal == nil do return false

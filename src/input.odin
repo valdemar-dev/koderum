@@ -58,13 +58,13 @@ key_store : map[i32]ActiveKey = {}
 pressed_chars : [dynamic]rune = {}
 
 @(private="package")
-is_key_down :: proc(key: i32) -> bool {
-    return key_store[key].is_down
+is_key_down :: proc(key: KEY_CODE) -> bool {
+    return key_store[i32(key)].is_down
 }
 
 @(private="package")
-is_key_pressed :: proc(key: i32) -> bool {
-    return key_store[key].is_pressed
+is_key_pressed :: proc(key: KEY_CODE) -> bool {
+    return key_store[i32(key)].is_pressed
 }
 
 check_inputs :: proc() -> bool {
@@ -171,11 +171,11 @@ target_key : i32 = -1
 char_to_suppress : rune
 
 @(private="package")
-set_mode :: proc(mode: InputMode, key: i32, char: rune) {
+set_mode :: proc(mode: InputMode, key: KEY_CODE, char: rune) {
     input_mode = mode
     
-    target_key = key
-    char_to_suppress = char
+    target_key = i32(key)
+    char_to_suppress = rune(key)
     
     glfw.SetKeyCallback(window, key_callback_hijack)
 }

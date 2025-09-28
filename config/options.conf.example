@@ -51,7 +51,7 @@ tab_width = 4
 
 [general]
 default_cwd = $HOME
-always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|
+always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|<>
 delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
 
 [search]
@@ -74,12 +74,9 @@ toggle_highlight_mode = v
 toggle_help_mode = f1
 toggle_buffer_info = q
 
-go_to_end_of_line = a
-go_to_start_of_line = z
-
-[these require shift + key to use]
-go_to_end_of_file = a
-go_to_start_of_file = z
+[shift for file-scope, non-shift for line-scope]
+go_to_end = a
+go_to_start = z
 
 enter_insert_mode = i
 enter_grep_search_mode = m
@@ -112,8 +109,18 @@ delete = x
 [ctrl + key = paste from clipboard]
 paste = p
 
+inject_line = l
+
+[ctrl + key required]
+go_back = b
+undo = x
+redo = c
+
+indent = e
+unindent = w
+
 [used for most things like leaving the file browser]
-escape = esc
+escape = escape
 
 [quits the program]
 exit = f10

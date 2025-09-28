@@ -176,13 +176,13 @@ tick_yank_history :: proc() {
 
 @(private="package")
 handle_yank_history_input :: proc() {
-    if is_key_pressed(glfw.KEY_S) {
+    if is_key_pressed(mapped_keybinds[.TOGGLE_YANK_HISTORY_MODE]) {
         hide_yank_history()
         
         return
     }
     
-    if is_key_pressed(glfw.KEY_ENTER) {        
+    if is_key_pressed(mapped_keybinds[.ENTER]) {        
         if yank_buffer.count == 0 {
             return
         }
@@ -194,7 +194,7 @@ handle_yank_history_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_J) {
+    if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) {
         if yank_buffer.count == 0 do return
         
         selected_index = clamp(
@@ -206,7 +206,7 @@ handle_yank_history_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_K) {
+    if is_key_pressed(mapped_keybinds[.MOVE_UP]) {
         if yank_buffer.count == 0 do return
         
         selected_index = clamp(

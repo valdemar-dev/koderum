@@ -168,7 +168,7 @@ handle_browser_input :: proc() {
         return
     }
    
-    if is_key_pressed(glfw.KEY_F) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.RENAME_FILE]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         attempting_rename = true
 
         if len(found_files) < 1 {
@@ -183,7 +183,7 @@ handle_browser_input :: proc() {
         return
     }
     
-    if is_key_pressed(glfw.KEY_U) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.GO_UP_DIRECTORY]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         if strings.ends_with(search_term, "/") {
             search_term = search_term[:len(search_term) - 1]
         }
@@ -202,7 +202,7 @@ handle_browser_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_J) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
 
         // set_found_files()
@@ -210,7 +210,7 @@ handle_browser_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_K) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.MOVE_UP]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset - 1, 0, len(found_files)-1)
 
         // set_found_files()
@@ -218,7 +218,7 @@ handle_browser_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_S) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.SET_CWD]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         dir := fp.dir(search_term, context.temp_allocator)
 
         os.set_current_directory(dir)
@@ -227,12 +227,18 @@ handle_browser_input :: proc() {
         return
     }
 
-    if is_key_pressed(glfw.KEY_D) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.DELETE_FILE]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         attempting_file_deletion = true
     }
 
-    if is_key_pressed(glfw.KEY_G) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+    if is_key_pressed(mapped_keybinds[.CREATE_FILE]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         if os.exists(search_term) {
+            create_alert(
+                "Can't create file.",
+                "A file or folder with this path already exists.",
+                5,
+                context.allocator,
+            )
             return
         }
         
@@ -315,7 +321,7 @@ toggle_browser_view :: proc() {
 
         return
     } else {
-        set_mode(.BROWSER_SEARCH, glfw.KEY_O, 'o')
+        set_mode(.BROWSER_SEARCH, mapped_keybinds[.ENTER_FILE_BROWSER_MODE], 'o')
 
         suppress = false
         show_browser_view = true

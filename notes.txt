@@ -4,6 +4,9 @@ reminders:
     - THREAD MUST BE SAFE FOR OPERATION MMM THREAD
 
 todo:
+    - IMPORTANT !! make set_mode() use lookups to translate glfw keys into runes
+
+
     - add variable font weights
     - renaming a file should rename and send a didclose/didopen
     - add "show trailing spaces" config option

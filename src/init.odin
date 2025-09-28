@@ -23,6 +23,12 @@ init :: proc() {
     context = global_context    
     
     load_configs()
+    
+    when ODIN_DEBUG {
+        fmt.println("--- LOADED KEYBINDS ---")
+        fmt.println(mapped_keybinds)
+        fmt.println("--- LOADED KEYBINDS ---")
+    }
 
     init_window()
     init_opengl()
