@@ -155,6 +155,8 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
         mapped_keybinds[.GO_TO_DEFINITION] = key
     case "previous_completion":
         mapped_keybinds[.PREVIOUS_COMPLETION] = key
+    case "next_completion":
+        mapped_keybinds[.NEXT_COMPLETION] = key
     case "insert_completion":
         mapped_keybinds[.INSERT_COMPLETION] = key
     case "cut_line":
