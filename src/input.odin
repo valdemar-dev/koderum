@@ -16,6 +16,8 @@ ActiveKey :: struct {
 @(private="package")
 mouse_pos := vec2{}
 
+drag_start := vec2{}
+
 last_scroll_direction := 0
 Click :: struct {
     button: i32,
@@ -345,12 +347,19 @@ cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {
     #partial switch input_mode {
     case .COMMAND:
         if is_clicking == true {
-            highlight_start_line = buffer_cursor_line
-            highlight_start_char = buffer_cursor_char_index
+            delta := vec2{
+                mouse_pos.x - drag_start.x,
+                mouse_pos.y - drag_start.y
+            }
             
-            input_mode = .HIGHLIGHT
-            
-            buffer_go_to_cursor_pos()
+            if abs(delta.x) > 5 || abs(delta.y) > 5 {
+                buffer_go_to_cursor_pos()
+                
+                highlight_start_line = buffer_cursor_line
+                highlight_start_char = buffer_cursor_char_index
+                
+                input_mode = .HIGHLIGHT
+            }
         }
     case .HIGHLIGHT:
         if is_clicking == true {
@@ -372,11 +381,12 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
         if button == glfw.MOUSE_BUTTON_1 {
             if action == glfw.PRESS {
                 is_clicking = true
+                
+                drag_start = mouse_pos
             } else if action == glfw.RELEASE {
                 is_clicking = false
                 buffer_go_to_cursor_pos()
             }
-            
         }
         
         break
@@ -384,6 +394,8 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, button,action,mods
         if button == glfw.MOUSE_BUTTON_1 {
             if action == glfw.PRESS {
                 is_clicking = true
+                
+                drag_start = mouse_pos
             
                 input_mode = .COMMAND
                 

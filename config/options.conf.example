@@ -52,7 +52,7 @@ tab_width = 4
 [general]
 default_cwd = $HOME
 always_loaded_characters = abcdefghijklmnopqrstuvwxyz1234567890()[]{},.-;:_!"#%&/?'$|<>
-delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\
+delimiter_runes =  ()[]{}'?!|/+:~^*`&=*`´§,.-";\<>
 
 [search]
 search_ignored_dir = node_modules
