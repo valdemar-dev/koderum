@@ -1864,25 +1864,25 @@ insert_into_buffer :: proc (key: rune) {
 constrain_scroll_to_cursor :: proc() {
     edge_padding := math.round_f32(font_base_px * cursor_edge_padding_em)
     
-    amnt_above_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - edge_padding + cursor_height
+    amnt_above_offscreen := (buffer_cursor_target_pos.y - scroll_target_y) - edge_padding + cursor_height
 
     if amnt_above_offscreen < 0 {
-        scroll_target_y -= -amnt_above_offscreen 
+        scroll_target_y -= -amnt_above_offscreen
     }
 
-    amnt_below_offscreen := (buffer_cursor_target_pos.y - active_buffer.scroll_y) - (fb_size.y - edge_padding)
+    amnt_below_offscreen := (buffer_cursor_target_pos.y - scroll_target_y) - (fb_size.y - edge_padding)
 
     if amnt_below_offscreen >= 0 {
         scroll_target_y += amnt_below_offscreen 
     }
 
-    amnt_left_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x)
+    amnt_left_offscreen := (buffer_cursor_target_pos.x - scroll_target_x)
 
     if amnt_left_offscreen < 0 {
         scroll_target_x -= -amnt_left_offscreen 
     }
 
-    amnt_right_offscreen := (buffer_cursor_target_pos.x - active_buffer.scroll_x) - (fb_size.x - edge_padding)
+    amnt_right_offscreen := (buffer_cursor_target_pos.x - scroll_target_x) - (fb_size.x - edge_padding)
 
     if amnt_right_offscreen >= 0 {
         scroll_target_x += amnt_right_offscreen 
