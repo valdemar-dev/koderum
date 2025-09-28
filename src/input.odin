@@ -352,7 +352,7 @@ cursor_callback :: proc "c" (window: glfw.WindowHandle, pos_x,pos_y: f64) {
                 mouse_pos.y - drag_start.y
             }
             
-            if abs(delta.x) > 5 || abs(delta.y) > 5 {
+            if abs(delta.x) > 3 || abs(delta.y) > 3 {
                 buffer_go_to_cursor_pos()
                 
                 highlight_start_line = buffer_cursor_line

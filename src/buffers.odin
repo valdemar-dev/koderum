@@ -3248,45 +3248,32 @@ buffer_go_to_cursor_pos :: proc() {
     
     pen := vec2{}
     
-    rune_index := -1
+    rune_index := 0
     did_hit := false
     
     for r in string(line.characters[:]) {
-        if pen.x > click_pos_x {
+        advance: f32
+        if r == '\t' {
+            character := get_char(font_size, u64(' '))
+            if character == nil {
+                continue
+            }
+            advance = (character.advance.x) * f32(tab_width)
+        } else {
+            character := get_char(font_size, u64(r))
+            if character == nil {
+                continue
+            }
+            advance = character.advance.x
+        }
+
+        if click_pos_x < pen.x + advance {
             did_hit = true
             break
         }
 
+        pen.x += advance
         rune_index += 1
-        
-        if r == '\t' {
-            character := get_char(font_size, u64(' '))
-
-            if character == nil {
-                continue
-            }
-
-            advance_amount := (character.advance.x) * f32(tab_width)
-            pen.x += advance_amount
-
-            continue
-        }
-
-        character := get_char(font_size, u64(r))
-
-        if character == nil {
-            continue
-        }
-
-        pen.x = pen.x + (character.advance.x)
-    }
-    
-    if did_hit == false {
-        rune_index = len(line.characters)
-    }
-    
-    if rune_index == -1 {
-        rune_index = 0
     }
     
     set_buffer_cursor_pos(
