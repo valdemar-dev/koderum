@@ -171,7 +171,7 @@ target_key : i32 = -1
 char_to_suppress : rune
 
 @(private="package")
-set_mode :: proc(mode: InputMode, key: KEY_CODE, char: rune) {
+set_mode :: proc(mode: InputMode, key: KEY_CODE) {
     input_mode = mode
     
     target_key = i32(key)

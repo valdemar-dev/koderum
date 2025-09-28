@@ -2514,7 +2514,7 @@ inject_line :: proc() {
         indent_spaces, 
     )
 
-    set_mode(.BUFFER_INPUT, mapped_keybinds[.INJECT_LINE], 'l')
+    set_mode(.BUFFER_INPUT, mapped_keybinds[.INJECT_LINE])
 }
 
 @(private="package")
@@ -2786,7 +2786,7 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(mapped_keybinds[.ENTER_SEARCH_MODE]) {
-        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE], 'g')
+        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE])
         
         cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
@@ -2796,7 +2796,7 @@ handle_buffer_input :: proc() -> bool {
     }
     
     if is_key_pressed(mapped_keybinds[.ENTER_GO_TO_LINE_MODE]) {
-        set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
+        set_mode(.GO_TO_LINE, mapped_keybinds[.ENTER_GO_TO_LINE_MODE])
         
         cached_buffer_index = get_buffer_index(active_buffer)
         cached_buffer_cursor_line = buffer_cursor_line
@@ -2806,7 +2806,7 @@ handle_buffer_input :: proc() -> bool {
     }
 
     if is_key_pressed(mapped_keybinds[.ENTER_INSERT_MODE]) {
-        set_mode(.BUFFER_INPUT, glfw.KEY_I, 'i')
+        set_mode(.BUFFER_INPUT, mapped_keybinds[.ENTER_INSERT_MODE])
         
         constrain_scroll_to_cursor()
 

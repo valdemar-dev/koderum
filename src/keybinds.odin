@@ -131,6 +131,8 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
         mapped_keybinds[.ENTER_INSERT_MODE] = key
     case "enter_grep_search_mode":
         mapped_keybinds[.ENTER_GREP_SEARCH_MODE] = key
+    case "grep_search_modifier":
+        mapped_keybinds[.GREP_SEARCH_MODIFIER] = key
     case "enter_search_mode":
         mapped_keybinds[.ENTER_SEARCH_MODE] = key
     case "enter_file_browser_mode":
@@ -141,6 +143,16 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
         mapped_keybinds[.ENTER_FIND_AND_REPLACE_MODE] = key
     case "enter_terminal_insert_mode":
         mapped_keybinds[.ENTER_TERMINAL_INSERT_MODE] = key
+    case "rename_file":
+        mapped_keybinds[.RENAME_FILE] = key
+    case "delete_file":
+        mapped_keybinds[.DELETE_FILE] = key
+    case "create_file":
+        mapped_keybinds[.CREATE_FILE] = key
+    case "go_up_directory":
+        mapped_keybinds[.GO_UP_DIRECTORY] = key
+    case "set_cwd":
+        mapped_keybinds[.SET_CWD] = key
     case "next_file":
         mapped_keybinds[.NEXT_FILE] = key
     case "previous_file":
@@ -197,7 +209,6 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
     
     return do_continue
 }
-
 
 @(private="package")
 GLFW_Keymap := map[string]i32 {

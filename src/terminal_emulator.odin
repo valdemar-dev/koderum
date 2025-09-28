@@ -805,7 +805,7 @@ handle_terminal_control_input :: proc() -> bool {
     }
     
     if is_key_pressed(mapped_keybinds[.ENTER_INSERT_MODE]) {
-        set_mode(.TERMINAL_TEXT_INPUT, mapped_keybinds[.ENTER_INSERT_MODE], 'i')
+        set_mode(.TERMINAL_TEXT_INPUT, mapped_keybinds[.ENTER_INSERT_MODE])
         
         terminal := terminals[current_terminal_idx]
         if terminal == nil do return false

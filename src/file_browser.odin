@@ -321,7 +321,7 @@ toggle_browser_view :: proc() {
 
         return
     } else {
-        set_mode(.BROWSER_SEARCH, mapped_keybinds[.ENTER_FILE_BROWSER_MODE], 'o')
+        set_mode(.BROWSER_SEARCH, mapped_keybinds[.ENTER_FILE_BROWSER_MODE])
 
         suppress = false
         show_browser_view = true

@@ -55,7 +55,7 @@ handle_highlight_input :: proc() {
     }
     
     if is_key_pressed(mapped_keybinds[.ENTER_GO_TO_LINE_MODE]) {
-        set_mode(.GO_TO_LINE, glfw.KEY_N, 'n')
+        set_mode(.GO_TO_LINE, mapped_keybinds[.ENTER_GO_TO_LINE_MODE])
         
         input_mode_return_callback = proc() {
             input_mode = .HIGHLIGHT
@@ -144,7 +144,7 @@ handle_highlight_input :: proc() {
             buffer_cursor_char_index,
         ) 
     
-        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE], 'g')
+        set_mode(.SEARCH, mapped_keybinds[.ENTER_SEARCH_MODE])
         
         highlight_start_line = -1
         highlight_start_char = -1

@@ -106,6 +106,12 @@ yank = y
 cut = c
 delete = x
 
+[ctrl + key required]
+set_cwd = s
+delete_file = d
+rename_file = f
+create_file = g
+
 [ctrl + key = paste from clipboard]
 paste = p
 

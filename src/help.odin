@@ -38,7 +38,7 @@ toggle_help_menu :: proc() {
     is_open = true
     suppress = false
     
-    set_mode(mode = .HELP, key = glfw.KEY_PERIOD, char = '.')
+    set_mode(mode = .HELP, key = mapped_keybinds[.TOGGLE_HELP_MODE])
 }
 
 @(private="package")

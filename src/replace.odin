@@ -60,7 +60,7 @@ show_find_and_replace :: proc() {
     suppress = false
     do_show = true
     
-    set_mode(.FIND_AND_REPLACE, mapped_keybinds[.ENTER_FIND_AND_REPLACE_MODE], 'h')
+    set_mode(.FIND_AND_REPLACE, mapped_keybinds[.ENTER_FIND_AND_REPLACE_MODE])
 }
 
 hide_find_and_replace :: proc() {
