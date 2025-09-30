@@ -5,6 +5,7 @@ import "vendor:glfw"
 import "core:fmt"
 import "base:runtime"
 import "core:math"
+import "core:unicode"
 
 @(private="package")
 ActiveKey :: struct {
@@ -177,7 +178,8 @@ set_mode :: proc(mode: InputMode, key: KEY_CODE) {
     input_mode = mode
     
     target_key = i32(key)
-    char_to_suppress = rune(key)
+    
+    char_to_suppress = unicode.to_lower(rune(key))
     
     glfw.SetKeyCallback(window, key_callback_hijack)
 }
