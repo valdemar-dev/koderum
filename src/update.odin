@@ -170,7 +170,7 @@ message_loop :: proc(this_thread: ^thread.Thread) {
             fmt.println("String Rep:", string(bytes))
             fmt.println("Byte Rep:", bytes)
             
-            panic("Malformed LSP JSON.")
+            fmt.println("Malformed LSP JSON.")
         }
 
         id_value := &obj["id"]

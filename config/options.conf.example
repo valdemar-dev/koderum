@@ -119,6 +119,7 @@ inject_line = l
 
 [ctrl + key required]
 go_back = b
+
 undo = x
 redo = c
 

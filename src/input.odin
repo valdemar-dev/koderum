@@ -76,18 +76,24 @@ check_inputs :: proc() -> bool {
     #partial switch input_mode {
     case .TERMINAL:
         handle_terminal_control_input() or_return
+        break
     case .COMMAND:
         handle_command_input() or_return
+        break
     case .BUFFER_INPUT:
         handle_text_input() or_return
     case .BROWSER_SEARCH:
         handle_browser_input()
+        break
     case .SEARCH:
         handle_search_input()
+        break
     case .GO_TO_LINE:
         handle_go_to_line_input()
+        break
     case .HIGHLIGHT:
         handle_highlight_input()
+        break
     case .DEBUG:
         handle_debug_input()
     case .YANK_HISTORY:

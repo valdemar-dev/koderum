@@ -1545,7 +1545,9 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
         obj_data,data_ok := obj["data"].(json.Array)
         
         if !data_ok {
-            panic("Malformed json in set_buffer_tokens")
+            fmt.println("DATA:", response)
+            
+            return
         }
         
         lsp_tokens := make([dynamic]i32)
@@ -1612,6 +1614,10 @@ notify_server_of_change :: proc(
         undo_stack := undo_stack_override == nil ? &active_buffer.undo_stack : undo_stack_override
         redo_stack := redo_stack_override == nil ? &active_buffer.redo_stack : redo_stack_override
         
+        if end_byte < start_byte {
+            fmt.println("FUCKKK")
+        }
+        
         append(undo_stack, BufferChange{
             u32(start_byte),
             u32(end_byte),
@@ -1624,6 +1630,8 @@ notify_server_of_change :: proc(
             0,
             0,
         })
+        
+        fmt.println("inserting to stack, notifying change.")
         
         amnt_over := len(undo_stack) - MAX_UNDO_COUNT
         

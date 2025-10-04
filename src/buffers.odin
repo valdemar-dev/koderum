@@ -1347,7 +1347,6 @@ insert_tab_as_spaces:: proc() {
         &active_buffer.insert_undo_stack,
         &active_buffer.insert_redo_stack,
     )    
-
 }
 
 remove_char :: proc() {
@@ -1600,10 +1599,10 @@ handle_text_input :: proc() -> bool {
         
         if len(completion_hits) > 0 {
             reset_completion_hits()
-            return false
         }
         
         if len(active_buffer.insert_undo_stack) > 0 {
+            fmt.println("adding ", len(active_buffer.insert_undo_stack), "changes to buffers undo stack")
             active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
             active_buffer.insert_undo_stack[0].redo_for = len(active_buffer.insert_undo_stack[:]) - 1
             
@@ -1629,6 +1628,8 @@ handle_text_input :: proc() -> bool {
             clear(&active_buffer.insert_undo_stack)
             clear(&active_buffer.insert_redo_stack)
         }
+        
+        return false
     }
 
     if is_key_pressed(glfw.KEY_TAB) {
@@ -3157,11 +3158,11 @@ handle_search_input :: proc() {
         return
     }
 
-    if is_key_pressed(mapped_keybinds[.TOGGLE_HIGHLIGHT_MODE]) && selected_hit != nil {
-        input_mode = .HIGHLIGHT
-
+    if is_key_pressed(mapped_keybinds[.TOGGLE_HIGHLIGHT_MODE]) && selected_hit != nil {    
         highlight_start_line = selected_hit.line
         highlight_start_char = selected_hit.start_char
+
+        input_mode = .HIGHLIGHT
 
         set_buffer_cursor_pos(
             buffer_cursor_line,
