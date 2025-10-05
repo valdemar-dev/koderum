@@ -2203,7 +2203,6 @@ go_to_definition :: proc() {
     
         append(&update_tasks, Task{
             func=proc(raw_data: rawptr) {
-                fmt.println("opening file in go-to-def")
                 context = global_context
                 
                 data := cast(^PolyData)raw_data
@@ -2211,6 +2210,8 @@ go_to_definition :: proc() {
                 open_file(data.name)
                 
                 go_to_line(int(data.line), int(data.char))
+                
+                free(raw_data)
             },
             data=data,
         })

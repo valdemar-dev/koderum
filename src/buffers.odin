@@ -1096,16 +1096,12 @@ open_file :: proc(file_name: string) {
         )
         
         PolyData :: struct {
-            name: string,
-            line: int,
-            char: int,
+            buffer: ^Buffer,
         }
 
         data := new(PolyData)
         data^ = PolyData{
-            active_buffer.file_name,
-            active_buffer.cursor_line,
-            active_buffer.cursor_char_index,
+            existing_file,
         }
     
         append(&update_tasks, Task{
@@ -1116,9 +1112,9 @@ open_file :: proc(file_name: string) {
             
                 context = global_context
                 
-                open_file(data.name)
+                lsp_handle_file_open(data.buffer)
                 
-                go_to_line(int(data.line), int(data.char))
+                go_to_line(int(data.buffer.cursor_line), int(data.buffer.cursor_char_index))
                 
                 free(raw_data)
             },
