@@ -91,7 +91,6 @@ background_image : string
 config_dir : string
 init_config :: proc() -> []u8 {
     home := os.get_env("HOME")
-
     defer delete(home)
 
     path : string
@@ -217,6 +216,8 @@ init_default_config :: proc(default_config_dir: string) {
 }
 
 load_configs :: proc() {
+    context = global_context
+
     init_local()
 
     bytes := init_config()
@@ -279,10 +280,29 @@ load_configs :: proc() {
 
 //TODO: Megajank omegalul
 set_option :: proc(options: []string) {
+    context = global_context
+    
     if len(options) < 2 {
         fmt.eprintf("option,", options, "is improper, must be at least len 2.")
-
-        panic("unrecoverable error.")
+        
+        joined := strings.join(options, "")
+        
+        msg := strings.concatenate({
+            "Option ", joined,
+            " is malformed. Each option value must have a length of at least 2 (two values separated by a space).",
+        })
+        
+        defer delete(joined)
+        defer delete(msg)
+        
+        create_alert(
+            "Misconfigured config",
+            msg,
+            5,
+            context.allocator,
+        )
+        
+        return
     }
 
     option_name := options[0]
