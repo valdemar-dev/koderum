@@ -54,6 +54,33 @@ attempting_file_deletion : bool = false
 attempting_rename : bool = false
 renaming_file_name : string
 
+make_directory_recursive :: proc(path: string, mode: u32 = 0o775) -> os.Error {	
+	if len(path) == 0 || path == "/" || path == "." {
+		return nil
+	}
+
+	err := os.make_directory(path, mode)
+	if err == nil {
+		return nil
+	}
+
+	if err == .EEXIST {
+		return nil
+	}
+
+	parent := fp.dir(path, context.temp_allocator)
+	if parent == "" || parent == path {
+		return err
+	}
+
+	err = make_directory_recursive(parent, mode)
+	if err != nil {
+		return err
+	}
+
+	return os.make_directory(path, mode)
+}
+
 @(private="package")
 handle_browser_input :: proc() {
     context = global_context
@@ -160,6 +187,7 @@ handle_browser_input :: proc() {
 
             delete_key(&cached_dirs, dir)
 
+            delete(search_term)
             search_term = strings.concatenate({dir, "/"})
 
             set_found_files()
@@ -179,8 +207,11 @@ handle_browser_input :: proc() {
 
         old := found_files[item_offset]
 
-        renaming_file_name = old
-        search_term = old
+        renaming_file_name = strings.clone(old)
+        
+        delete(search_term)
+        
+        search_term = strings.clone(old)
 
         return
     }
@@ -195,6 +226,8 @@ handle_browser_input :: proc() {
         if dir == "." {
             return
         } else {
+            delete(search_term)
+            
             search_term = strings.concatenate({
                 dir,
                 dir != "/" ? "/" : "",
@@ -207,15 +240,11 @@ handle_browser_input :: proc() {
     if is_key_pressed(mapped_keybinds[.MOVE_DOWN]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset + 1, 0, len(found_files)-1)
 
-        // set_found_files()
-
         return
     }
 
     if is_key_pressed(mapped_keybinds[.MOVE_UP]) && is_key_down(glfw.KEY_LEFT_CONTROL) {
         item_offset = clamp(item_offset - 1, 0, len(found_files)-1)
-
-        // set_found_files()
 
         return
     }
@@ -247,7 +276,7 @@ handle_browser_input :: proc() {
         }
         
         if strings.ends_with(search_term, "/") {
-            err := os.make_directory(search_term)
+            err := make_directory_recursive(search_term)
             
             if err != os.General_Error.None {
                 create_alert(

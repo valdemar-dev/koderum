@@ -1114,8 +1114,6 @@ open_file :: proc(file_name: string) {
                 
                 lsp_handle_file_open(data.buffer)
                 
-                go_to_line(int(data.buffer.cursor_line), int(data.buffer.cursor_char_index))
-                
                 free(raw_data)
             },
             data=data,
