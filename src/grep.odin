@@ -81,9 +81,10 @@ handle_grep_input :: proc() {
         target := item_offset
         hit := grep_found_files[target]
         
-        open_file(
-            strings.concatenate({ cwd, "/", hit.file_name, })
-        )
+        name := strings.concatenate({ cwd, "/", hit.file_name, })
+        defer delete(name)
+        
+        open_file(name)
         
         toggle_grep_view()
         
@@ -105,6 +106,12 @@ toggle_grep_view :: proc() {
         show_browser_view = false
 
         input_mode = .COMMAND
+        
+        // this is essentially cache invalidation
+        // imagine you open a file, edit it
+        // and then re-open a view.
+        // good to redo-results
+        if search_term != "" do set_found_files()
 
         return
     } else {
@@ -112,11 +119,6 @@ toggle_grep_view :: proc() {
 
         suppress = false
         show_browser_view = true
-        
-        if search_term != "" do delete(search_term)
-        search_term = ""
-
-        set_found_files()
         
         return
     }
