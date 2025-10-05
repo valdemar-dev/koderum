@@ -25,11 +25,13 @@ LSPRequest :: struct {
 @(private="package")
 requests : [dynamic]LSPRequest
 
+@(private="package")
 Task :: struct{
     func: proc(data: rawptr),
     data: rawptr,
 }
 
+@(private="package")
 update_tasks := make([dynamic]Task)
 
 @(private="package")

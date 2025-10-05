@@ -1082,22 +1082,7 @@ open_file :: proc(file_name: string) {
         active_buffer^.cursor_line = buffer_cursor_line
     }
 
-    existing_file : ^Buffer
-
-    when ODIN_DEBUG {
-        fmt.println("-- Comparing existing buffers with new name ---")
-    }
-    
-    for buffer in buffers {
-        if buffer.file_name == file_name {
-            existing_file = buffer
-            
-            fmt.println("Names", buffer.file_name, "and", file_name, "are equivalent.")
-            break
-        }
-        
-        fmt.println("Names", buffer.file_name, "and", file_name, "are not equivalent.")
-    }
+    existing_file := get_buffer_by_name(file_name)
     
     if existing_file != nil {
         active_buffer = existing_file
@@ -1110,7 +1095,35 @@ open_file :: proc(file_name: string) {
             existing_file.cursor_char_index,
         )
         
-        thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
+        PolyData :: struct {
+            name: string,
+            line: int,
+            char: int,
+        }
+
+        data := new(PolyData)
+        data^ = PolyData{
+            active_buffer.file_name,
+            active_buffer.cursor_line,
+            active_buffer.cursor_char_index,
+        }
+    
+        append(&update_tasks, Task{
+            func=proc(raw_data: rawptr) {
+                context = global_context
+                
+                data := cast(^PolyData)raw_data
+            
+                context = global_context
+                
+                open_file(data.name)
+                
+                go_to_line(int(data.line), int(data.char))
+                
+                free(raw_data)
+            },
+            data=data,
+        })
 
         return
     }
@@ -1119,7 +1132,19 @@ open_file :: proc(file_name: string) {
     defer delete(data)
 
     if !ok {
-        fmt.println("failed to open file")
+        desc := strings.concatenate({
+            "Could not read contents of file with name ", 
+            file_name,
+        })
+        
+        defer delete(desc)
+        
+        create_alert(
+            "Failed to open file",
+            desc,
+            10,
+            context.allocator
+        )
 
         return
     }

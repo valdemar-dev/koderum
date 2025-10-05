@@ -2194,21 +2194,26 @@ go_to_definition :: proc() {
             char: json.Float,
         }
 
-        data := PolyData{
+        data := new(PolyData)
+        data^ = PolyData{
             decoded,
             line,
             char,
         }
-
-        handle_file_open :: proc(data: PolyData) {
-            context = global_context
-            
-            open_file(data.name)
-            
-            go_to_line(int(data.line), int(data.char))
-        }
-
-        thread.run_with_poly_data(data, handle_file_open) 
+    
+        append(&update_tasks, Task{
+            func=proc(raw_data: rawptr) {
+                fmt.println("opening file in go-to-def")
+                context = global_context
+                
+                data := cast(^PolyData)raw_data
+                
+                open_file(data.name)
+                
+                go_to_line(int(data.line), int(data.char))
+            },
+            data=data,
+        })
     }
 }
 
