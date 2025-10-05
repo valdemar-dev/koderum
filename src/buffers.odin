@@ -351,6 +351,17 @@ update_buffer_lines_after_change :: proc(buffer: ^Buffer, change: BufferChange, 
         int(b_char),
     )
     
+    if (start_accumulated == -1 || end_accumulated == -1) {
+        create_alert(
+            "Unrecoverable error.",
+            "Failed to compute byte offset for line -1 in update_buffer_lines_after_change.\nPlease exit the program to avoid corrupting data.",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
+    
     if a_line == b_line {
         remove_range(&first_line.characters, a_char_byte, b_char_byte)
     } else {
@@ -536,7 +547,7 @@ find_search_hits :: proc() {
             "Not Found!",
             "Search term matched 0 hits.",
             5,
-            context.allocator
+            context.allocator,
         )
     }
 }
@@ -1202,6 +1213,10 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
     cached_buffer_cursor_char_index = -1
     cached_buffer_cursor_line = -1
     
+    if buffer.previous_tree != nil {
+        ts.tree_delete(buffer.previous_tree)
+    }
+    
     delete(buffer.content)
     delete(buffer.redo_stack)
     delete(buffer.undo_stack)
@@ -1295,6 +1310,17 @@ insert_tab_as_spaces:: proc() {
         buffer_cursor_line,
         buffer_cursor_char_index,
     )
+    
+    if buffer_cursor_accumulated_byte_position == -1 {
+        create_alert(
+            "Internal Error",
+            "Failed to compute byte offset in insert_tab_as_spaces",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
     
     tab_string : string
     defer delete(tab_string)
@@ -1394,6 +1420,17 @@ remove_char :: proc() {
             buffer_cursor_line-1,
             prev_line_len,
         )
+        
+        if buffer_cursor_accumulated_byte_position == -1 {
+            create_alert(
+                "Internal Error",
+                "Failed to compute byte offset in remove_char.",
+                5,
+                context.allocator,
+            )
+            
+            return
+        }
 
         notify_server_of_change(
             active_buffer,
@@ -1435,6 +1472,18 @@ remove_char :: proc() {
                 buffer_cursor_line,
                 buffer_cursor_char_index,
             )
+            
+            if buffer_cursor_accumulated_byte_position == -1 {
+                create_alert(
+                    "Internal Error",
+                    "Failed to compute byte offset in remove_char.",
+                    5,
+                    context.allocator,
+                )
+                
+                return
+            }
+
     
             notify_server_of_change(
                 active_buffer,
@@ -1475,6 +1524,18 @@ remove_char :: proc() {
                 buffer_cursor_line,
                 buffer_cursor_char_index,
             )
+            
+            if buffer_cursor_accumulated_byte_position == -1 {
+                create_alert(
+                    "Internal Error",
+                    "Failed to compute byte offset in remove_char.",
+                    5,
+                    context.allocator,
+                )
+                
+                return
+            }
+
     
             notify_server_of_change(
                 active_buffer,
@@ -1513,6 +1574,18 @@ remove_char :: proc() {
         buffer_cursor_line,
         buffer_cursor_char_index-1,
     )
+    
+    if buffer_cursor_accumulated_byte_position == -1 {
+        create_alert(
+            "Internal Error",
+            "Failed to compute byte offset in remove_char.",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
+
 
     notify_server_of_change(
         active_buffer,
@@ -1773,6 +1846,18 @@ handle_text_input :: proc() -> bool {
             buffer_cursor_line,
             cur_line_end_char,
         ) 
+        
+        if cur_line_end_byte == -1 {
+            create_alert(
+                "Internal Error",
+                "Failed to compute byte offset whilst newlining with enter.",
+                5,
+                context.allocator,
+            )
+            
+            return false
+        }
+
  
 
         notify_server_of_change(
@@ -1835,6 +1920,18 @@ insert_into_buffer :: proc (key: rune) {
         buffer_cursor_line,
         buffer_cursor_char_index,
     )
+    
+    if buffer_cursor_accumulated_byte_position == -1 {
+        create_alert(
+            "Internal Error",
+            "Failed to compute byte offset in insert_into_buffer.",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
+
   
     notify_server_of_change(
         active_buffer,
@@ -2106,6 +2203,10 @@ indent_selection :: proc(start_line: int, end_line: int) {
     start_line : int = start_line
     end_line : int = end_line
     
+    if start_line == -1 || end_line == -1 {
+        return
+    }
+    
     if end_line < start_line {
         temp := end_line
         end_line = start_line
@@ -2113,6 +2214,17 @@ indent_selection :: proc(start_line: int, end_line: int) {
     }
     
     start_byte := compute_byte_offset(active_buffer, start_line, 0)
+    if start_byte == -1 {
+        create_alert(
+            "Internal Error",
+            "Failed to compute byte offset in indent_selection.",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
+
     old_rune_count := utf8.rune_count(active_buffer.lines[end_line].characters[:])
         
     text := ""
@@ -2201,6 +2313,18 @@ unindent_selection :: proc(start_line: int, end_line: int) {
     }
 
     start_byte := compute_byte_offset(active_buffer, start_line, 0)
+    
+    if start_byte == -1 {
+        create_alert(
+            "Internal Error",
+            "Failed to compute byte offset in unindent_selection.",
+            5,
+            context.allocator,
+        )
+        
+        return
+    }
+
     old_rune_count := utf8.rune_count(active_buffer.lines[end_line].characters[:])
 
     text := ""
@@ -2271,6 +2395,19 @@ unindent_selection :: proc(start_line: int, end_line: int) {
         old_rune_count,
         transmute([]u8)text,
     )
+    
+    // Constrain cursor
+    // no need to do fancy math
+    // this function clamps the pos anyway.
+    // only thing that might be janky is it might want to go to a higher char index
+    // when going to a new line.
+    // but i'm not sure.
+    {
+        set_buffer_cursor_pos(
+            buffer_cursor_line,
+            buffer_cursor_char_index,
+        )
+    }
 }
 
 array_is_equal :: proc(a, b: []rune) -> bool {
@@ -2301,6 +2438,10 @@ remove_selection :: proc(
     start_line: int, end_line: int,
     start_char: int, end_char: int,
 ) {
+    if start_line == -1 || end_line == -1 {
+        return
+    }
+    
     a_line, a_char := start_line, start_char
     b_line, b_char := end_line,   end_char
     if a_line > b_line || (a_line == b_line && a_char > b_char) {
@@ -3189,11 +3330,16 @@ handle_go_to_line_input :: proc() {
 
     if is_key_pressed(mapped_keybinds[.REMOVE_CHARACTER]) {
         runes := utf8.string_to_runes(go_to_line_input_string)
-
+    
         end_idx := len(runes)-1        
 
+        if end_idx == -1 {
+            return
+        }
+        
         runes = runes[:end_idx]
 
+        if go_to_line_input_string != "" do delete(go_to_line_input_string)
         go_to_line_input_string = utf8.runes_to_string(runes)
 
         delete(runes)
@@ -3208,6 +3354,7 @@ handle_go_to_line_input :: proc() {
         
         go_to_line(target_line, buffer_cursor_char_index)
         
+        delete(go_to_line_input_string)
         go_to_line_input_string = ""
         
         input_mode = .COMMAND

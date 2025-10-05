@@ -269,6 +269,12 @@ replace_selection :: proc() {
             end_char,
         )
         
+        if (hl_start_byte == -1 || hl_end_byte == -1) {
+            fmt.println("Failed to compute byte offset in replace_selection due to invalid byte positions.")
+            
+            return
+        }
+        
         end, end_byte := byte_to_pos(u32(hl_start_byte + len(selection)))
         end_rune := byte_offset_to_rune_index(
             string(active_buffer.lines[end].characters[:]),

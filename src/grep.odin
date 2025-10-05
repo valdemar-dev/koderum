@@ -49,6 +49,7 @@ handle_grep_input :: proc() {
         
         runes = runes[:end_idx]
 
+        if search_term != "" do delete(search_term)
         search_term = utf8.runes_to_string(runes)
 
         delete(runes)
@@ -112,6 +113,7 @@ toggle_grep_view :: proc() {
         suppress = false
         show_browser_view = true
         
+        if search_term != "" do delete(search_term)
         search_term = ""
 
         set_found_files()

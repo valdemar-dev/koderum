@@ -1771,7 +1771,20 @@ reset_change_stack :: proc(stack: ^[dynamic]BufferChange) {
 
 compute_byte_offset :: proc(buffer: ^Buffer, line: int, rune_index: int) -> int {
     if line == -1 {
-        panic("CANNOT COMPUTE BYTE OFFSET FOR LINE -1")
+        create_alert(
+            "Internal Error",
+            "Cannot compute byte offset for line -1",
+            5,
+            context.allocator,
+        )
+        
+        fmt.println("Cannot compute byte offest for line -1.")
+        fmt.println("Current input mode:", input_mode)
+        fmt.println("Input mode return callback:", input_mode_return_callback)
+        fmt.println("HL Values:", highlight_start_line, highlight_start_char)
+        fmt.println("Please make sure these values are set before setting input_mode to .highlight")
+        
+        return -1
     }
     
     byte_offset := 0

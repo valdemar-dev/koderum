@@ -27,7 +27,7 @@ found_files : [dynamic]string
 @(private="package")
 cached_dirs : map[string][]os.File_Info
 
-search_term := ""
+search_term := strings.clone("")
 
 item_offset := 0 
 
@@ -35,6 +35,7 @@ change_dir :: proc(dir: string) {
     os.set_current_directory(dir)
     cwd = os.get_current_directory()
 
+    if search_term != "" do delete(search_term)
     search_term = strings.concatenate({
         cwd, "/",
     })
@@ -118,6 +119,7 @@ handle_browser_input :: proc() {
         
         runes = runes[:end_idx]
 
+        if search_term != "" do delete(search_term)
         search_term = utf8.runes_to_string(runes)
 
         delete(runes)
@@ -222,6 +224,8 @@ handle_browser_input :: proc() {
         dir := fp.dir(search_term, context.temp_allocator)
 
         os.set_current_directory(dir)
+        
+        delete(cwd)
         cwd = os.get_current_directory()
 
         return
@@ -314,6 +318,8 @@ handle_browser_input :: proc() {
 
 @(private="package")
 toggle_browser_view :: proc() {
+    context = global_context
+    
     if show_browser_view {
         show_browser_view = false
 
@@ -326,6 +332,7 @@ toggle_browser_view :: proc() {
         suppress = false
         show_browser_view = true
         
+        if search_term != "" do delete(search_term)
         search_term = strings.concatenate({
             cwd, "/",
         })
@@ -336,6 +343,7 @@ toggle_browser_view :: proc() {
     }
 }
 
+@(private="package")
 clear_found_files :: proc() {
     context = global_context
     
@@ -352,6 +360,7 @@ set_found_files :: proc() {
     clear_found_files()
     
     candidates := make([dynamic]string)
+    // dont iterate clean, since they're appended into found files
     defer delete(candidates)
 
     dirs_searched := 0
@@ -371,13 +380,24 @@ set_found_files :: proc() {
     }
     
     queue := make([dynamic]string)
-    defer delete(queue)
+    defer {
+        for elem in queue {
+            delete(elem)
+        }
+        
+        delete(queue)
+    }
     
-    append_elem(&queue, search_dir)
+    append_elem(&queue, strings.clone(search_dir))
 
     for len(queue) > 0 && dirs_searched < 25 && file_index < 2000 {
         dir := queue[0]
-        ordered_remove(&queue, 0)
+        
+        defer {
+            delete(queue[0])
+            ordered_remove(&queue, 0)
+        }
+        
         dirs_searched += 1
 
         fd, err := os.open(dir)
@@ -389,7 +409,7 @@ set_found_files :: proc() {
         defer delete(hits)
         
         defer for file in hits {
-            delete(file.fullpath)
+            os.file_info_delete(file)
         }
         
         for hit in hits {
@@ -423,6 +443,8 @@ set_found_files :: proc() {
 
 @(private="package")
 browser_append_to_search_term :: proc(key: rune) {
+    context = global_context
+    
     if attempting_file_deletion {
         return
     }
@@ -435,6 +457,7 @@ browser_append_to_search_term :: proc(key: rune) {
     append_elems(&buf, ..runes)
     append_elem(&buf, key)
 
+    if search_term != "" do delete(search_term)
     search_term = utf8.runes_to_string(buf[:])
     
     // NOTE: disabled because annoying. pls no renable

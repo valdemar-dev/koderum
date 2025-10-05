@@ -18,6 +18,12 @@ generate_highlight_string :: proc(
 ) -> string {
     start_byte_offset := compute_byte_offset(active_buffer, start_line, start_char)
     end_byte_offset := compute_byte_offset(active_buffer, end_line, end_char)
+    
+    if (start_byte_offset == -1 || end_byte_offset == -1) {
+        fmt.println("Failed to compute byte offset in generate_highlight_string due to invalid byte positions.")
+        
+        return strings.clone("ERR: INVALID_BYTE_POSITION")
+    }
 
     if start_byte_offset > end_byte_offset {
         temp := start_byte_offset

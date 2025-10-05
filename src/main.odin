@@ -11,6 +11,7 @@ import "core:strings"
 import "core:time"
 import "core:thread"
 import "core:os"
+import ts "../../odin-tree-sitter"
 
 target_fps :: 144.0
 target_frame_time :: 1.0 / target_fps
@@ -225,7 +226,19 @@ main :: proc() {
             continue
         }
     }
+    
+    delete(default_cwd)
+    delete(cwd)
 
+    for buffer in buffers {
+        for &line in buffer.lines {
+            clean_line(&line)
+        }
+
+        delete(buffer.content)
+        delete(buffer.lines^)
+    }
+    
     clear_fonts()
 
     delete_rect_cache(&rect_cache)
@@ -233,15 +246,19 @@ main :: proc() {
 
     thread.terminate(update_thread, 9)
     thread.terminate(message_thread, 9)
+    if set_found_files_thread != nil do thread.terminate(set_found_files_thread, 9)
 
     thread.destroy(update_thread)
     thread.destroy(message_thread)
-
+    if set_found_files_thread != nil do thread.destroy(set_found_files_thread)
+    
     reset_rect_cache(&rect_cache)
     
     reset_completion_hits()
     delete(completion_hits)
-       
+    
+    clear_found_files()
+    
     for key, server in active_language_servers {
         for type in server.token_types {
             delete(type)
@@ -251,9 +268,19 @@ main :: proc() {
             delete(mod)
         }
         
+        if server.ts_parser != nil {
+            ts.parser_delete(server.ts_parser)
+        }
+        
         delete(server.completion_trigger_runes)
         delete(server.token_types)
         delete(server.token_modifiers)
+    }
+    
+    for key, language in languages {
+        delete(language.ts_query_src)
+        
+        ts.language_delete(language.ts_language^)
     }
     
     for notification in notification_queue {
@@ -266,20 +293,11 @@ main :: proc() {
     
     delete(notification_queue)
         
-    for buffer in buffers {
-        for &line in buffer.lines {
-            clean_line(&line)
-        }
-
-        delete(buffer.content)
-        delete(buffer.lines^)
-    }
 
     for dir in search_ignored_dirs {
         delete(dir)
     }
 
-    delete(default_cwd)
     delete(font_list)
     delete(delimiter_runes)
     delete(search_ignored_dirs)

@@ -48,7 +48,7 @@ init :: proc() {
     }
     
     if default_cwd != "" {
-        cwd = default_cwd
+        cwd = strings.clone(default_cwd)
     } else {
         cwd = os.get_current_directory()
     }
