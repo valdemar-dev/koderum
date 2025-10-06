@@ -476,9 +476,6 @@ set_found_files :: proc() {
             os.file_info_delete(file)
         }
         
-        fmt.println(dir)
-        fmt.println(glob)
-        
         for hit in hits {
             if glob == "." || strings.contains(hit.name, glob) {
                 if hit.is_dir {
