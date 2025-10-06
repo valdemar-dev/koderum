@@ -132,6 +132,9 @@ escape = escape
 [quits the program]
 exit = f10
 
+[ctrl + key required]
+file_browser_toggle_expand_folders = e
+
 [this requires ctrl + key]
 toggle_terminal = t
 

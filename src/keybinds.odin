@@ -85,6 +85,8 @@ KODERUM_KEY :: enum {
     ESCAPE,
     EXIT,
     
+    FILE_BROWSER_TOGGLE_EXPAND_FOLDERS,
+    
     /*
         non-configurable,
         might be in the future though
@@ -205,6 +207,8 @@ check_for_keybind :: proc(option_name: string, value: string) -> (do_continue: b
         mapped_keybinds[.ESCAPE] = key
     case "exit":
         mapped_keybinds[.EXIT] = key    
+    case "file_browser_toggle_expand_folders":
+        mapped_keybinds[.FILE_BROWSER_TOGGLE_EXPAND_FOLDERS] = key
     }
     
     return do_continue

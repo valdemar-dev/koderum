@@ -8,6 +8,7 @@ import "core:fmt"
 import "core:math"
 import "core:unicode/utf8"
 import "vendor:glfw"
+import "core:sort";
 
 show_browser_view := false
 
@@ -21,8 +22,14 @@ bg_rect : rect
 @(private="package")
 cwd : string
 
+FoundFile :: struct {
+    // owned memory, delete later
+    fullpath: string,
+    is_folder: bool,
+}
+
 @(private="package")
-found_files : [dynamic]string
+found_files : [dynamic]FoundFile
 
 @(private="package")
 cached_dirs : map[string][]os.File_Info
@@ -47,6 +54,13 @@ change_dir :: proc(dir: string) {
     set_found_files()
 
     return
+}
+
+expand_folders := false
+toggle_expand :: proc() {
+    expand_folders = !expand_folders
+    
+    set_found_files()
 }
 
 attempting_file_deletion : bool = false
@@ -85,24 +99,32 @@ make_directory_recursive :: proc(path: string, mode: u32 = 0o775) -> os.Error {
 handle_browser_input :: proc() {
     context = global_context
     
+    if (is_key_pressed(mapped_keybinds[.FILE_BROWSER_TOGGLE_EXPAND_FOLDERS])) && is_key_down(glfw.KEY_LEFT_CONTROL) {
+        fmt.println("bruh")
+    
+        toggle_expand()
+    
+        return
+    }
+    
     if attempting_file_deletion {
         if (is_key_pressed(glfw.KEY_ENTER) && is_key_down(glfw.KEY_LEFT_CONTROL)) {
             target := item_offset
 
             file := found_files[target]
             
-            if os.exists(file) == false {
+            if os.exists(file.fullpath) == false {
                 return
             }
 
-            if os.is_dir(file) {
-                err := os.remove_directory(file)
+            if os.is_dir(file.fullpath) {
+                err := os.remove_directory(file.fullpath)
 
                 if err != os.General_Error.None {
                     return
                 }
             } else {
-                err := os.remove(file)
+                err := os.remove(file.fullpath)
 
                 if err != os.General_Error.None {
                     create_alert(
@@ -219,11 +241,10 @@ handle_browser_input :: proc() {
 
         old := found_files[item_offset]
 
-        renaming_file_name = strings.clone(old)
+        renaming_file_name = strings.clone(old.fullpath)
         
         delete(search_term)
-        
-        search_term = strings.clone(old)
+        search_term = strings.clone(old.fullpath)
 
         return
     }
@@ -239,7 +260,6 @@ handle_browser_input :: proc() {
             return
         } else {
             delete(search_term)
-            
             search_term = strings.concatenate({
                 dir,
                 dir != "/" ? "/" : "",
@@ -322,8 +342,7 @@ handle_browser_input :: proc() {
             toggle_browser_view()
             open_file(search_term)
         }
-
-
+        
         return
     }
 
@@ -334,10 +353,10 @@ handle_browser_input :: proc() {
 
         target := item_offset
 
-        if os.is_dir(found_files[target]) {        
+        if os.is_dir(found_files[target].fullpath) {        
             delete(search_term)
             search_term = strings.concatenate({
-                found_files[target], "/",
+                found_files[target].fullpath, "/",
             })
         
             set_found_files()
@@ -345,7 +364,7 @@ handle_browser_input :: proc() {
             return
         }
 
-        open_file(found_files[target])
+        open_file(found_files[target].fullpath)
         toggle_browser_view()
         
         return
@@ -390,7 +409,7 @@ clear_found_files :: proc() {
     context = global_context
     
     for file in found_files {
-        delete(file)
+        delete(file.fullpath)
     }    
     
     clear(&found_files)
@@ -401,9 +420,12 @@ set_found_files :: proc() {
 
     clear_found_files()
     
-    candidates := make([dynamic]string)
+    candidates := make([dynamic]FoundFile)
     // dont iterate clean, since they're appended into found files
     defer delete(candidates)
+    
+    candidate_dirs := make([dynamic]FoundFile)
+    defer delete(candidate_dirs)
 
     dirs_searched := 0
     file_index := 0
@@ -454,18 +476,27 @@ set_found_files :: proc() {
             os.file_info_delete(file)
         }
         
+        fmt.println(dir)
+        fmt.println(glob)
+        
         for hit in hits {
-            if len(glob) < 0 || strings.contains(hit.name, glob) {
-                if hit.is_dir || hit.fullpath == search_term {
-                    inject_at(&candidates, 0, strings.clone(hit.fullpath))
+            if glob == "." || strings.contains(hit.name, glob) {
+                if hit.is_dir {
+                    append_elem(&candidate_dirs, FoundFile{
+                        fullpath=strings.clone(hit.fullpath),
+                        is_folder=true,
+                    })
                 } else {
-                    append_elem(&candidates, strings.clone(hit.fullpath))
+                    append_elem(&candidates, FoundFile{
+                        fullpath=strings.clone(hit.fullpath),
+                        is_folder=false,
+                    })
                 }
             }
             
             file_index += 1
             
-            if hit.is_dir {
+            if hit.is_dir && expand_folders {
                 skip := false
                 for ign in search_ignored_dirs {
                     if hit.name == ign {
@@ -480,6 +511,12 @@ set_found_files :: proc() {
         }
     }
     
+    /*
+    sort.quick_sort(candidate_dirs[:])
+    sort.quick_sort(candidates[:])
+    */
+    
+    append(&found_files, ..candidate_dirs[:])
     append(&found_files, ..candidates[:])
 }
 
@@ -772,7 +809,8 @@ draw_browser_view :: proc() {
                 font_size,
                 strings.concatenate({
                     index == start_idx ? "> " : "",
-                    found_file[len(dir):]
+                    found_file.is_folder ? "\uf07c  " : "\uf15c  ",
+                    found_file.fullpath[len(dir):]
                 }, context.temp_allocator),
                 start_z + 1,
                 true,
