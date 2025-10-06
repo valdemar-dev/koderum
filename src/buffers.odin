@@ -798,8 +798,7 @@ draw_text_buffer :: proc() {
     
     line_height := (ascender - descender)
     
-    sb := strings.builder_make()
-    defer strings.builder_destroy(&sb)
+    sb := strings.builder_make(context.temp_allocator)
     
     strings.write_int(&sb, len(active_buffer.lines))
 
