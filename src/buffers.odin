@@ -784,6 +784,8 @@ draw_image_buffer :: proc(ext: string) {
 }
 
 draw_text_buffer :: proc() {
+    context = global_context
+    
     buffer_lines := active_buffer.lines
     
     font_size := math.round_f32(font_base_px * buffer_text_scale)
@@ -799,7 +801,7 @@ draw_text_buffer :: proc() {
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
     
-    strings.write_int(&sb, len(buffer_lines))
+    strings.write_int(&sb, len(active_buffer.lines))
 
     highest_line_string := strings.to_string(sb)
 

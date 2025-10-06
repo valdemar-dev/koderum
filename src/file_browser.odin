@@ -175,7 +175,19 @@ handle_browser_input :: proc() {
             existing_buffer := get_buffer_by_name(renaming_file_name)
             
             if existing_buffer != nil {
-                (&existing_buffer)^.file_name = search_term
+                delete(existing_buffer.file_name)
+                existing_buffer.file_name = strings.clone(search_term)
+                
+                existing_buffer.ext = fp.ext(search_term)
+                
+                file_info, lstat_error := os.lstat(search_term)
+            
+                if lstat_error != os.General_Error.None {
+                    return
+                }
+                
+                os.file_info_delete(existing_buffer.info)
+                existing_buffer.info = file_info
             }
             
             os.rename(renaming_file_name, search_term)
@@ -323,6 +335,7 @@ handle_browser_input :: proc() {
         target := item_offset
 
         if os.is_dir(found_files[target]) {        
+            delete(search_term)
             search_term = strings.concatenate({
                 found_files[target], "/",
             })
