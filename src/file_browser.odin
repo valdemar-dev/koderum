@@ -508,13 +508,23 @@ set_found_files :: proc() {
         }
     }
     
-    /*
-    sort.quick_sort(candidate_dirs[:])
-    sort.quick_sort(candidates[:])
-    */
+    compare :: proc(a,b: FoundFile) -> int {
+        return sort.compare_strings(a.fullpath, b.fullpath)
+    }
     
-    append(&found_files, ..candidate_dirs[:])
-    append(&found_files, ..candidates[:])
+    if expand_folders == false {
+        sort.quick_sort_proc(candidate_dirs[:], compare)
+        sort.quick_sort_proc(candidates[:], compare)
+        
+        append(&found_files, ..candidate_dirs[:])
+        append(&found_files, ..candidates[:])
+    } else {
+        append(&found_files, ..candidate_dirs[:])
+        append(&found_files, ..candidates[:])
+        
+        sort.quick_sort_proc(found_files[:], compare)
+    }
+    
 }
 
 @(private="package")
