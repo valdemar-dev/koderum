@@ -185,7 +185,8 @@ handle_browser_input :: proc() {
             concat := strings.concatenate({
                 cwd, "/",
             })
-
+            
+            if search_term != "" do delete(search_term)
             search_term = concat
 
             set_found_files()
@@ -193,10 +194,35 @@ handle_browser_input :: proc() {
             return
         }
 
-        if is_key_pressed(glfw.KEY_ENTER) {
+        if is_key_pressed(glfw.KEY_ENTER) {            
+            rename_err := os.rename(renaming_file_name, search_term)
+            
+            if rename_err != os.ERROR_NONE {
+                str := os.error_string(rename_err)
+                
+                msg := strings.concatenate({
+                    "Encountered an error: '",
+                    str,
+                    "'.",
+                })
+                
+                defer delete(msg)
+                
+                create_alert(
+                    "Failed to rename file.",
+                    msg,
+                    10,
+                    context.allocator,
+                )
+                
+                return
+            }
+            
             existing_buffer := get_buffer_by_name(renaming_file_name)
             
             if existing_buffer != nil {
+                existing_buffer.is_saved = false
+                
                 delete(existing_buffer.file_name)
                 existing_buffer.file_name = strings.clone(search_term)
                 
@@ -212,8 +238,6 @@ handle_browser_input :: proc() {
                 existing_buffer.info = file_info
             }
             
-            os.rename(renaming_file_name, search_term)
-
             attempting_rename = false
 
             dir := fp.dir(search_term)
@@ -221,7 +245,7 @@ handle_browser_input :: proc() {
 
             delete_key(&cached_dirs, dir)
 
-            delete(search_term)
+            if search_term != "" do delete(search_term)
             search_term = strings.concatenate({dir, "/"})
 
             set_found_files()
@@ -243,7 +267,7 @@ handle_browser_input :: proc() {
 
         renaming_file_name = strings.clone(old.fullpath)
         
-        delete(search_term)
+        if search_term != "" do delete(search_term)
         search_term = strings.clone(old.fullpath)
 
         return
@@ -259,7 +283,7 @@ handle_browser_input :: proc() {
         if dir == "." {
             return
         } else {
-            delete(search_term)
+            if search_term != "" do delete(search_term)
             search_term = strings.concatenate({
                 dir,
                 dir != "/" ? "/" : "",
@@ -545,19 +569,6 @@ browser_append_to_search_term :: proc(key: rune) {
 
     if search_term != "" do delete(search_term)
     search_term = utf8.runes_to_string(buf[:])
-    
-    // NOTE: disabled because annoying. pls no renable
-    /*
-    if os.is_dir(search_term) {
-        last_char := search_term[len(search_term)-1:]
-
-        if last_char != "/" && last_char != "." {
-            search_term = strings.concatenate({
-                search_term, "/",
-            })
-        }
-    }
-    */
     
     set_found_files()
 

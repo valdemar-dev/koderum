@@ -2444,7 +2444,7 @@ array_is_equal :: proc(a, b: []rune) -> bool {
 
 @(private="package")
 get_buffer_by_name :: proc(file_name: string) -> ^Buffer {
-    for buffer in buffers {
+    for &buffer in buffers {
         if buffer.file_name == file_name {
             return buffer
         }
