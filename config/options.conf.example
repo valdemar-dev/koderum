@@ -111,6 +111,7 @@ set_cwd = s
 delete_file = d
 rename_file = f
 create_file = g
+go_up_directory = u
 
 [ctrl + key = paste from clipboard]
 paste = p
@@ -137,6 +138,7 @@ file_browser_toggle_expand_folders = e
 
 [this requires ctrl + key]
 toggle_terminal = t
+
 
 enter_terminal_insert_mode = i
 exit_terminal_insert_mode = escape

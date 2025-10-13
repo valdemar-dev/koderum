@@ -1441,35 +1441,6 @@ decode_semantic_tokens :: proc(buffer: ^Buffer, data: []i32, token_types: []stri
     return tokens
 }
 
-/*
-set_buffer_tokens :: proc() {
-    if active_language_server == nil {
-        return
-    }
-     
-    when ODIN_DEBUG {
-        start := time.now()
-        prev := start
-    }
-    
-    start_version := active_buffer.version 
-    
-    sync.lock(&tree_mutex)
-
-    new_tree := parse_tree(
-        active_buffer.first_drawn_line,
-        active_buffer.last_drawn_line,
-        active_buffer,
-    )
-
-    ts.tree_delete(active_buffer.previous_tree)
-    
-    active_buffer.previous_tree = new_tree
-    
-    sync.unlock(&tree_mutex)
-}
-*/
-
 set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
     context = global_context
     
@@ -2211,6 +2182,7 @@ go_to_definition :: proc() {
                 
                 go_to_line(int(data.line), int(data.char))
                 
+                delete(data.name)
                 free(raw_data)
             },
             data=data,

@@ -6,6 +6,7 @@ import "core:strings"
 import "vendor:glfw"
 import "core:unicode/utf8"
 import ft "../../alt-odin-freetype"
+import fp "core:path/filepath"
 
 status_bar_rect : rect
 
@@ -124,6 +125,9 @@ draw_ui :: proc() {
     case .HELP:
         mode_string = "Help"
         mode_text_color = TOKEN_COLOR_02
+    case .VIEW_OPEN_BUFFERS:
+        mode_string = "View Open Buffers"
+        mode_text_color = TOKEN_COLOR_04
     }
     
     // Draw Input Mode
@@ -234,11 +238,29 @@ draw_ui :: proc() {
     
     // Draw Current File
     if active_buffer != nil {
-        file_name := active_buffer.is_saved ? active_buffer.info.name : strings.concatenate({ active_buffer.info.name, " - Unsaved", }, context.temp_allocator)
+        /*
+            kind of a "name" of the cwd. 
+            if we're in /home/user/programming/my-project,
+            we assume their "project name" is my-project
+        */
+        cwd_name := fp.base(cwd)
+        
+        rel_path, ok := fp.rel(cwd, active_buffer.file_name)
+        
+        defer delete(rel_path)
+        
+        file_name := strings.concatenate({
+            "\uf07c ", cwd_name, " > ",
+            rel_path
+        })
+        
+        defer delete(file_name)
+        
+        content := active_buffer.is_saved ? file_name : strings.concatenate({ "Unsaved -", file_name, }, context.temp_allocator)
+        
+        content_size := measure_text(normal_text, content)
 
-        file_name_size := measure_text(normal_text, file_name)
-
-        half_offset := file_name_size.x / 2
+        half_offset := content_size.x / 2
         
         padding : f32 = small_text / 2
 
@@ -251,7 +273,7 @@ draw_ui :: proc() {
             pos,
             TEXT_MAIN,
             normal_text,
-            file_name,
+            content,
             ui_z_index + 5,
         )
 
@@ -261,8 +283,8 @@ draw_ui :: proc() {
             bg_rect := rect{
                 pos.x - padding * 2,
                 pos.y - padding,
-                file_name_size.x + padding * 4,
-                file_name_size.y + padding * 2,
+                content_size.x + padding * 4,
+                content_size.y + padding * 2,
             }
             
             add_rect(&rect_cache,

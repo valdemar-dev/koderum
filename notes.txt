@@ -5,6 +5,8 @@ reminders:
 
 todo:
     - IMPORTANT !! make set_mode() use lookups to translate glfw keys into runes
+    
+    - please make sure to clear input undo buffer on close file
 
 
     - add variable font weights

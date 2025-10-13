@@ -44,6 +44,7 @@ InputMode :: enum {
     GREP_SEARCH,
     FIND_AND_REPLACE,
     HELP,
+    VIEW_OPEN_BUFFERS,
 }
 
 @(private="package")

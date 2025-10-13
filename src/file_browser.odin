@@ -443,6 +443,8 @@ set_found_files :: proc() {
     context = global_context 
 
     clear_found_files()
+
+    item_offset = 0
     
     candidates := make([dynamic]FoundFile)
     // dont iterate clean, since they're appended into found files
@@ -728,6 +730,23 @@ draw_browser_view :: proc() {
     {
         padding := small_text
         
+        msg := strings.concatenate({
+            "Ctrl + [ ",
+            Human_Readable_Keys[mapped_keybinds[.MOVE_DOWN]],
+            Human_Readable_Keys[mapped_keybinds[.MOVE_UP]],
+            ": Scroll, ",
+            Human_Readable_Keys[mapped_keybinds[.DELETE_FILE]],
+            ": Delete, ",
+            Human_Readable_Keys[mapped_keybinds[.CREATE_FILE]],
+            ": Create, ",
+            Human_Readable_Keys[mapped_keybinds[.RENAME_FILE]],
+            ": Rename, ",
+            Human_Readable_Keys[mapped_keybinds[.GO_UP_DIRECTORY]],
+            ": Go Up ]",            
+        })
+        
+        defer delete(msg)
+        
         size := add_text_measure(
             &text_rect_cache,
             vec2{
@@ -736,7 +755,7 @@ draw_browser_view :: proc() {
             },
             TEXT_DARKER,
             small_text,
-            "Ctrl + [ D: Delete, JK: Scroll, F: Rename, G: Create, U: Up ]",
+            msg,
             start_z + 2,
             false,
             bg_rect.width - padding * 2,
@@ -827,7 +846,7 @@ draw_browser_view :: proc() {
                 font_size,
                 strings.concatenate({
                     index == start_idx ? "> " : "",
-                    found_file.is_folder ? "\uf07c  " : "\uf15c  ",
+                    found_file.is_folder ? "\uf07c " : "\uf15c ",
                     found_file.fullpath[len(dir):]
                 }, context.temp_allocator),
                 start_z + 1,
