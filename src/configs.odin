@@ -11,7 +11,8 @@ import fp "core:path/filepath"
 import "core:unicode/utf8"
 import "core:dynlib"
 
-MAX_UNDO_COUNT :: 100
+// increased to combat inserts counting as *1*
+MAX_UNDO_COUNT :: 500
 
 font_base_px : f32
 

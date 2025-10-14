@@ -256,7 +256,7 @@ draw_ui :: proc() {
         
         defer delete(file_name)
         
-        content := active_buffer.is_saved ? file_name : strings.concatenate({ "Unsaved -", file_name, }, context.temp_allocator)
+        content := active_buffer.is_saved ? file_name : strings.concatenate({ "Unsaved - ", file_name, }, context.temp_allocator)
         
         content_size := measure_text(normal_text, content)
 

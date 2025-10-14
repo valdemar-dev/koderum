@@ -1295,7 +1295,7 @@ init_lsp_server :: proc(buffer: ^Buffer, server: ^LanguageServer) {
 
 lsp_handle_file_open :: proc(buffer: ^Buffer) {
     context = global_context
-    
+        
     set_buffer_language_server(buffer)
     
     if buffer.language_server == nil {
@@ -1444,6 +1444,9 @@ decode_semantic_tokens :: proc(buffer: ^Buffer, data: []i32, token_types: []stri
 set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
     context = global_context
     
+    sync.ticket_mutex_lock(&active_buffer_mutex)
+    defer sync.ticket_mutex_unlock(&active_buffer_mutex)
+    
     sync.lock(&tree_mutex)
     defer sync.unlock(&tree_mutex)
     
@@ -1487,7 +1490,6 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
     new_tree := parse_tree(0, len(buffer.lines), buffer, buffer_content)
     
     ts.tree_delete(buffer.previous_tree)
-    
     buffer^.previous_tree = new_tree
 
     handle_response :: proc(response: json.Object, raw_data: rawptr) {
@@ -1504,6 +1506,11 @@ set_buffer_tokens_threaded :: proc(buffer: ^Buffer, buffer_content: cstring) {
             
             return
         }
+        
+        sync.ticket_mutex_lock(&active_buffer_mutex)
+        defer sync.ticket_mutex_unlock(&active_buffer_mutex)
+
+        if data.buffer == nil do return
         
         if data.buffer.language_server == nil do return
         
@@ -1586,7 +1593,10 @@ notify_server_of_change :: proc(
         redo_stack := redo_stack_override == nil ? &active_buffer.redo_stack : redo_stack_override
         
         if end_byte < start_byte {
-            fmt.println("FUCKKK")
+            // this is really not meant to happen
+            // actually it *cant* happen.
+            // but maybe it can....?
+            return
         }
         
         append(undo_stack, BufferChange{
@@ -1596,13 +1606,12 @@ notify_server_of_change :: proc(
             start_char,
             end_line,
             end_char,
+            // evil.
             transmute([]u8)(strings.clone(string(buffer.content[start_byte:end_byte]))),
             transmute([]u8)(strings.clone(string(new_text))),
             0,
             0,
         })
-        
-        fmt.println("inserting to stack, notifying change.")
         
         amnt_over := len(undo_stack) - MAX_UNDO_COUNT
         

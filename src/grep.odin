@@ -82,13 +82,33 @@ handle_grep_input :: proc() {
         hit := grep_found_files[target]
         
         name := strings.concatenate({ cwd, "/", hit.file_name, })
-        defer delete(name)
         
-        open_file(name)
-        
-        toggle_grep_view()
-        
-        go_to_line(hit.line-1, 0)
+        PolyData :: struct {
+            name: string,
+            line: int,
+        }
+    
+        data := new(PolyData)
+        data^ = PolyData{
+            name,
+            hit.line-1,
+        }
+    
+        append(&update_tasks, Task{
+            func=proc(raw_data: rawptr) {
+                data := cast(^PolyData)raw_data
+                
+                open_file(data.name)
+            
+                toggle_grep_view()
+                
+                go_to_line(data.line, 0)        
+                
+                delete(data.name)
+                free(raw_data)
+            },
+            data=data,
+        })
         
         return
     }
@@ -171,7 +191,7 @@ set_found_files_threaded :: proc(thread: ^thread.Thread) {
 
     clear(&grep_found_files)
     
-    if search_term == "" {
+    if len(search_term) < 2 {
         return
     }
     
@@ -427,7 +447,7 @@ draw_grep_view :: proc() {
         
         max_width := bg_rect.width - padding * 2
         
-        if len(search_term) == 0 {
+        if len(search_term) < 2 {
             add_text(&rect_cache,
                 vec2{
                     bg_rect.x + padding,

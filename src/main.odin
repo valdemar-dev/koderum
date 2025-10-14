@@ -11,6 +11,7 @@ import "core:strings"
 import "core:time"
 import "core:thread"
 import "core:os"
+import "core:sync"
 import ts "../../odin-tree-sitter"
 
 target_fps :: 144.0
@@ -52,7 +53,7 @@ toggle_fullscreen :: proc() {
                               stored_width, stored_height,
                               0)
     }
-
+    
     fullscreen = !fullscreen
 }
 
@@ -107,8 +108,6 @@ parse_args :: proc() {
 track: mem.Tracking_Allocator
 global_context: runtime.Context
 
-cleanup_procedures : [dynamic]proc()
-
 main :: proc() {
     fmt.println("Loading..")
     
@@ -142,8 +141,8 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
-
-    global_context = context
+	
+	global_context = context
 
     parse_args()
     
@@ -158,15 +157,19 @@ main :: proc() {
     last_fps_measurement_time := glfw.GetTime()
 
     glfw.SwapBuffers(window)
-
+    
+    
     for !glfw.WindowShouldClose(window) {
+        sync.ticket_mutex_lock(&active_buffer_mutex)
+        
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
         local_fps_measurement_time := current_time - last_fps_measurement_time
 
         if local_frame_time < target_frame_time {
             time.sleep(time.Duration((target_frame_time - local_frame_time) * f64(time.Second)))
-            
+            sync.ticket_mutex_unlock(&active_buffer_mutex)
+        
             continue
         }
         
@@ -204,7 +207,9 @@ main :: proc() {
         update_camera()
  
         render()
-
+        
+        sync.ticket_mutex_unlock(&active_buffer_mutex)
+        
         free_all(context.temp_allocator)
         cleanup()
         
@@ -292,7 +297,6 @@ main :: proc() {
     }
     
     delete(notification_queue)
-        
 
     for dir in search_ignored_dirs {
         delete(dir)
@@ -328,10 +332,6 @@ main :: proc() {
             free(alert, alert.allocator)
         }
         clear(&alert_queue)
-    }
-    
-    for cleanup_proc in cleanup_procedures {
-        cleanup_proc()
     }
 }
 

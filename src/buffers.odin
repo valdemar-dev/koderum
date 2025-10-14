@@ -174,6 +174,9 @@ IndentRule :: struct {
 buffers : [dynamic]^Buffer
 
 @(private="package")
+active_buffer_mutex : sync.Ticket_Mutex
+
+@(private="package")
 active_buffer : ^Buffer
 
 SearchHit :: struct{
@@ -448,7 +451,7 @@ next_buffer :: proc() {
 
     for buffer, index in buffers {
         if set_next_as_current == true {
-            open_file(buffer.file_name)
+            task_open_file(buffer.file_name)
 
             break
         } else if buffer.file_name == active_buffer.file_name {
@@ -470,7 +473,7 @@ set_buffer :: proc(number: int) {
     reset_completion_hits()
 
     buf := buffers[idx]
-    open_file(buf.file_name)
+    task_open_file(buf.file_name)
 }
 
 prev_buffer :: proc() {
@@ -482,7 +485,7 @@ prev_buffer :: proc() {
 
     #reverse for buffer, index in buffers {
         if set_next_as_current == true {
-            open_file(buffer.file_name)
+            task_open_file(buffer.file_name)
 
             break
         } else if buffer.file_name == active_buffer.file_name {
@@ -617,12 +620,6 @@ draw_buffer_line :: proc(
     true_font_height := (ascender - descender)
 
     line_height := true_font_height
-
-    if line_pos.y < 0 {
-        pen.y = pen.y + line_height
-
-        return pen
-    }
 
     chars := string(buffer_line.characters[:])
 
@@ -855,7 +852,7 @@ draw_text_buffer :: proc() {
             break
         }
         
-        if line_pos.y < 0 {
+        if (line_pos.y + line_height) < 0 {
             pen.y += line_height
             continue
         }
@@ -1075,7 +1072,36 @@ draw_autocomplete :: proc() {
 }
 
 @(private="package")
+task_open_file :: proc(file_name: string) {
+    context = global_context
+    
+    PolyData :: struct {
+        name: string,
+    }
+
+    data := new(PolyData)
+    data^ = PolyData{
+        strings.clone(file_name)
+    }
+
+    append(&update_tasks, Task{
+        func=proc(raw_data: rawptr) {
+            data := cast(^PolyData)raw_data
+            
+            open_file(data.name)
+            
+            delete(data.name)
+            free(raw_data)
+        },
+        data=data,
+    })
+}
+
+@(private="package")
 open_file :: proc(file_name: string) {
+    sync.ticket_mutex_lock(&active_buffer_mutex)
+    defer sync.ticket_mutex_unlock(&active_buffer_mutex)
+    
     context = global_context
     
     if active_buffer != nil {
@@ -1110,8 +1136,6 @@ open_file :: proc(file_name: string) {
                 context = global_context
                 
                 data := cast(^PolyData)raw_data
-            
-                context = global_context
                 
                 lsp_handle_file_open(data.buffer)
                 
@@ -1204,7 +1228,29 @@ open_file :: proc(file_name: string) {
     
     set_buffer_cursor_pos(0,0)
 
-    thread.run_with_poly_data(active_buffer, lsp_handle_file_open)
+    {
+        PolyData :: struct {
+            buffer: ^Buffer,
+        }
+    
+        data := new(PolyData)
+        data^ = PolyData{
+            active_buffer
+        }
+    
+        append(&update_tasks, Task{
+            func=proc(raw_data: rawptr) {
+                context = global_context
+                
+                data := cast(^PolyData)raw_data
+                
+                lsp_handle_file_open(data.buffer)
+                
+                free(raw_data)
+            },
+            data=data,
+        })
+    }
 }
 
 close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
@@ -1260,7 +1306,7 @@ close_file :: proc(buffer: ^Buffer) -> (ok: bool) {
         return true
     }
     
-    open_file(buffers[new_buffer_index].file_name)
+    task_open_file(buffers[new_buffer_index].file_name)
     
     return true
 }
@@ -1693,7 +1739,8 @@ handle_text_input :: proc() -> bool {
         if len(completion_hits) > 0 {
             reset_completion_hits()
         }
-        
+
+        /*        
         if len(active_buffer.insert_undo_stack) > 0 {
             fmt.println("adding ", len(active_buffer.insert_undo_stack), "changes to buffers undo stack")
             active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
@@ -1721,6 +1768,7 @@ handle_text_input :: proc() -> bool {
             clear(&active_buffer.insert_undo_stack)
             clear(&active_buffer.insert_redo_stack)
         }
+        */
         
         return false
     }
@@ -3064,7 +3112,7 @@ handle_buffer_input :: proc() -> bool {
         cached_file := buffers[cached_buffer_index]
         
         if cached_file.file_name != active_buffer.file_name {
-            open_file(cached_file.file_name)
+            task_open_file(cached_file.file_name)
         }
         
         set_buffer_cursor_pos(

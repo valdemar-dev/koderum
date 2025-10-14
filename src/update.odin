@@ -13,6 +13,7 @@ import "core:strings"
 import "core:mem"
 import "core:sort"
 import "core:net"
+import "core:sync"
 
 LSPRequest :: struct {
     id: string,
@@ -479,16 +480,16 @@ update :: proc(thread: ^thread.Thread) {
     for !glfw.WindowShouldClose(window) {
         current_time := glfw.GetTime()
         local_frame_time := current_time - last_time
-
+                
         if local_frame_time < target_frame_time {
             sleep_duration := (target_frame_time - local_frame_time) * f64(second)
             time.sleep(time.Duration(sleep_duration))
 
             continue
         }
-
+        
         last_time = current_time
 
-        update_state(current_time)
+        update_state(current_time)        
     }
 }

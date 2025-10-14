@@ -364,7 +364,7 @@ handle_browser_input :: proc() {
             delete_key(&cached_dirs, dir)
     
             toggle_browser_view()
-            open_file(search_term)
+            task_open_file(search_term)
         }
         
         return
@@ -388,7 +388,7 @@ handle_browser_input :: proc() {
             return
         }
 
-        open_file(found_files[target].fullpath)
+        task_open_file(found_files[target].fullpath)
         toggle_browser_view()
         
         return
