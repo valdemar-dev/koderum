@@ -45,10 +45,10 @@ ansi_basic_colors := [8]vec4{
     {0.1, 0.1, 0.1, 1.0},  // 0 black
     {1, 0.0, 0.0, 1.0},  // 1 red
     {0.0, 1, 0.0, 1.0},  // 2 green
-    {1, 1, 0, 1.0},  // 3 yellow
+    {0, 1, 1, 1.0},  // 3 yellow
     {0, 0.0, 1, 1.0},  // 4 blue
     {1, 0.0, 1, 1.0},  // 5 magenta
-    {0.0, 1.0, 1.0, 1.0},  // 6 cyan
+    {0.0, 0.5, 0.5, 1.0},  // 6 cyan
     {1, 1, 1, 1.0},  // 7 white
 }
 
@@ -1025,15 +1025,15 @@ erase_line :: proc(params: [dynamic]int, index: int) {
     switch mode {
     case 0:
         for c in terminal.cursor_col..<cell_count_x {
-            buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     case 1:
         for c in 0..=terminal.cursor_col {
-            buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     case 2:
         for c in 0..<cell_count_x {
-            buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+            buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
         }
     }
 }
@@ -1053,7 +1053,7 @@ erase_screen :: proc(params: [dynamic]int, index: int) {
             row_idx := start_row_in_buf + r
             start_col := r == terminal.cursor_row ? terminal.cursor_col : 0
             for c in start_col..<cell_count_x {
-                buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     case 1:
@@ -1061,14 +1061,14 @@ erase_screen :: proc(params: [dynamic]int, index: int) {
             row_idx := start_row_in_buf + r
             end_col := r == terminal.cursor_row ? terminal.cursor_col : cell_count_x - 1
             for c in 0..=end_col {
-                buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     case 2:
         for r in 0..<cell_count_y {
             row_idx := start_row_in_buf + r
             for c in 0..<cell_count_x {
-                buf[row_idx][c] = Cell{' ', terminal.current_fg_color, terminal.current_bg_color}
+                buf[row_idx][c] = Cell{' ', default_fg_color^, default_bg_color^}
             }
         }
     }
@@ -1775,12 +1775,7 @@ set_graphics_rendition :: proc(params: [dynamic]int, index: int) {
         case 22:
             terminal.current_bold = false
         case 30..=37:
-            color_idx := p - 30
-            if terminal.current_bold {
-                terminal.current_fg_color = ansi_bright_colors[color_idx]
-            } else {
-                terminal.current_fg_color = ansi_basic_colors[color_idx]
-            }
+            terminal.current_fg_color = ansi_basic_colors[p - 30]
         case 40..=47:
             terminal.current_bg_color = ansi_basic_colors[p - 40]
         case 90..=97:
