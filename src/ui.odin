@@ -71,8 +71,8 @@ draw_ui :: proc() {
     margin := one_width_percentage * 10
 
     status_bar_rect = rect{
-        margin,
-        normal_text,
+        normal_text*2,
+        normal_text*1.5,
         fb_size.x - (margin * 2),
         f32(status_bar_height),
     }
@@ -130,6 +130,8 @@ draw_ui :: proc() {
         mode_text_color = TOKEN_COLOR_04
     }
     
+    mode_right : f32
+    
     // Draw Input Mode
     {
         size := add_text_measure(
@@ -174,6 +176,8 @@ draw_ui :: proc() {
             vec2{},
             ui_z_index + 1,
         )
+        
+        mode_right = border_rect.x + border_rect.width
     }
 
     // Draw Char History
@@ -181,7 +185,7 @@ draw_ui :: proc() {
         buf_data_string := utf8.runes_to_string(ui_sliding_buffer.data[:ui_sliding_buffer.count])
         defer delete(buf_data_string)
     
-        end_pos := status_bar_rect.x + status_bar_rect.width
+        end_pos := fb_size.x - (normal_text * 2)
     
         buf_data_string_size := measure_text(
             normal_text,
@@ -260,15 +264,13 @@ draw_ui :: proc() {
         
         content_size := measure_text(normal_text, content)
 
-        half_offset := content_size.x / 2
-        
         padding : f32 = small_text / 2
 
         pos := vec2{
-            status_bar_rect.x + (status_bar_rect.width / 2) - half_offset,
+            mode_right + (normal_text * 2),
             status_bar_rect.y,
         }
-                
+        
         add_text(&text_rect_cache,
             pos,
             TEXT_MAIN,
