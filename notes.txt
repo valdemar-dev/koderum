@@ -2,7 +2,6 @@ reminders:
     - THREAD SAFETY!!
     - SAFE THREAD
     - THREAD MUST BE SAFE FOR OPERATION MMM THREAD
-
 todo:
     - IMPORTANT !! make set_mode() use lookups to translate glfw keys into runes
     

@@ -33,8 +33,7 @@ render :: proc() {
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.Enable(gl.DEPTH_TEST)
-    gl.DepthFunc(gl.LESS)
-    
+    gl.DepthFunc(gl.LESS)    
     
     time := glfw.GetTime()
     frame_time = f32(time - prev_time)
@@ -681,8 +680,10 @@ add_code_text :: proc(
         if character == nil {
             // this should be .notdef?
             character = get_char_with_char_map(char_map, font_height, 0)
+            
+            // can be triggered by resize.
             if character == nil {
-                panic("no .notdef")
+                continue
             }
         }
         

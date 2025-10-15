@@ -407,8 +407,7 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
     if terminal_debug_mode {
         fmt.println("Terminal Debugger: Resizing Terminal")
     }
-    
-    
+        
     text := math.round_f32(font_base_px * normal_text_scale)
 
     error := ft.set_pixel_sizes(primary_font, 0, u32(text))
@@ -429,8 +428,8 @@ resize_terminal :: proc (index: int = current_terminal_idx) {
     cell_width = char.advance.x
     cell_height = ascender - descender
     
-    cell_count_x = int(math.round_f32(width / f32(cell_width)))
-    cell_count_y = int(math.round_f32(height / f32(cell_height)))
+    cell_count_x = max(int(math.round_f32(width / f32(cell_width))), 10)
+    cell_count_y = max(int(math.round_f32(height / f32(cell_height))), 10)
     
     width = f32(cell_width) * f32(cell_count_x)
     height = f32(cell_height) * f32(cell_count_y)
@@ -551,6 +550,7 @@ draw_terminal_emulator :: proc() {
     z_index: f32 = 100
     reset_rect_cache(&rect_cache)
     reset_rect_cache(&text_rect_cache)
+    
     
     terminal := terminals[current_terminal_idx]
     if terminal == nil do return
@@ -686,6 +686,9 @@ draw_terminal_emulator :: proc() {
                 current_bg = cell.bg_color
             }
         }
+        
+        draw_rects(&rect_cache)
+        reset_rect_cache(&rect_cache)
     
         // foreground/text runs
         run_start = 0
@@ -760,8 +763,8 @@ draw_terminal_emulator :: proc() {
         }
     }
     
-    draw_rects(&rect_cache)
     draw_rects(&text_rect_cache)
+    draw_rects(&rect_cache)
 }
 
 @(private="package")
@@ -1534,6 +1537,12 @@ handle_csi_seq :: proc(seq: string, index: int) -> (handled: bool) {
         insert_chars(n, index)
 
         return true
+    case 'X':
+        n := len(params) > 0 ? params[0] : 1
+        if n == 0 { n = 1 }
+        delete_chars(n, index)
+
+        return true
     case 'm':
         set_graphics_rendition(params, index)
 
@@ -1551,6 +1560,8 @@ handle_csi_seq :: proc(seq: string, index: int) -> (handled: bool) {
         terminal^.cursor_row = clamp(terminal^.stored_cursor_row, 0, cell_count_y - 1)
         terminal^.cursor_col = clamp(terminal^.stored_cursor_col, 0, cell_count_x - 1)
 
+        return true
+    case 'q':
         return true
     case 'c':
         ps := len(params) > 0 ? params[0] : 0

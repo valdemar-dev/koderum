@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strings"
 import ft "../../alt-odin-freetype"
 import "core:math"
+import "vendor:glfw"
 
 buffer_cursor_pos := vec2{}
 buffer_cursor_target_pos := vec2{}
@@ -20,6 +21,12 @@ has_cursor_moved : bool = false
 draw_cursor :: proc() {
     if active_buffer == nil {
         return
+    }
+    
+    if (math.sin(glfw.GetTime() * math.PI * 2) > 0) {
+        if input_mode == .COMMAND {
+            return
+        }
     }
     
     buffer_text := math.round_f32(font_base_px * buffer_text_scale)
