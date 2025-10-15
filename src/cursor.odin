@@ -18,12 +18,16 @@ cursor_height : f32
 
 has_cursor_moved : bool = false
 
+last_moved := glfw.GetTime()
+
 draw_cursor :: proc() {
     if active_buffer == nil {
         return
     }
     
-    if (math.sin(glfw.GetTime() * math.PI * 2) > 0) {
+    time_since_move := glfw.GetTime() - last_moved
+    
+    if (math.sin(time_since_move * math.PI * 2) > 0) && time_since_move > 1 {
         if input_mode == .COMMAND {
             return
         }
@@ -69,6 +73,8 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
         reset_completion_hits()
         constrain_scroll_to_cursor()
     }
+    
+    last_moved = glfw.GetTime()
     
     line := min(line, len(active_buffer.lines)-1)
     char_index := char_index
