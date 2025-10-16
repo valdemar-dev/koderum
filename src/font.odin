@@ -53,6 +53,8 @@ Character :: struct {
 FontSize :: f32
 CharacterCode :: u64
 
+PLANE_ZERO_MAX :: 65_536
+
 @(private="package")
 CharUvMap :: map[CharacterCode]int
 
