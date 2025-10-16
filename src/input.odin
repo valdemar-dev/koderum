@@ -143,6 +143,7 @@ handle_global_input :: proc() -> (continue_execution: bool = true) {
         
         if key.modifiers == CTRL_SHIFT {
             font_base_px = clamp(font_base_px - 1, 4, font_base_px)
+            refresh_character_maps()
             
             continue_execution = false
             

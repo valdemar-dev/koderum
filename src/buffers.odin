@@ -1212,9 +1212,9 @@ open_file :: proc(file_name: string) {
         chars := make([dynamic]u8)
         
         append_elems(&chars, ..transmute([]u8)line)
-
+        
         for r in line {
-            get_char(font_size, u64(r))
+            get_char_with_char_map(BUFFER_CHARACTER_MAP, font_size, u64(r))
         }
 
         append_elem(buffer_lines, BufferLine{
@@ -1979,7 +1979,7 @@ insert_into_buffer :: proc (key: rune) {
     
     // avoids ghost characters
     {
-        get_char(font_size, u64(key))
+        get_char_with_char_map(BUFFER_CHARACTER_MAP, font_size, u64(key))
         add_missing_characters()
     }
     
@@ -2877,7 +2877,7 @@ reload_buffer :: proc(buffer: ^Buffer) {
         append_elems(&chars, ..transmute([]u8)line)
 
         for r in line {
-            get_char(font_size, u64(r))
+            get_char_with_char_map(BUFFER_CHARACTER_MAP, font_size, u64(r))
         }
 
         append_elem(buffer_lines, BufferLine{
@@ -3470,13 +3470,13 @@ buffer_go_to_cursor_pos :: proc() {
     for r in string(line.characters[:]) {
         advance: f32
         if r == '\t' {
-            character := get_char(font_size, u64(' '))
+            character := get_char_with_char_map(BUFFER_CHARACTER_MAP, font_size, u64(' '))
             if character == nil {
                 continue
             }
             advance = (character.advance.x) * f32(tab_width)
         } else {
-            character := get_char(font_size, u64(r))
+            character := get_char_with_char_map(BUFFER_CHARACTER_MAP, font_size, u64(r))
             if character == nil {
                 continue
             }

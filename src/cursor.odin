@@ -35,8 +35,7 @@ draw_cursor :: proc() {
     
     buffer_text := math.round_f32(font_base_px * buffer_text_scale)
 
-    index := character_maps[buffer_text]
-    char_map := character_maps_array[index]
+    char_map := BUFFER_CHARACTER_MAP
 
     if char_map == nil {
         return
