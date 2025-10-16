@@ -216,8 +216,8 @@ init_window :: proc() {
     }
     
     window = glfw.CreateWindow(
-        640,
-        480,
+        1280,
+        720,
         "Koderum",
         nil,
         nil,

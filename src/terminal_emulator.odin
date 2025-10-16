@@ -686,10 +686,7 @@ draw_terminal_emulator :: proc() {
                 current_bg = cell.bg_color
             }
         }
-        
-        draw_rects(&rect_cache)
-        reset_rect_cache(&rect_cache)
-    
+            
         // foreground/text runs
         run_start = 0
         current_fg := row[0].fg_color
@@ -763,8 +760,9 @@ draw_terminal_emulator :: proc() {
         }
     }
     
-    draw_rects(&text_rect_cache)
     draw_rects(&rect_cache)
+    
+    draw_rects(&text_rect_cache)
 }
 
 @(private="package")
