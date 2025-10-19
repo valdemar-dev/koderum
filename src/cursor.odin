@@ -98,7 +98,7 @@ set_buffer_cursor_pos :: proc(line: int, char_index: int) {
     new_x : f32 = 0
 
 
-    char_map := get_char_map(buffer_text)
+    char_map := BUFFER_CHARACTER_MAP
 
     // looping through a string gives index as byte_index
     rune_index := 0
