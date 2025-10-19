@@ -236,6 +236,8 @@ measure_text :: proc (
     pen := highest
 
     line_height := font_height * 1.2
+    
+    char_map := get_char_map(font_height)
 
     for r,i in text {
         if r == '\n' {
@@ -246,7 +248,7 @@ measure_text :: proc (
             continue
         }
 
-        character := get_char(font_height, u64(r))
+        character := get_char_with_char_map(char_map, font_height, u64(r))
 
         if character == nil {
             continue
@@ -342,6 +344,8 @@ add_text :: proc(
 
     highest_x : f32
        
+    char_map := get_char_map(font_height)
+
     for r,i in text {
         defer if pen.x > highest_x {
             highest_x = pen.x
@@ -359,7 +363,7 @@ add_text :: proc(
         }
 
         if r == '\t' {
-            character := get_char(font_height, u64(' '))
+            character := get_char_with_char_map(char_map, font_height, u64(' '))
 
             if character == nil {
                 continue
@@ -371,30 +375,21 @@ add_text :: proc(
             continue
         }
 
-        character := get_char(font_height, u64(r))
+        character := get_char_with_char_map(char_map, font_height, u64(r))
 
         if character == nil {
             if draw_missing_glyphs == false {
                 continue
             }
 
-            character = get_char(font_height, u64(0))
+            character = get_char_with_char_map(char_map, font_height, u64(0))
 
             if character == nil {
                 continue
             }
         }
         
-        if font_height in char_uv_maps == false {
-            continue
-        }
-
-        index := char_uv_maps[font_height]
-
-        char_uv_map := char_uv_maps_array[index]
-
-        uvs_index := char_uv_map[u64(r)]
-        uvs := char_rects[uvs_index]
+        uvs := char_rects[character.uvs_index]
       
         height := f32(character.rows)
         width := f32(character.width)
@@ -687,18 +682,11 @@ add_code_text :: proc(
             }
         }
         
-        if font_height in char_uv_maps == false {
-            continue
-        }
-        
         if pen.x + character.advance.x > fb_size.x {
             break
         }
 
-        index := char_uv_maps[font_height]
-        char_uv_map := char_uv_maps_array[index]
-        uvs_index := char_uv_map[u64(r)]
-        uvs := char_rects[uvs_index]
+        uvs := char_rects[character.uvs_index]
 
         advance_amount := character.advance.x
         was_highlighted := process_highlights(
@@ -758,14 +746,7 @@ add_code_text :: proc(
                 continue
             }
 
-            if font_height in char_uv_maps == false {
-                continue
-            }
-
-            index := char_uv_maps[font_height]
-            char_uv_map := char_uv_maps_array[index]
-            uvs_index := char_uv_map[u64('_')]
-            uvs := char_rects[uvs_index]
+            uvs := char_rects[character.uvs_index]
 
             color : vec4
 

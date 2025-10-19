@@ -369,6 +369,7 @@ set_option :: proc(options: []string) {
     case "font_base_px":
         font_size := strconv.atof(value)
         font_base_px = f32(font_size)
+        refresh_character_maps()
     case "small_text_scale":
         font_size := strconv.atof(value)
         small_text_scale = f32(font_size)
@@ -416,10 +417,10 @@ set_option :: proc(options: []string) {
             normal_text := math.round_f32(font_base_px * normal_text_scale)
             buffer_text := math.round_f32(font_base_px * buffer_text_scale)
             
-            get_char(buffer_text, u64(r[0]))
-            get_char(big_text, u64(r[0]))
-            get_char(small_text, u64(r[0]))
-            get_char(normal_text, u64(r[0]))
+            get_char_with_char_map(BUFFER_CHARACTER_MAP, buffer_text, u64(r[0]))
+            get_char_with_char_map(LARGE_CHARACTER_MAP, big_text, u64(r[0]))
+            get_char_with_char_map(SMALL_CHARACTER_MAP, small_text, u64(r[0]))
+            get_char_with_char_map(NORMAL_CHARACTER_MAP, normal_text, u64(r[0]))
 
             delete(r)
         }
