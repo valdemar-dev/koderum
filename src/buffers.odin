@@ -1728,7 +1728,6 @@ determine_line_indent :: proc(line_num: int) -> int {
     }
 }
 
-
 @(private="package")
 handle_text_input :: proc() -> bool {
     line := &active_buffer.lines[buffer_cursor_line] 
@@ -1740,9 +1739,7 @@ handle_text_input :: proc() -> bool {
             reset_completion_hits()
         }
 
-        /*        
         if len(active_buffer.insert_undo_stack) > 0 {
-            fmt.println("adding ", len(active_buffer.insert_undo_stack), "changes to buffers undo stack")
             active_buffer.insert_undo_stack[len(active_buffer.insert_undo_stack[:]) - 1].undo_for = len(active_buffer.insert_undo_stack[:]) - 1
             active_buffer.insert_undo_stack[0].redo_for = len(active_buffer.insert_undo_stack[:]) - 1
             
@@ -1768,7 +1765,6 @@ handle_text_input :: proc() -> bool {
             clear(&active_buffer.insert_undo_stack)
             clear(&active_buffer.insert_redo_stack)
         }
-        */
         
         return false
     }
@@ -3392,6 +3388,7 @@ handle_go_to_line_input :: proc() {
         input_mode = .COMMAND
         
         if input_mode_return_callback != nil do input_mode_return_callback()
+        input_mode_return_callback = nil
 
         return
     }
